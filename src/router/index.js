@@ -32,6 +32,12 @@ const routes = [
         meta: { titleKey: 'nav.enrollClass' },
       },
       {
+        path: 'enroll-future',
+        name: 'enroll-future',
+        component: () => import('@/views/EnrollFutureView.vue'),
+        meta: { titleKey: 'nav.enrollFuture' },
+      },
+      {
         path: 'team/:id',
         name: 'team-detail',
         component: () => import('@/views/TeamDetailView.vue'),

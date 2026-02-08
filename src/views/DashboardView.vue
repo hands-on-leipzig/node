@@ -1,13 +1,56 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { listTeams, listClasses } from '@/services/draht'
+import { ENROLLMENT_OPTIONS, EDITION_FOUNDERS, EDITION_FUTURE } from '@/config/enrollmentOptions'
+import EnrollWizard from '@/components/EnrollWizard.vue'
+import fllExploreLogo from '@/assets/fll_explore_v.png'
+import fllChallengeLogo from '@/assets/fll_challenge_v.png'
+import firstFllLogo from '@/assets/first+fll_v.png'
 
 const router = useRouter()
 const { t } = useI18n()
-const teams = ref([])
-const classes = ref([])
+
+const wizardOpen = ref(false)
+function openWizard() {
+  wizardOpen.value = true
+}
+function onWizardClose() {
+  wizardOpen.value = false
+}
+function onWizardSuccess() {
+  // Optional: refresh counts
+  listTeams().then((r) => {
+    const d = r.data
+    const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    teamsCount.value = arr.length
+  })
+  listClasses().then((r) => {
+    const d = r.data
+    const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    classesCount.value = arr.length
+  })
+}
+
+function foundersCardLogo(opt) {
+  return opt.program === 1 || opt.program === 4 ? fllExploreLogo : fllChallengeLogo
+}
+
+const foundersOptions = computed(() => ENROLLMENT_OPTIONS.filter(o => o.edition === EDITION_FOUNDERS))
+const futureOptions = computed(() => ENROLLMENT_OPTIONS.filter(o => o.edition === EDITION_FUTURE))
+
+function goEnroll(option) {
+  if (option.type === 'future') {
+    router.push({ name: 'enroll-future', query: { group: option.group } })
+    return
+  }
+  const name = option.type === 'team' ? 'enroll-team' : 'enroll-class'
+  router.push({ name, query: { program: option.program } })
+}
+
+const teamsCount = ref(0)
+const classesCount = ref(0)
 const loading = ref(true)
 const error = ref(null)
 
@@ -19,11 +62,13 @@ onMounted(async () => {
     ])
     if (teamsRes.status === 'fulfilled' && teamsRes.value?.data) {
       const d = teamsRes.value.data
-      teams.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+      const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+      teamsCount.value = arr.length
     }
     if (classesRes.status === 'fulfilled' && classesRes.value?.data) {
       const d = classesRes.value.data
-      classes.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+      const arr = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+      classesCount.value = arr.length
     }
   } catch (e) {
     error.value = e.message || t('errors.loadFailed')
@@ -31,266 +76,323 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-function goEnrollTeam() {
-  router.push({ name: 'enroll-team' })
-}
-function goEnrollClass() {
-  router.push({ name: 'enroll-class' })
-}
 </script>
 
 <template>
   <div class="dashboard-view">
-    <!-- Enrollments overview – main focus -->
-    <section class="overview">
-      <h2 class="overview-title">
-        <i class="bi bi-clipboard-check"></i>
-        {{ t('dashboard.yourEnrollments') }}
-      </h2>
-      <div v-if="loading" class="overview-loading">
-        <i class="bi bi-arrow-repeat spin"></i>
-        {{ t('dashboard.loading') }}
+    <div v-if="loading" class="dashboard-loading">
+      <i class="bi bi-arrow-repeat spin"></i>
+      {{ t('dashboard.loading') }}
+    </div>
+    <div v-else-if="error" class="dashboard-error">
+      <i class="bi bi-exclamation-circle"></i>
+      {{ error }}
+    </div>
+    <div v-else class="dashboard-boxes">
+      <div class="dashboard-box">
+        <span class="dashboard-box-value">{{ teamsCount }}</span>
+        <span class="dashboard-box-label">{{ t('dashboard.registeredTeams') }}</span>
       </div>
-      <div v-else-if="error" class="overview-error">
-        <i class="bi bi-exclamation-circle"></i>
-        {{ error }}
+      <div class="dashboard-box">
+        <span class="dashboard-box-value">{{ classesCount }}</span>
+        <span class="dashboard-box-label">{{ t('dashboard.registeredClasses') }}</span>
       </div>
-      <div v-else-if="teams.length === 0 && classes.length === 0" class="overview-empty">
-        <p>{{ t('dashboard.noEnrollmentsYet') }}</p>
-      </div>
-      <div v-else class="overview-grid">
-        <div v-if="teams.length" class="overview-block">
-          <h3><i class="bi bi-people-fill"></i> {{ t('dashboard.teams') }}</h3>
-          <ul class="overview-list">
-            <li v-for="team in teams" :key="team.id || team.name" class="overview-item">
-              <span class="overview-item-name">{{ team.name }}</span>
-              <span v-if="team.organization" class="overview-item-meta">{{ team.organization }}</span>
-            </li>
-          </ul>
-        </div>
-        <div v-if="classes.length" class="overview-block">
-          <h3><i class="bi bi-mortarboard-fill"></i> {{ t('dashboard.classes') }}</h3>
-          <ul class="overview-list">
-            <li v-for="cls in classes" :key="cls.id || cls.name" class="overview-item">
-              <span class="overview-item-name">{{ cls.name }}</span>
-              <span v-if="cls.organization" class="overview-item-meta">{{ cls.organization }}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </section>
+    </div>
 
-    <p class="intro">{{ t('dashboard.intro') }}</p>
+    <p class="dashboard-intro">{{ t('dashboard.intro') }}</p>
 
-    <div class="cards">
-      <button type="button" class="card card-action" @click="goEnrollTeam">
-        <div class="card-icon">
-          <i class="bi bi-people-fill"></i>
-        </div>
-        <h2>{{ t('dashboard.enrollTeam') }}</h2>
-        <p>{{ t('dashboard.enrollTeamDesc') }}</p>
-        <span class="card-cta">
-          {{ t('dashboard.enrollTeamCta') }}
-          <i class="bi bi-arrow-right"></i>
-        </span>
-      </button>
-      <button type="button" class="card card-action" @click="goEnrollClass">
-        <div class="card-icon">
-          <i class="bi bi-mortarboard-fill"></i>
-        </div>
-        <h2>{{ t('dashboard.enrollClass') }}</h2>
-        <p>{{ t('dashboard.enrollClassDesc') }}</p>
-        <span class="card-cta">
-          {{ t('dashboard.enrollClassCta') }}
-          <i class="bi bi-arrow-right"></i>
-        </span>
+    <div class="dashboard-wizard-row">
+      <button type="button" class="wizard-trigger" @click="openWizard" :title="t('wizard.ctaButton')">
+        <i class="bi bi-magic"></i>
+        <span>{{ t('wizard.ctaButton') }}</span>
       </button>
     </div>
+
+    <div class="dashboard-sections">
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">{{ t('dashboard.editionFuture') }}</h2>
+        <div class="dashboard-cards">
+          <button
+            v-for="opt in futureOptions"
+            :key="'future-' + opt.group"
+            type="button"
+            class="dashboard-card card-future"
+            @click="goEnroll(opt)"
+          >
+            <div class="dashboard-card-left">
+              <div class="dashboard-card-icon">
+                <i class="bi bi-stars"></i>
+              </div>
+              <span class="dashboard-card-label">{{ t(opt.labelKey) }}</span>
+              <span class="dashboard-card-cta">{{ t('dashboard.optionCta') }}</span>
+            </div>
+            <div class="dashboard-card-logo">
+              <img :src="firstFllLogo" :alt="t(opt.labelKey)" class="card-logo" />
+            </div>
+          </button>
+        </div>
+      </section>
+      <section class="dashboard-section">
+        <h2 class="dashboard-section-title">{{ t('dashboard.editionFounders') }}</h2>
+        <div class="dashboard-cards">
+          <button
+            v-for="opt in foundersOptions"
+            :key="opt.edition + '-' + opt.type + '-' + opt.program"
+            type="button"
+            class="dashboard-card"
+            :class="{ 'card-team': opt.type === 'team', 'card-class': opt.type === 'class' }"
+            @click="goEnroll(opt)"
+          >
+            <div class="dashboard-card-left">
+              <div class="dashboard-card-icon">
+                <i class="bi" :class="opt.type === 'team' ? 'bi-people-fill' : 'bi-mortarboard-fill'"></i>
+              </div>
+              <span class="dashboard-card-label">{{ t(opt.labelKey) }}</span>
+              <span class="dashboard-card-cta">{{ t('dashboard.optionCta') }}</span>
+            </div>
+            <div class="dashboard-card-logo">
+              <img :src="foundersCardLogo(opt)" :alt="t(opt.labelKey)" class="card-logo" />
+            </div>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <EnrollWizard :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
   </div>
 </template>
 
 <style scoped>
 .dashboard-view {
-  max-width: 40rem;
   width: 100%;
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-/* Enrollments overview – top of dashboard */
-.overview {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
-}
-.overview-title {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 1rem;
+.dashboard-loading,
+.dashboard-error {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-}
-.overview-title .bi {
+  min-height: 12rem;
   font-size: 1.25rem;
-  color: var(--color-accent);
-}
-.overview-loading,
-.overview-error {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
-.overview-error {
-  color: #dc2626;
+
+.dashboard-error {
+  color: var(--color-error, #dc2626);
 }
-.overview-error .bi {
-  flex-shrink: 0;
-}
-.overview-empty {
-  color: var(--color-text-muted);
-  font-size: var(--text-base);
-}
-.overview-empty p {
-  margin: 0;
-}
-.overview-grid {
+
+.dashboard-boxes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
 }
-@media (max-width: 520px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.overview-block h3 {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.overview-block h3 .bi {
-  font-size: 1rem;
-  color: var(--color-accent);
-}
-.overview-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.overview-item {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-.overview-item:last-child {
-  border-bottom: none;
-}
-.overview-item-name {
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--color-text);
-}
-.overview-item-meta {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
 
-.intro {
-  font-size: var(--text-lg);
-  color: var(--color-text-muted);
-  margin-bottom: 1.25rem;
-  line-height: 1.55;
-}
-.cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-.card {
+.dashboard-box {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-  min-height: 8rem;
+  padding: 2.5rem 2rem;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
+  min-height: 14rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-box-value {
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.dashboard-box-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.dashboard-intro {
+  margin-top: 2rem;
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.dashboard-wizard-row {
+  margin-top: 1rem;
+}
+
+.wizard-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.wizard-trigger:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.wizard-trigger .bi {
+  font-size: 1rem;
+}
+
+.dashboard-sections {
+  margin-top: 1.5rem;
+}
+
+.dashboard-section {
+  margin-bottom: 2rem;
+}
+
+.dashboard-section:last-child {
+  margin-bottom: 0;
+}
+
+.dashboard-section-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 1rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.dashboard-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
   text-align: left;
   cursor: pointer;
   font-family: inherit;
   width: 100%;
   box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 5.5rem;
+  gap: 1rem;
 }
-.card-action:hover {
+.dashboard-card-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dashboard-card:hover {
   border-color: var(--color-accent);
   box-shadow: var(--shadow);
   transform: translateY(-2px);
 }
-.card-action:active {
+
+.dashboard-card:active {
   transform: translateY(0);
 }
-.card-icon {
-  width: 2.5rem;
-  height: 2.5rem;
+
+.dashboard-card-icon {
+  width: 2rem;
+  height: 2rem;
   border-radius: var(--radius);
   background: var(--color-accent-soft);
   color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
-  margin-bottom: 1rem;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
 }
-.card h2 {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  color: var(--color-text);
+
+.dashboard-card.card-team .dashboard-card-icon {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
-.card p {
+
+.dashboard-card.card-class .dashboard-card-icon {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.dashboard-card.card-future .dashboard-card-icon {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.dashboard-card-logo {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.dashboard-card-logo .card-logo {
+  height: 100%;
+  width: auto;
+  max-width: 5rem;
+  object-fit: contain;
+}
+
+.dashboard-card-label {
   font-size: var(--text-base);
-  color: var(--color-text-muted);
-  margin-bottom: 0.75rem;
-  line-height: 1.45;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
 }
-.card-cta {
-  font-size: var(--text-lg);
+
+.dashboard-card-cta {
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-accent);
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   margin-top: auto;
 }
-.card-cta .bi {
-  font-size: 1rem;
-  transition: transform 0.2s;
-}
-.card-action:hover .card-cta .bi {
-  transform: translateX(4px);
-}
-.loading .spin {
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-@media (min-width: 480px) {
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
+
+@media (max-width: 420px) {
+  .dashboard-boxes {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-box-value {
+    font-size: 3.25rem;
+  }
+  .dashboard-cards {
+    grid-template-columns: 1fr;
   }
 }
 </style>

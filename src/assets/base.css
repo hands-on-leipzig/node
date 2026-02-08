@@ -1,0 +1,153 @@
+/* Fresh design system – 2024 */
+:root {
+  /* Surfaces – warm light */
+  --color-bg: #fafaf9;
+  --color-bg-elevated: #ffffff;
+  --color-bg-muted: #f5f5f4;
+  --color-bg-hover: #e7e5e4;
+
+  --color-border: rgba(0, 0, 0, 0.06);
+  --color-border-strong: rgba(0, 0, 0, 0.1);
+
+  --color-text: #1c1917;
+  --color-text-muted: #57534e;
+  --color-text-subtle: #a8a29e;
+
+  /* Accent – HANDS on TECHNOLOGY orange */
+  --color-accent: #ff7a00;
+  --color-accent-hover: #e66d00;
+  --color-accent-muted: rgba(255, 122, 0, 0.14);
+  --color-accent-soft: rgba(255, 122, 0, 0.1);
+
+  --color-sidebar: #ffffff;
+  --color-sidebar-border: rgba(0, 0, 0, 0.06);
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text-base: 1rem;
+  --text-sm: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+
+  --touch: 2.75rem;
+  --touch-lg: 3rem;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* Dark theme */
+html[data-theme='dark'] {
+  --color-bg: #0c0a09;
+  --color-bg-elevated: #1c1917;
+  --color-bg-muted: #292524;
+  --color-bg-hover: #44403c;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+
+  --color-text: #fafaf9;
+  --color-text-muted: #a8a29e;
+  --color-text-subtle: #78716c;
+
+  --color-accent: #ff9f4d;
+  --color-accent-hover: #ffb366;
+  --color-accent-muted: rgba(255, 159, 77, 0.2);
+  --color-accent-soft: rgba(255, 159, 77, 0.12);
+
+  --color-sidebar: #1c1917;
+  --color-sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Legacy names for compatibility */
+:root {
+  --color-background: var(--color-bg);
+  --color-background-soft: var(--color-bg-elevated);
+  --color-background-mute: var(--color-bg-muted);
+  --color-heading: var(--color-text);
+  --color-primary: var(--color-accent);
+  --color-primary-dark: var(--color-accent-hover);
+  --color-primary-light: var(--color-accent-muted);
+  --font-size-base: var(--text-base);
+  --font-size-lg: var(--text-lg);
+  --font-size-xl: var(--text-xl);
+  --font-size-2xl: var(--text-2xl);
+  --font-size-3xl: var(--text-3xl);
+  --font-size-4xl: var(--text-4xl);
+  --touch-min: var(--touch);
+  --touch-comfortable: var(--touch-lg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: color 0.25s, background-color 0.25s;
+}
+
+@media (pointer: coarse) {
+  button:not(.no-touch-min),
+  .nav-link {
+    min-height: var(--touch);
+  }
+}
+
+/* Fancy dropdown / select – add class "select-fancy" to use */
+select.select-fancy {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-text);
+  background-color: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 1.25rem !important;
+  padding-right: 2.5rem !important;
+}
+select.select-fancy:hover {
+  border-color: var(--color-border-strong) !important;
+  background-color: var(--color-bg-muted) !important;
+}
+select.select-fancy:focus {
+  outline: none;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+select.select-fancy:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+html[data-theme='dark'] select.select-fancy {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+}

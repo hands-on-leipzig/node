@@ -475,6 +475,9 @@ const userInitials = computed(() => {
 .profile-btn {
   width: 2.5rem;
   height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  flex-shrink: 0;
   border-radius: 50%;
   border: none;
   padding: 0;
@@ -486,6 +489,7 @@ const userInitials = computed(() => {
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
+  aspect-ratio: 1;
 }
 .profile-btn:hover {
   background: var(--color-bg-hover);
@@ -495,6 +499,7 @@ const userInitials = computed(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 .profile-avatar-initials {
   font-size: 0.75rem;
