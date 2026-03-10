@@ -84,6 +84,39 @@ export function getAddresses() {
 }
 
 /**
+ * List events via DRAHT flow API (for event registration, team nachmelden).
+ * GET /handson/flow/events – returns list of events with capacity/usage (Auslastung) when provided.
+ * Response may be: array, or { data: [] }, or { events: [] }. Each event may have id, label/name/title/ref, capacity, registered, etc.
+ */
+export function getEvents() {
+  return handsonApi.get('/flow/events')
+}
+
+/**
+ * Get a single event details from flow API (e.g. capacity, slots).
+ * GET /handson/flow/events/:id – optional second endpoint for event details/usage.
+ */
+export function getFlowEvent(eventId) {
+  return handsonApi.get('/flow/events/' + encodeURIComponent(eventId))
+}
+
+/**
+ * List events nearest to a location (sorted by distance to zip).
+ * GET /handson/events/nearest?country=de&zip=10115&program=1
+ * @param {string} [country] - Country code (e.g. 'de')
+ * @param {string} [zip] - Postal code
+ * @param {string|number} [program] - Program id (optional)
+ */
+export function getEventsNearest(country, zip, program) {
+  const params = new URLSearchParams()
+  if (country != null && String(country).trim()) params.set('country', String(country).trim())
+  if (zip != null && String(zip).trim()) params.set('zip', String(zip).trim())
+  if (program != null && program !== '') params.set('program', String(program))
+  const qs = params.toString()
+  return handsonApi.get('/events/nearest' + (qs ? '?' + qs : ''))
+}
+
+/**
  * Enroll a team. Payload: name, location, organization, voucher, deliveryAddress, invoiceAddress.
  */
 export function enrollTeam(payload) {
@@ -139,6 +172,13 @@ export function updateTeamPlayers(teamId, payload) {
  */
 export function updateTeamVersandaufschub(teamId, payload) {
   return api.put('/teams/' + encodeURIComponent(teamId) + '/versandaufschub', payload)
+}
+
+/**
+ * Register team for an event (nachmelden). Payload: { eventId }. Returns updated team card.
+ */
+export function registerTeamForEvent(teamId, eventId) {
+  return api.put('/teams/' + encodeURIComponent(teamId) + '/event', { eventId })
 }
 
 /**

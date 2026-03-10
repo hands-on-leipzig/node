@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
+import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 
 const router = useRouter()
 const route = useRoute()
@@ -26,7 +27,7 @@ const emptyAddressState = () => ({
 
 const form = ref({
   name: '',
-  school: '',
+  schoolType: '',
   location: '',
   zip: '',
   organization: '',
@@ -152,7 +153,7 @@ async function submit() {
       group: group.value,
       pupils: selectedPupils.value,
       name: form.value.name.trim(),
-      school: form.value.school.trim() || undefined,
+      schoolType: form.value.schoolType || undefined,
       location: form.value.location.trim() || undefined,
       zip: form.value.zip.trim() || undefined,
       organization: form.value.organization.trim() || undefined,
@@ -170,7 +171,7 @@ async function submit() {
     voucherInvoiceName.value = null
     form.value = {
       name: '',
-      school: '',
+      schoolType: '',
       location: '',
       zip: '',
       organization: '',
@@ -217,7 +218,8 @@ function onFormFieldFocus(e) {
       <!-- Step 1: Choose number of pupils -->
       <div v-if="step === 'pupils' && group" class="pupils-step">
         <p class="pupils-question">{{ t('enrollFuture.howManyPupils') }}</p>
-        <div class="pupils-options">
+        <p class="pupils-hint">{{ t('enrollFuture.pupilsFlexibleHint') }}</p>
+        <div class="pupils-options pupils-options-grid">
           <button
             v-for="num in FUTURE_PUPIL_OPTIONS"
             :key="num"
@@ -253,13 +255,13 @@ function onFormFieldFocus(e) {
           />
         </div>
         <div class="field">
-          <label for="future-school">{{ t('enrollClass.school') }}</label>
-          <input
-            id="future-school"
-            v-model="form.school"
-            type="text"
-            :placeholder="t('enrollClass.placeholderSchool')"
-          />
+          <label for="future-school-type">{{ t('enroll.schoolType') }}</label>
+          <select id="future-school-type" v-model="form.schoolType">
+            <option value="" disabled>{{ t('schoolTypes.none') }}</option>
+            <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ t(opt.labelKey) }}
+            </option>
+          </select>
         </div>
         <div class="field">
           <label for="future-location">{{ t('enroll.location') }}</label>
@@ -280,7 +282,7 @@ function onFormFieldFocus(e) {
           />
         </div>
         <div class="field">
-          <label for="future-organization">{{ t('enroll.organization') }}</label>
+          <label for="future-organization">{{ t('enroll.schoolName') }}</label>
           <input id="future-organization" v-model="form.organization" type="text" />
         </div>
         <div class="field">
@@ -402,11 +404,21 @@ function onFormFieldFocus(e) {
   color: var(--color-text);
   margin-bottom: 1.25rem;
 }
+.pupils-hint {
+  margin: 0.35rem 0 1.25rem;
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+}
 .pupils-options {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
+}
+.pupils-options.pupils-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }
 .pupils-btn {
   flex: 1;
@@ -447,7 +459,8 @@ function onFormFieldFocus(e) {
   color: #dc2626;
 }
 .form input,
-.form textarea {
+.form textarea,
+.form select {
   width: 100%;
   padding: 0.875rem 1rem;
   min-height: var(--touch-lg);

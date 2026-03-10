@@ -2,9 +2,10 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { getTeam, getEvents, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
+import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -19,6 +20,16 @@ const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: ''
 const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
+
+// Event nachmelden
+const events = ref([])
+const eventsLoading = ref(false)
+const eventsNearest = ref([])
+const eventsNearestLoading = ref(false)
+const registerEventId = ref('')
+const registeringEvent = ref(false)
+const registerEventError = ref(null)
+const registerEventSuccess = ref(false)
 
 const id = computed(() => route.params.id)
 
@@ -207,8 +218,82 @@ async function fetchTeam() {
   }
 }
 
-onMounted(fetchTeam)
-watch(id, fetchTeam)
+async function loadEvents() {
+  eventsLoading.value = true
+  events.value = []
+  registerEventError.value = null
+  try {
+    const res = await getEvents()
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    events.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    events.value = []
+  } finally {
+    eventsLoading.value = false
+  }
+}
+
+async function loadEventsNearest() {
+  eventsNearestLoading.value = true
+  eventsNearest.value = []
+  registerEventError.value = null
+  try {
+    const addr = team.value?.overview?.delivery_address || team.value?.overview?.billing_address
+    const country = addr?.country ?? undefined
+    const zip = addr?.zip ?? undefined
+    const program = team.value?.program ?? undefined
+    const res = await getEventsNearest(country, zip, program)
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    eventsNearest.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    eventsNearest.value = []
+  } finally {
+    eventsNearestLoading.value = false
+  }
+}
+
+async function submitRegisterForEvent() {
+  const eventId = registerEventId.value?.trim()
+  if (!id.value || !eventId) return
+  registeringEvent.value = true
+  registerEventError.value = null
+  registerEventSuccess.value = false
+  try {
+    const res = await registerTeamForEvent(id.value, eventId)
+    team.value = res.data
+    registerEventId.value = ''
+    registerEventSuccess.value = true
+    setTimeout(() => { registerEventSuccess.value = false }, 3000)
+  } catch (e) {
+    registerEventError.value = e.response?.data?.message || e.message || t('teamDetail.registerEventFailed')
+  } finally {
+    registeringEvent.value = false
+  }
+}
+
+/** Event display label with optional capacity (from flow API). */
+function eventLabel(ev) {
+  const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
+  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
+  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
+  if (typeof used === 'number' && typeof max === 'number') {
+    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
+  }
+  return name
+}
+
+onMounted(async () => {
+  await fetchTeam()
+  loadEvents()
+  loadEventsNearest()
+})
+watch(id, async () => {
+  await fetchTeam()
+  loadEvents()
+  loadEventsNearest()
+})
 </script>
 
 <template>
@@ -266,6 +351,46 @@ watch(id, fetchTeam)
           <dt>{{ t('detail.institution') }}</dt>
           <dd>{{ team.institution || t('detail.noData') }}</dd>
         </dl>
+      </section>
+
+      <!-- 3b) Team für Event nachmelden -->
+      <section class="detail-section">
+        <h3 class="detail-section-title">{{ t('teamDetail.registerForEvent') }}</h3>
+        <p class="detail-hint">{{ t('teamDetail.registerForEventHint') }}</p>
+        <div class="detail-register-event">
+          <div class="detail-event-dropdowns">
+            <EventSelectDropdown
+              :title="t('wizard.eventSelectAllEvents')"
+              :events="events"
+              :loading="eventsLoading"
+              :model-value="registerEventId"
+              :placeholder="t('teamDetail.selectEvent')"
+              :event-label-fn="eventLabel"
+              @update:model-value="registerEventId = $event"
+            />
+            <EventSelectDropdown
+              :title="t('wizard.eventSelectNearest')"
+              :events="eventsNearest"
+              :loading="eventsNearestLoading"
+              :model-value="registerEventId"
+              :placeholder="t('teamDetail.selectEvent')"
+              :event-label-fn="eventLabel"
+              @update:model-value="registerEventId = $event"
+            />
+          </div>
+          <button
+            type="button"
+            class="detail-btn detail-btn-primary"
+            :disabled="!registerEventId || registeringEvent"
+            @click="submitRegisterForEvent"
+          >
+            <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
+            <i v-else class="bi bi-calendar-check"></i>
+            {{ registeringEvent ? t('teamDetail.registering') : t('teamDetail.registerForEventButton') }}
+          </button>
+        </div>
+        <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
+        <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> {{ t('teamDetail.registerEventSuccess') }}</p>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
@@ -574,5 +699,47 @@ watch(id, fetchTeam)
 .detail-coaches span + span::before {
   content: ' · ';
   color: var(--color-text-muted);
+}
+.detail-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+.detail-register-event {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.detail-event-dropdowns {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.detail-event-select {
+  min-width: 14rem;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--text-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.detail-event-select:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.detail-field-hint,
+.detail-message {
+  font-size: var(--text-sm);
+  margin: 0.5rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.detail-message-error {
+  color: var(--color-error, #dc2626);
+}
+.detail-message-success {
+  color: #16a34a;
 }
 </style>

@@ -2,24 +2,15 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
+import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEvents, getEventsNearest, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import logoHot from '@/assets/hot.png'
-import logoHotOutline from '@/assets/hot_outline.png'
-import logoHotFll from '@/assets/hot+fll.png'
-import logoFirstH from '@/assets/first_h.png'
-import logoFirstV from '@/assets/first_v.png'
-import logoFirstFllH from '@/assets/first+fll_h.png'
+import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import logoFirstFllV from '@/assets/first+fll_v.png'
-import logoFllExploreH from '@/assets/fll_explore_h.png'
-import logoFllExploreHs from '@/assets/fll_explore_hs.png'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
-import logoFllChallengeH from '@/assets/fll_challenge_h.png'
-import logoFllChallengeHs from '@/assets/fll_challenge_hs.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_canopy_fll_future_edition_rgb_fullcolor_ohne_HG-Fläche.png'
-import logoMain from '@/assets/logo.svg'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -27,7 +18,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 
 const emptyAddressState = () => ({
@@ -36,6 +27,8 @@ const emptyAddressState = () => ({
   new: { street: '', postalCode: '', city: '', country: '' },
 })
 
+// Step 0: Voucher / Direkteinstieg
+const hasVoucherCode = ref(null) // null | 'yes' | 'no'
 // Step 1
 const edition = ref(null) // 'founders' | 'future'
 // Step 2: Future = group '5'|'8', Founders = variant 'explore'|'challenge'
@@ -43,15 +36,27 @@ const futureGroup = ref(null)
 const foundersVariant = ref(null)
 // Step 3: Future = pupils 8|16|24, Founders = type 'team'|'class'
 const futurePupils = ref(null)
+const futurePupilsMode = ref(null) // 'preset' | 'custom'
+const futurePupilsCustom = ref(40)
+// Future: optional on-site event registration (+100€)
+const futureOnSiteEvent = ref(null) // null | 'yes' | 'no' | 'skip'
+const futureEventId = ref(null)
+const futureEvents = ref([])
+const futureEventsLoading = ref(false)
+const futureEventsNearest = ref([])
+const futureEventsNearestLoading = ref(false)
 const foundersType = ref(null)
 // Step 4
 const formData = ref({
   name: '',
   schoolOrClub: '',
-  school: '',
-  location: '',
-  zip: '',
+  schoolType: '',
   organization: '',
+  country: '',
+  zip: '',
+  city: '',
+  state: '',
+  location: '',
   notes: '',
   grade: '',
   teacherName: '',
@@ -78,35 +83,170 @@ const success = ref(false)
 const successMessage = ref('')
 
 const totalSteps = computed(() => {
-  return 6
+  const contentSteps = edition.value === 'future' ? 6 : 6 // Future: +1 step for on-site event
+  return 1 + contentSteps // Step 0 (voucher?) + rest
 })
 
 const progress = computed(() => {
   if (totalSteps.value <= 1) return 0
-  return Math.round(((step.value - 1) / (totalSteps.value - 1)) * 100)
+  return Math.round((step.value / (totalSteps.value - 1)) * 100)
 })
 
 const stepTitle = computed(() => {
+  if (step.value === 0) return t('wizard.stepVoucherCode')
   if (step.value === 1) return t('wizard.stepEdition')
   if (step.value === 2) return edition.value === 'future' ? t('wizard.stepFutureGroup') : t('wizard.stepVariant')
   if (step.value === 3) return edition.value === 'future' ? t('wizard.stepPupils') : t('wizard.stepTeamClass')
   if (step.value === 4) return t('wizard.stepData')
-  if (step.value === 5) return t('wizard.stepVoucher')
-  if (step.value === 6) return t('wizard.stepAddresses')
+  if (step.value === 5) return edition.value === 'future' ? t('wizard.stepOnSiteEvent') : t('wizard.stepVoucher')
+  if (step.value === 6) return edition.value === 'future' ? t('wizard.stepOrder') : t('wizard.stepAddresses')
   return ''
 })
 
-const foundersLogos = [{ src: logoFirstFllH, alt: 'FIRST LEGO League' }]
+function selectFuturePupils(num) {
+  futurePupilsMode.value = 'preset'
+  futurePupils.value = num
+}
+
+function selectFuturePupilsMore() {
+  futurePupilsMode.value = 'custom'
+  if (!futurePupilsCustom.value || futurePupilsCustom.value < 40) futurePupilsCustom.value = 40
+  futurePupils.value = futurePupilsCustom.value
+}
+
+function adjustFuturePupils(delta) {
+  const nextVal = Math.max(40, (futurePupilsCustom.value || 40) + delta)
+  futurePupilsCustom.value = nextVal
+  futurePupils.value = nextVal
+}
+
+const summaryItems = computed(() => {
+  const items = []
+  if (voucher.value?.trim() && voucherValid.value === true) {
+    items.push({ label: t('wizard.entryByCode') })
+  }
+  if (edition.value === 'founders') {
+    items.push({ label: t('dashboard.editionFounders') })
+  } else if (edition.value === 'future') {
+    items.push({ label: t('dashboard.editionFuture') })
+  }
+  if (edition.value === 'future' && futureGroup.value) {
+    items.push({ label: t(futureGroup.value === '5' ? 'dashboard.optionFutureGroup5' : 'dashboard.optionFutureGroup8') })
+  }
+  if (edition.value === 'founders' && foundersVariant.value) {
+    items.push({ label: t(foundersVariant.value === 'explore' ? 'wizard.optionExplore' : 'wizard.optionChallenge') })
+  }
+  if (edition.value === 'future' && futurePupils.value != null) {
+    items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
+  }
+  if (edition.value === 'future' && futureOnSiteEvent.value === 'yes' && futureEventId.value) {
+    items.push({ label: selectedFutureEventLabel.value || t('wizard.onSiteEventSelected') })
+  }
+  if (edition.value === 'founders' && foundersType.value) {
+    items.push({ label: t(foundersType.value === 'team' ? 'dashboard.team' : 'dashboard.class') })
+  }
+  if (formData.value.name?.trim()) {
+    items.push({ label: formData.value.name.trim() })
+  }
+  return items
+})
+
+const selectedFutureEventLabel = computed(() => {
+  if (!futureEventId.value || !futureEvents.value.length) return null
+  const ev = futureEvents.value.find((e) => String(e.id) === String(futureEventId.value))
+  return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
+})
+
+/** Event display label with optional capacity (from flow API). */
+function futureEventOptionLabel(ev) {
+  const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
+  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
+  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
+  if (typeof used === 'number' && typeof max === 'number') {
+    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
+  }
+  return name
+}
+
+const countryOptions = computed(() => {
+  const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+    ? new Intl.DisplayNames([locale.value], { type: 'region' })
+    : null
+  let codes = ['DE', 'AT', 'CH', 'US', 'GB', 'FR', 'IT', 'ES', 'NL', 'BE', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'SE', 'NO', 'DK', 'FI', 'PT', 'IE', 'GR', 'SI', 'HR', 'RS', 'UA', 'TR', 'CN', 'JP', 'KR', 'AU', 'NZ', 'CA', 'BR', 'MX', 'AR', 'CL', 'ZA', 'IN']
+  if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+    try {
+      const supported = Intl.supportedValuesOf('region')
+      if (Array.isArray(supported) && supported.length) codes = supported
+    } catch (_) {
+      // keep fallback list
+    }
+  }
+  codes = codes.filter((code) => /^[A-Z]{2}$/.test(code))
+  const toLabel = (code) => displayNames ? displayNames.of(code) : code
+  const unique = Array.from(new Set(codes))
+  unique.sort((a, b) => toLabel(a).localeCompare(toLabel(b)))
+  const top = ['DE', 'AT', 'CH']
+  const rest = unique.filter((c) => !top.includes(c))
+  return {
+    top: top.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
+    rest: rest.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
+  }
+})
+
+let zipLookupTimer = null
+let zipLookupAbort = null
+
+async function lookupZipCityState() {
+  const zip = formData.value.zip?.trim()
+  let country = (formData.value.country || '').toLowerCase()
+  if (!zip) return
+  // Fallback: if no country selected but zip looks like DACH PLZ, try DE so Ort gets filled (Team/Class)
+  if (!country && /^\d{4,5}$/.test(zip)) country = 'de'
+  if (!country) return
+  if (zipLookupAbort) zipLookupAbort.abort()
+  zipLookupAbort = new AbortController()
+  try {
+    const res = await fetch(`https://api.zippopotam.us/${country}/${encodeURIComponent(zip)}`, { signal: zipLookupAbort.signal })
+    if (!res.ok) return
+    const data = await res.json()
+    const place = Array.isArray(data.places) && data.places.length ? data.places[0] : null
+    if (!place) return
+    const city = place['place name']
+    const state = place['state']
+    if (city) formData.value.city = city
+    if (state) formData.value.state = state
+  } catch (_) {
+    // ignore lookup errors
+  }
+}
+
+const foundersLogos = [{ src: logoFirstFllV, alt: 'FIRST LEGO League' }]
 
 const futureLogos = [{ src: logoFuture, alt: 'Future Edition' }]
 
+function chooseNoVoucher() {
+  hasVoucherCode.value = 'no'
+  step.value = 1
+}
+
+function selectEdition(val) {
+  edition.value = val
+  if (step.value === 1) next()
+}
+
 function openWizard() {
+  hasVoucherCode.value = null
   edition.value = null
   futureGroup.value = null
   foundersVariant.value = null
   futurePupils.value = null
+  futurePupilsMode.value = null
+  futureOnSiteEvent.value = null
+  futureEventId.value = null
+  futureEvents.value = []
+  futureEventsNearest.value = []
   foundersType.value = null
-  formData.value = { name: '', schoolOrClub: '', school: '', location: '', zip: '', organization: '', notes: '', grade: '', teacherName: '', description: '', playersTotal: '' }
+  formData.value = { name: '', schoolOrClub: '', schoolType: '', organization: '', country: '', zip: '', city: '', state: '', location: '', notes: '', grade: '', teacherName: '', description: '', playersTotal: '' }
   voucher.value = ''
   voucherValid.value = null
   voucherMessage.value = ''
@@ -115,7 +255,7 @@ function openWizard() {
   voucherInvoiceName.value = null
   deliveryAddress.value = emptyAddressState()
   invoiceAddress.value = emptyAddressState()
-  step.value = 1
+  step.value = 0
   error.value = null
   success.value = false
 }
@@ -143,23 +283,83 @@ function successMessageFor(kind) {
 }
 
 function canNext() {
+  if (step.value === 0) {
+    if (hasVoucherCode.value === 'no') return true
+    if (hasVoucherCode.value === 'yes') return !!voucher.value?.trim() && voucherValid.value === true
+    return false
+  }
   if (step.value === 1) return edition.value != null
   if (step.value === 2) return edition.value === 'future' ? futureGroup.value != null : foundersVariant.value != null
   if (step.value === 3) return edition.value === 'future' ? futurePupils.value != null : foundersType.value != null
-  if (step.value === 4) return !!formData.value.name?.trim()
+  if (step.value === 4) return edition.value === 'future' ? true : !!formData.value.name?.trim()
+  if (step.value === 5 && edition.value === 'future') {
+    if (!futureOnSiteEvent.value) return false
+    if (futureOnSiteEvent.value === 'yes') return !!futureEventId.value
+    return true
+  }
   if (step.value === 5) return true
   if (step.value === 6) return true
   return false
 }
 
 function next() {
+  if (step.value === 0) {
+    step.value = 1
+    if (edition.value) {
+      if (edition.value === 'future' && futureGroup.value) loadAddresses()
+      else if (edition.value !== 'future') loadAddresses()
+    }
+    return
+  }
   if (step.value === 2 && edition.value === 'future') loadAddresses()
-  if (step.value === 3) loadAddresses() // have addresses ready for step 6
+  if (step.value === 3) loadAddresses()
+  if (step.value === 4 && edition.value === 'future') {
+    loadFutureEvents()
+    loadFutureEventsNearest()
+  }
   if (step.value < totalSteps.value) step.value++
 }
 
 function prev() {
+  if (step.value === 1) {
+    step.value = 0
+    hasVoucherCode.value = null
+    return
+  }
   if (step.value > 1) step.value--
+}
+
+async function loadFutureEvents() {
+  futureEventsLoading.value = true
+  futureEvents.value = []
+  try {
+    const res = await getEvents()
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    futureEvents.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    futureEvents.value = []
+  } finally {
+    futureEventsLoading.value = false
+  }
+}
+
+async function loadFutureEventsNearest() {
+  futureEventsNearestLoading.value = true
+  futureEventsNearest.value = []
+  try {
+    const country = formData.value.country?.trim() || undefined
+    const zip = formData.value.zip?.trim() || undefined
+    const program = futureGroup.value || undefined
+    const res = await getEventsNearest(country, zip, program)
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    futureEventsNearest.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    futureEventsNearest.value = []
+  } finally {
+    futureEventsNearestLoading.value = false
+  }
 }
 
 async function loadAddresses() {
@@ -202,6 +402,36 @@ function formatSubmitError(e) {
   return message || t('wizard.enrollmentFailed')
 }
 
+/**
+ * Apply preset from voucher/direct-entry API response.
+ * Expected data (when API supports it): edition ('founders'|'future'), program (1|2|4|5),
+ * or for future: group ('5'|'8'), pupils (number). Program: 1=Explore team, 2=Challenge team, 4=Explore class, 5=Challenge class.
+ */
+function applyVoucherPreset(data) {
+  if (!data || typeof data !== 'object') return
+  const editionVal = data.edition
+  if (editionVal === 'future') {
+    edition.value = 'future'
+    if (data.group === '5' || data.group === '8') futureGroup.value = data.group
+    if (typeof data.pupils === 'number' && data.pupils >= 8) {
+      futurePupils.value = data.pupils
+      futurePupilsMode.value = [8, 16, 32].includes(data.pupils) ? 'preset' : 'custom'
+      if (futurePupilsMode.value === 'custom') futurePupilsCustom.value = data.pupils
+    }
+    return
+  }
+  const program = data.program
+  if (program === 1 || program === 2 || program === 4 || program === 5) {
+    edition.value = 'founders'
+    foundersVariant.value = program === 1 || program === 4 ? 'explore' : 'challenge'
+    foundersType.value = program === 1 || program === 2 ? 'team' : 'class'
+  } else if (editionVal === 'founders') {
+    edition.value = 'founders'
+    if (data.variant === 'explore' || data.variant === 'challenge') foundersVariant.value = data.variant
+    if (data.type === 'team' || data.type === 'class') foundersType.value = data.type
+  }
+}
+
 async function onVoucherBlur() {
   const code = voucher.value?.trim()
   if (!code) {
@@ -232,6 +462,8 @@ async function onVoucherBlur() {
           voucherMessage.value = t('enroll.voucherInvalid')
         }
       }
+      const preset = result.data?.data ?? result.data
+      if (preset) applyVoucherPreset(preset)
     }
   } catch (_) {
     voucherValid.value = false
@@ -242,7 +474,7 @@ async function onVoucherBlur() {
 }
 
 async function submit() {
-  if (!formData.value.name?.trim()) {
+  if (edition.value !== 'future' && !formData.value.name?.trim()) {
     error.value = t('wizard.nameRequired')
     return
   }
@@ -257,15 +489,20 @@ async function submit() {
       const payload = {
         group: futureGroup.value,
         pupils: futurePupils.value,
-        name: formData.value.name.trim(),
-        school: formData.value.school?.trim() || undefined,
-        location: formData.value.location?.trim() || undefined,
-        zip: formData.value.zip?.trim() || undefined,
+        name: formData.value.name?.trim() || undefined,
+        schoolType: formData.value.schoolType || undefined,
         organization: formData.value.organization?.trim() || undefined,
+        country: formData.value.country?.trim() || undefined,
+        zip: formData.value.zip?.trim() || undefined,
+        location: formData.value.city?.trim() || undefined,
+        state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         notes: formData.value.notes?.trim() || undefined,
         deliveryAddress: buildAddressPayload(deliveryAddress.value),
         invoiceAddress: buildInvoicePayload(),
+      }
+      if (futureOnSiteEvent.value === 'yes' && futureEventId.value) {
+        payload.eventId = futureEventId.value
       }
       await enrollFuture(payload)
       successMessage.value = t('wizard.success')
@@ -276,10 +513,12 @@ async function submit() {
         program,
         name: formData.value.name.trim(),
         schoolOrClub: isTeam ? (formData.value.schoolOrClub?.trim() || undefined) : undefined,
-        school: !isTeam ? (formData.value.school?.trim() || undefined) : undefined,
-        location: formData.value.location?.trim() || undefined,
-        zip: formData.value.zip?.trim() || undefined,
+        schoolType: !isTeam ? (formData.value.schoolType || undefined) : undefined,
         organization: formData.value.organization?.trim() || undefined,
+        country: formData.value.country?.trim() || undefined,
+        zip: formData.value.zip?.trim() || undefined,
+        location: formData.value.city?.trim() || undefined,
+        state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         notes: formData.value.notes?.trim() || undefined,
         deliveryAddress: buildAddressPayload(deliveryAddress.value),
@@ -340,13 +579,23 @@ watch(foundersVariant, (val) => {
 
 watch(futurePupils, (val) => {
   if (!props.open || val == null) return
-  if (step.value === 3 && edition.value === 'future') next()
+  if (step.value === 3 && edition.value === 'future' && futurePupilsMode.value !== 'custom') next()
 })
 
 watch(foundersType, (val) => {
   if (!props.open || !val) return
   if (step.value === 3 && edition.value !== 'future') next()
 })
+
+watch(
+  () => [formData.value.country, formData.value.zip],
+  () => {
+    if (zipLookupTimer) clearTimeout(zipLookupTimer)
+    zipLookupTimer = setTimeout(() => {
+      lookupZipCityState()
+    }, 350)
+  }
+)
 </script>
 
 <template>
@@ -357,11 +606,22 @@ watch(foundersType, (val) => {
           <p class="wizard-eyebrow">{{ t('wizard.stepEdition') }}</p>
           <h2 id="wizard-title">{{ t('wizard.ctaTitle') }}</h2>
           <p class="wizard-hero-text">{{ t('dashboard.intro') }}</p>
+          <div v-if="summaryItems.length" class="wizard-path">
+            <div v-for="(item, idx) in summaryItems" :key="idx" class="wizard-path-step">
+              <span class="wizard-path-icon">
+                <i v-if="idx === 0" class="bi bi-stars"></i>
+                <i v-else-if="idx === 1" class="bi bi-diagram-3"></i>
+                <i v-else-if="idx === 2" class="bi bi-people"></i>
+                <i v-else class="bi bi-check2-circle"></i>
+              </span>
+              <span class="wizard-path-label">{{ item.label }}</span>
+            </div>
+          </div>
           <div class="wizard-hero-progress">
             <div class="wizard-progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
               <span :style="{ width: `${progress}%` }"></span>
             </div>
-            <p class="wizard-step-label">{{ stepTitle }} ({{ step }}/{{ totalSteps }})</p>
+            <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
           </div>
           <div class="wizard-hero-hint">
             <i class="bi bi-lightning-charge-fill"></i>
@@ -378,17 +638,54 @@ watch(foundersType, (val) => {
         </div>
 
         <div class="wizard-body">
+          <!-- Step 0: Voucher-Code / Direkteinstieg -->
+          <div v-show="step === 0" class="wizard-step wizard-step-voucher wizard-step-animate">
+            <div class="wizard-step-voucher-inner">
+              <p class="wizard-question">{{ t('wizard.voucherCodeQuestion') }}</p>
+              <p class="wizard-hint">{{ t('wizard.voucherCodeHint') }}</p>
+              <div v-if="hasVoucherCode === null" class="wizard-options wizard-options-stack">
+                <button type="button" class="wizard-option wizard-option-card" @click="hasVoucherCode = 'yes'">
+                  <div class="wizard-option-main">{{ t('wizard.voucherCodeYes') }}</div>
+                  <div class="wizard-option-desc">{{ t('wizard.voucherCodeYesDesc') }}</div>
+                </button>
+                <button type="button" class="wizard-option wizard-option-card" @click="chooseNoVoucher">
+                  <div class="wizard-option-main">{{ t('wizard.voucherCodeNo') }}</div>
+                  <div class="wizard-option-desc">{{ t('wizard.voucherCodeNoDesc') }}</div>
+                </button>
+              </div>
+              <div v-else-if="hasVoucherCode === 'yes'" class="wizard-voucher-code-form">
+                <div class="field" :class="{ filled: isFilled(voucher) }">
+                  <label>{{ t('enroll.voucherCodeLabel') }}</label>
+                  <input
+                    v-model="voucher"
+                    type="text"
+                    :placeholder="t('enroll.placeholderVoucherCode')"
+                    autofocus
+                    @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                    @blur="onVoucherBlur"
+                  />
+                  <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+                  <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
+                  <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
+                </div>
+                <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null">
+                  <i class="bi bi-arrow-left"></i> {{ t('wizard.voucherCodeBack') }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Step 1: Edition -->
-          <div v-show="step === 1" class="wizard-step">
+          <div v-show="step === 1" class="wizard-step wizard-step-animate">
             <div class="wizard-options wizard-options-two">
-              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'founders' }" @click="edition = 'founders'">
+              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'founders' }" @click="selectEdition('founders')">
                 <div class="wizard-option-main">{{ t('dashboard.editionFounders') }}</div>
                 <div class="wizard-option-desc">{{ t('wizard.editionFoundersDesc') }}</div>
                 <div class="wizard-option-logos">
                   <img v-for="logo in foundersLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
                 </div>
               </button>
-              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'future' }" @click="edition = 'future'">
+              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'future' }" @click="selectEdition('future')">
                 <div class="wizard-option-main">{{ t('dashboard.editionFuture') }}</div>
                 <div class="wizard-option-desc">{{ t('wizard.editionFutureDesc') }}</div>
                 <div class="wizard-option-logos wizard-option-logos-single">
@@ -399,14 +696,16 @@ watch(foundersType, (val) => {
           </div>
 
           <!-- Step 2: Future = group 5+/8+, Founders = Explore/Challenge -->
-          <div v-show="step === 2" class="wizard-step">
+          <div v-show="step === 2" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '5' }" @click="futureGroup = '5'">
+                  <img :src="logoFuture" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('dashboard.optionFutureGroup5') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.futureGroup5Desc') }}</div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '8' }" @click="futureGroup = '8'">
+                  <img :src="logoFuture" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('dashboard.optionFutureGroup8') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.futureGroup8Desc') }}</div>
                 </button>
@@ -415,12 +714,12 @@ watch(foundersType, (val) => {
             <template v-else>
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="foundersVariant = 'explore'">
-                  <img :src="logoFllExploreHs" alt="" class="wizard-option-logo" />
+                  <img :src="logoFllExploreV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('wizard.optionExplore') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.optionExploreDesc') }}</div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="foundersVariant = 'challenge'">
-                  <img :src="logoFllChallengeHs" alt="" class="wizard-option-logo" />
+                  <img :src="logoFllChallengeV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('wizard.optionChallenge') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.optionChallengeDesc') }}</div>
                 </button>
@@ -429,31 +728,45 @@ watch(foundersType, (val) => {
           </div>
 
           <!-- Step 3: Future = pupils, Founders = Team/Class -->
-          <div v-show="step === 3" class="wizard-step">
+          <div v-show="step === 3" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
               <p class="wizard-question">{{ t('enrollFuture.howManyPupils') }}</p>
-              <div class="wizard-options wizard-options-three">
+              <p class="wizard-hint">{{ t('enrollFuture.pupilsFlexibleHint') }}</p>
+              <div class="wizard-options wizard-options-three wizard-options-grid">
                 <button
-                  v-for="num in FUTURE_PUPIL_OPTIONS"
+                  v-for="num in [8, 16, 32]"
                   :key="num"
                   type="button"
                   class="wizard-option"
-                  :class="{ active: futurePupils === num }"
-                  @click="futurePupils = num"
+                  :class="{ active: futurePupils === num && futurePupilsMode !== 'custom' }"
+                  @click="selectFuturePupils(num)"
                 >
                   {{ num }}
                 </button>
+                <button
+                  type="button"
+                  class="wizard-option"
+                  :class="{ active: futurePupilsMode === 'custom' }"
+                  @click="selectFuturePupilsMore"
+                >
+                  {{ t('wizard.morePupils') }}
+                </button>
+              </div>
+              <div v-if="futurePupilsMode === 'custom'" class="wizard-counter">
+                <button type="button" class="wizard-counter-btn" :disabled="futurePupilsCustom <= 40" @click="adjustFuturePupils(-8)">-</button>
+                <span class="wizard-counter-value">{{ futurePupilsCustom }}</span>
+                <button type="button" class="wizard-counter-btn" @click="adjustFuturePupils(8)">+</button>
               </div>
             </template>
             <template v-else>
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="foundersType = 'team'">
-                  <img :src="logoHot" alt="" class="wizard-option-logo" />
+                  <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('dashboard.team') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.teamDesc') }}</div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="foundersType = 'class'">
-                  <img :src="logoFirstH" alt="" class="wizard-option-logo" />
+                  <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main">{{ t('dashboard.class') }}</div>
                   <div class="wizard-option-desc">{{ t('wizard.classDesc') }}</div>
                 </button>
@@ -462,31 +775,54 @@ watch(foundersType, (val) => {
           </div>
 
           <!-- Step 4: Form data -->
-          <div v-show="step === 4" class="wizard-step wizard-step-form">
-            <div class="field" :class="{ filled: isFilled(formData.name) }">
+          <div v-show="step === 4" class="wizard-step wizard-step-form wizard-step-animate">
+            <div v-if="edition !== 'future'" class="field" :class="{ filled: isFilled(formData.name) }">
               <input v-model="formData.name" type="text" placeholder=" " />
-              <label>{{ foundersType === 'team' ? t('enrollTeam.teamName') : (edition === 'future' ? t('enrollFuture.nameLabel') : t('enrollClass.className')) }} <span class="required">*</span></label>
+              <label>{{ foundersType === 'team' ? t('enrollTeam.teamName') : t('enrollClass.className') }} <span class="required">*</span></label>
             </div>
             <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
               <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
               <label>{{ t('enrollTeam.schoolClub') }}</label>
             </div>
-            <div v-if="foundersType === 'class' || edition === 'future'" class="field" :class="{ filled: isFilled(formData.school) }">
-              <input v-model="formData.school" type="text" placeholder=" " />
-              <label>{{ t('enrollClass.school') }}</label>
-            </div>
-            <div class="field" :class="{ filled: isFilled(formData.location) }">
-              <input v-model="formData.location" type="text" placeholder=" " />
-              <label>{{ t('enroll.location') }}</label>
-            </div>
-            <div class="field" :class="{ filled: isFilled(formData.zip) }">
-              <input v-model="formData.zip" type="text" placeholder=" " />
-              <label>{{ t('enroll.postalCode') }}</label>
-            </div>
-            <div class="field" :class="{ filled: isFilled(formData.organization) }">
-              <input v-model="formData.organization" type="text" placeholder=" " />
-              <label>{{ t('enroll.organization') }}</label>
-            </div>
+            <template v-if="foundersType === 'class' || edition === 'future'">
+              <div class="field" :class="{ filled: isFilled(formData.organization) }">
+                <input v-model="formData.organization" type="text" placeholder=" " />
+                <label>{{ t('enroll.schoolName') }}</label>
+              </div>
+              <div class="field field-select">
+                <label>{{ t('enroll.schoolType') }}</label>
+                <select v-model="formData.schoolType">
+                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+                    {{ t(opt.labelKey) }}
+                  </option>
+                </select>
+              </div>
+            </template>
+            <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
+              <div class="field field-select">
+                <label>{{ t('enroll.schoolCountry') }}</label>
+                <select v-model="formData.country">
+                  <optgroup :label="t('enroll.countriesTop')">
+                    <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                  <optgroup :label="t('enroll.countriesOther')">
+                    <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="field" :class="{ filled: isFilled(formData.zip) }">
+                <input v-model="formData.zip" type="text" placeholder=" " />
+                <label>{{ t('enroll.schoolZip') }}</label>
+              </div>
+              <div class="field" :class="{ filled: isFilled(formData.city) }">
+                <input v-model="formData.city" type="text" placeholder=" " />
+                <label>{{ t('enroll.schoolCity') }}</label>
+              </div>
+              <div class="field" :class="{ filled: isFilled(formData.state) }">
+                <input v-model="formData.state" type="text" placeholder=" " />
+                <label>{{ t('enroll.schoolState') }}</label>
+              </div>
+            </template>
             <template v-if="foundersType === 'class'">
               <div class="field" :class="{ filled: isFilled(formData.grade) }">
                 <input v-model="formData.grade" type="text" placeholder=" " />
@@ -511,8 +847,8 @@ watch(foundersType, (val) => {
             </div>
           </div>
 
-          <!-- Step 5: Voucher -->
-          <div v-show="step === 5" class="wizard-step wizard-step-form">
+          <!-- Step 5: Voucher (Founders only) -->
+          <div v-show="step === 5 && edition !== 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <div class="field" :class="{ filled: isFilled(voucher) }">
               <input
                 v-model="voucher"
@@ -531,8 +867,122 @@ watch(foundersType, (val) => {
             </template>
           </div>
 
-          <!-- Step 6: Addresses -->
-          <div v-show="step === 6" class="wizard-step wizard-step-form">
+          <!-- Step 5: On-site event (Future only) -->
+          <div v-show="step === 5 && edition === 'future'" class="wizard-step wizard-step-animate">
+            <div class="wizard-step-voucher-inner wizard-step-onsite-event">
+              <p class="wizard-question">{{ t('wizard.onSiteEventQuestion') }}</p>
+              <p class="wizard-hint">{{ t('wizard.onSiteEventHint') }}</p>
+              <p class="wizard-hint wizard-hint-skip">{{ t('wizard.onSiteEventSkipHint') }}</p>
+              <div class="wizard-options wizard-options-stack">
+                <button
+                  type="button"
+                  class="wizard-option wizard-option-card"
+                  :class="{ active: futureOnSiteEvent === 'yes' }"
+                  @click="futureOnSiteEvent = 'yes'"
+                >
+                  <div class="wizard-option-main">{{ t('wizard.onSiteEventYes') }}</div>
+                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventYesDesc') }}</div>
+                </button>
+                <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
+                  <p class="wizard-event-label">{{ t('wizard.onSiteEventSelect') }}</p>
+                  <div class="wizard-event-dropdowns">
+                    <EventSelectDropdown
+                      :title="t('wizard.eventSelectAllEvents')"
+                      :events="futureEvents"
+                      :loading="futureEventsLoading"
+                      :model-value="futureEventId"
+                      :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                      :event-label-fn="futureEventOptionLabel"
+                      @update:model-value="futureEventId = $event"
+                    />
+                    <EventSelectDropdown
+                      :title="t('wizard.eventSelectNearest')"
+                      :events="futureEventsNearest"
+                      :loading="futureEventsNearestLoading"
+                      :model-value="futureEventId"
+                      :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                      :event-label-fn="futureEventOptionLabel"
+                      @update:model-value="futureEventId = $event"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="wizard-option wizard-option-card"
+                  :class="{ active: futureOnSiteEvent === 'no' }"
+                  @click="futureOnSiteEvent = 'no'; futureEventId = null"
+                >
+                  <div class="wizard-option-main">{{ t('wizard.onSiteEventNo') }}</div>
+                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventNoDesc') }}</div>
+                </button>
+                <button
+                  type="button"
+                  class="wizard-option wizard-option-card"
+                  :class="{ active: futureOnSiteEvent === 'skip' }"
+                  @click="futureOnSiteEvent = 'skip'; futureEventId = null"
+                >
+                  <div class="wizard-option-main">{{ t('wizard.onSiteEventSkip') }}</div>
+                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventSkipDesc') }}</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 6: Order overview (Future) -->
+          <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
+            <div class="wizard-cart">
+              <h3 class="wizard-cart-title">{{ t('wizard.orderTitle') }}</h3>
+              <div class="wizard-cart-row">
+                <span>{{ t('wizard.orderEdition') }}</span>
+                <strong>{{ t('dashboard.editionFuture') }}</strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span>{{ t('wizard.orderGroup') }}</span>
+                <strong>{{ t(futureGroup === '5' ? 'dashboard.optionFutureGroup5' : 'dashboard.optionFutureGroup8') }}</strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span>{{ t('wizard.orderPupils') }}</span>
+                <strong>{{ futurePupils }} {{ t('enrollFuture.pupils') }}</strong>
+              </div>
+              <div v-if="formData.organization?.trim()" class="wizard-cart-row">
+                <span>{{ t('wizard.orderSchool') }}</span>
+                <strong>{{ formData.organization.trim() }}</strong>
+              </div>
+              <div v-if="futureOnSiteEvent === 'yes' && futureEventId" class="wizard-cart-row">
+                <span>{{ t('wizard.orderOnSiteEvent') }}</span>
+                <strong>{{ selectedFutureEventLabel || futureEventId }}</strong>
+              </div>
+            </div>
+
+            <div class="field" :class="{ filled: isFilled(voucher) }">
+              <input
+                v-model="voucher"
+                type="text"
+                placeholder=" "
+                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                @blur="onVoucherBlur"
+              />
+              <label>{{ t('enroll.voucher') }}</label>
+              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+              <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
+              <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
+            </div>
+            <template v-if="voucherType === '1'">
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+            </template>
+
+            <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            <template v-if="voucherType === '1'">
+              <div class="field voucher-invoice-forced">
+                <label class="label">{{ t('enroll.invoiceAddress') }}</label>
+                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+              </div>
+            </template>
+            <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+          </div>
+
+          <!-- Step 6: Addresses (Founders only) -->
+          <div v-show="step === 6 && edition !== 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1'">
               <div class="field voucher-invoice-forced">
@@ -548,13 +998,13 @@ watch(foundersType, (val) => {
         <div v-if="success" class="wizard-message success"><i class="bi bi-check-circle-fill"></i> {{ successMessage || t('wizard.success') }}</div>
 
         <div class="wizard-footer">
-          <button type="button" class="btn btn-ghost" :disabled="step === 1" @click="prev">
+          <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
             <i class="bi bi-arrow-left"></i> {{ t('wizard.back') }}
           </button>
           <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
             {{ t('wizard.next') }} <i class="bi bi-arrow-right"></i>
           </button>
-          <button v-else type="button" class="btn btn-primary" :disabled="submitting || !formData.name?.trim()" @click="submit">
+          <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim())" @click="submit">
             <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
             <i v-else class="bi bi-check-lg"></i>
             {{ submitting ? t('wizard.submitting') : t('wizard.submit') }}
@@ -586,6 +1036,7 @@ watch(foundersType, (val) => {
   background: var(--color-bg);
   box-shadow: var(--shadow);
   overflow: hidden;
+  animation: wizardFadeIn 0.35s ease;
 }
 .wizard-header {
   flex-shrink: 0;
@@ -649,16 +1100,161 @@ watch(foundersType, (val) => {
   max-width: 36rem;
   margin: 0 auto;
 }
+/* Step 0: vertical layout for voucher / direct entry */
+.wizard-step-voucher {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.wizard-step-voucher .wizard-step-voucher-inner {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.wizard-step-voucher .wizard-question {
+  margin: 0 0 0.25rem;
+}
+.wizard-step-voucher .wizard-hint {
+  margin: 0 0 0.5rem;
+}
+.wizard-options-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+.wizard-voucher-code-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+.wizard-voucher-code-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0;
+}
+.wizard-voucher-code-form .field label {
+  position: static;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
+}
+.wizard-voucher-code-form .field input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: 0.75rem;
+  font-size: 1.05rem;
+  box-sizing: border-box;
+}
+.wizard-voucher-code-form .field input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.wizard-voucher-code-form .field-hint {
+  margin: 0;
+}
+.wizard-step-onsite-event {
+  max-width: 32rem;
+}
+.wizard-hint-skip {
+  font-size: 0.9rem;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+}
+.wizard-event-select-wrap {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+.wizard-event-dropdowns {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.wizard-event-label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+.wizard-event-select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.wizard-event-select:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+.wizard-step-animate {
+  animation: wizardStepSlide 0.35s ease;
+}
 .wizard-question {
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--color-text);
   margin: 0 0 1rem;
 }
+.wizard-hint {
+  margin: 0.35rem 0 1.25rem;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
 .wizard-options {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+.wizard-options.wizard-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.wizard-counter {
+  margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+.wizard-counter-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wizard-counter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wizard-counter-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  min-width: 3rem;
+  text-align: center;
 }
 .wizard-options-two {
   display: grid;
@@ -685,6 +1281,7 @@ watch(foundersType, (val) => {
   justify-content: center;
   gap: 0.5rem;
   min-height: 7.5rem;
+  animation: wizardFloatIn 0.4s ease;
 }
 .wizard-option-card {
   width: 100%;
@@ -737,7 +1334,8 @@ watch(foundersType, (val) => {
   position: relative;
 }
 .wizard-step-form input,
-.wizard-step-form textarea {
+.wizard-step-form textarea,
+.wizard-step-form select {
   width: 100%;
   padding: 1.4rem 1.1rem 0.85rem;
   border: none;
@@ -755,7 +1353,8 @@ watch(foundersType, (val) => {
   resize: vertical;
 }
 .wizard-step-form input:focus,
-.wizard-step-form textarea:focus {
+.wizard-step-form textarea:focus,
+.wizard-step-form select:focus {
   border-color: var(--color-accent);
   outline: none;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
@@ -777,6 +1376,43 @@ watch(foundersType, (val) => {
   font-size: 0.8rem;
   color: var(--color-accent);
 }
+.wizard-step-form .field-select label {
+  position: static;
+  transform: none;
+  font-size: 1rem;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+.wizard-step-form .field-select select {
+  padding-top: 0.95rem;
+}
+.wizard-cart {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+.wizard-cart-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.wizard-cart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+.wizard-cart-row strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
 .required { color: #dc2626; }
 .field-hint {
   margin: 0.35rem 0 0;
@@ -792,6 +1428,22 @@ watch(foundersType, (val) => {
 @keyframes spin { to { transform: rotate(360deg); } }
 .voucher-forced-msg { margin-top: 0.5rem; }
 .voucher-invoice-forced .label { margin-bottom: 0.35rem; }
+.wizard-voucher-code-form .wizard-back-link {
+  margin-top: 0.5rem;
+}
+.wizard-back-link {
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+}
+.wizard-back-link:hover { color: var(--color-text); }
 .wizard-message {
   margin: 0 2rem 0;
   padding: 0.75rem 1rem;
@@ -843,6 +1495,7 @@ watch(foundersType, (val) => {
   color: #f8fafc;
   display: flex;
   align-items: center;
+  animation: wizardSlideIn 0.5s ease;
 }
 .wizard-hero-content {
   max-width: 22rem;
@@ -902,6 +1555,64 @@ watch(foundersType, (val) => {
   display: flex;
   flex-direction: column;
   background: var(--color-bg);
+}
+.wizard-path {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.wizard-path-step {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  animation: wizardPopIn 0.4s ease;
+}
+.wizard-path-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f8fafc;
+}
+.wizard-path-label {
+  color: #f8fafc;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+@keyframes wizardFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes wizardSlideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wizardFloatIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wizardPopIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes wizardStepSlide {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @media (max-width: 960px) {

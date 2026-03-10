@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, getAddresses, validateVoucher } from '@/services/draht'
@@ -7,7 +7,7 @@ import AddressSelector from '@/components/AddressSelector.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const program = route.query.program != null && route.query.program !== ''
   ? parseInt(route.query.program, 10)
@@ -23,8 +23,10 @@ const emptyAddressState = () => ({
 const form = ref({
   name: '',
   schoolOrClub: '',
-  location: '',
+  country: '',
   zip: '',
+  city: '',
+  state: '',
   organization: '',
   voucher: '',
   notes: '',
@@ -42,6 +44,60 @@ const voucherMessage = ref('')
 const voucherType = ref(null) // '1' = forces invoice address, '2' = no form change
 const voucherInvoiceId = ref(null) // societe id for type 1
 const voucherInvoiceName = ref(null) // display name for type 1
+
+const countryOptions = computed(() => {
+  const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+    ? new Intl.DisplayNames([locale.value], { type: 'region' })
+    : null
+  let codes = ['DE', 'AT', 'CH', 'US', 'GB', 'FR', 'IT', 'ES', 'NL', 'BE', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'SE', 'NO', 'DK', 'FI', 'PT', 'IE', 'GR', 'SI', 'HR', 'RS', 'UA', 'TR', 'CN', 'JP', 'KR', 'AU', 'NZ', 'CA', 'BR', 'MX', 'AR', 'CL', 'ZA', 'IN']
+  if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+    try {
+      const supported = Intl.supportedValuesOf('region')
+      if (Array.isArray(supported) && supported.length) codes = supported
+    } catch (_) {}
+  }
+  codes = codes.filter((code) => /^[A-Z]{2}$/.test(code))
+  const toLabel = (code) => (displayNames ? displayNames.of(code) : code)
+  const unique = Array.from(new Set(codes))
+  unique.sort((a, b) => toLabel(a).localeCompare(toLabel(b)))
+  const top = ['DE', 'AT', 'CH']
+  const rest = unique.filter((c) => !top.includes(c))
+  return {
+    top: top.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
+    rest: rest.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
+  }
+})
+
+let zipLookupTimer = null
+let zipLookupAbort = null
+async function lookupZipCityState() {
+  const zip = form.value.zip?.trim()
+  let country = (form.value.country || '').toLowerCase()
+  if (!zip) return
+  if (!country && /^\d{4,5}$/.test(zip)) country = 'de'
+  if (!country) return
+  if (zipLookupAbort) zipLookupAbort.abort()
+  zipLookupAbort = new AbortController()
+  try {
+    const res = await fetch(`https://api.zippopotam.us/${country}/${encodeURIComponent(zip)}`, { signal: zipLookupAbort.signal })
+    if (!res.ok) return
+    const data = await res.json()
+    const place = Array.isArray(data.places) && data.places.length ? data.places[0] : null
+    if (!place) return
+    const city = place['place name']
+    const state = place['state']
+    if (city) form.value.city = city
+    if (state) form.value.state = state
+  } catch (_) {}
+}
+
+watch(
+  () => [form.value.country, form.value.zip],
+  () => {
+    if (zipLookupTimer) clearTimeout(zipLookupTimer)
+    zipLookupTimer = setTimeout(lookupZipCityState, 350)
+  }
+)
 
 onMounted(async () => {
   try {
@@ -136,9 +192,11 @@ async function submit() {
     const payload = {
       name: form.value.name.trim(),
       schoolOrClub: form.value.schoolOrClub.trim() || undefined,
-      location: form.value.location.trim() || undefined,
-      zip: form.value.zip.trim() || undefined,
-      organization: form.value.organization.trim() || undefined,
+      country: form.value.country?.trim() || undefined,
+      zip: form.value.zip?.trim() || undefined,
+      location: form.value.city?.trim() || undefined,
+      state: form.value.state?.trim() || undefined,
+      organization: form.value.organization?.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
       notes: form.value.notes.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
@@ -155,8 +213,10 @@ async function submit() {
     form.value = {
       name: '',
       schoolOrClub: '',
-      location: '',
+      country: '',
       zip: '',
+      city: '',
+      state: '',
       organization: '',
       voucher: '',
       notes: '',
@@ -205,16 +265,28 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-location">{{ t('enroll.location') }}</label>
+        <label for="team-school">{{ t('enrollTeam.schoolClub') }}</label>
         <input
-          id="team-location"
-          v-model="form.location"
+          id="team-school"
+          v-model="form.schoolOrClub"
           type="text"
-          :placeholder="t('enrollTeam.placeholderLocation')"
+          :placeholder="t('enrollTeam.placeholderSchool')"
         />
       </div>
+      <div class="field field-select">
+        <label for="team-country">{{ t('enroll.schoolCountry') }}</label>
+        <select id="team-country" v-model="form.country">
+          <option value="">{{ t('enroll.selectCountry') }}</option>
+          <optgroup :label="t('enroll.countriesTop')">
+            <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </optgroup>
+          <optgroup :label="t('enroll.countriesOther')">
+            <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </optgroup>
+        </select>
+      </div>
       <div class="field">
-        <label for="team-zip">{{ t('enroll.postalCode') }}</label>
+        <label for="team-zip">{{ t('enroll.schoolZip') }}</label>
         <input
           id="team-zip"
           v-model="form.zip"
@@ -223,20 +295,28 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
+        <label for="team-city">{{ t('enroll.schoolCity') }}</label>
+        <input
+          id="team-city"
+          v-model="form.city"
+          type="text"
+          :placeholder="t('enrollTeam.placeholderLocation')"
+        />
+      </div>
+      <div class="field">
+        <label for="team-state">{{ t('enroll.schoolState') }}</label>
+        <input
+          id="team-state"
+          v-model="form.state"
+          type="text"
+        />
+      </div>
+      <div class="field">
         <label for="team-organization">{{ t('enroll.organization') }}</label>
         <input
           id="team-organization"
           v-model="form.organization"
           type="text"
-        />
-      </div>
-      <div class="field">
-        <label for="team-school">{{ t('enrollTeam.schoolClub') }}</label>
-        <input
-          id="team-school"
-          v-model="form.schoolOrClub"
-          type="text"
-          :placeholder="t('enrollTeam.placeholderSchool')"
         />
       </div>
       <div class="field">

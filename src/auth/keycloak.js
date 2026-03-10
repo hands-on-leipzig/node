@@ -13,13 +13,17 @@ export const keycloak = new Keycloak(keycloakConfig)
  * @param {Object} options - { onLoad: 'login-required' | 'check-sso' }
  * @returns {Promise<boolean>} true if authenticated
  */
+let initPromise = null
+
 export function initKeycloak(options = {}) {
+  if (initPromise) return initPromise
   const { onLoad = 'check-sso' } = options
-  return keycloak.init({
+  initPromise = keycloak.init({
     onLoad,
     checkLoginIframe: false,
     pkceMethod: 'S256',
   })
+  return initPromise
 }
 
 export function getToken() {
@@ -71,8 +75,20 @@ export function getCoachDolibarrContactId() {
   return Number.isFinite(n) ? n : null
 }
 
-export function login() {
-  keycloak.login()
+export async function login() {
+  const redirectUri = `${window.location.origin}/dashboard`
+  try {
+    await initKeycloak({ onLoad: 'check-sso' })
+    return keycloak.login({ redirectUri })
+  } catch (e) {
+    try {
+      const url = keycloak.createLoginUrl({ redirectUri })
+      window.location.assign(url)
+    } catch (err) {
+      console.error('Keycloak login failed', err)
+      throw err
+    }
+  }
 }
 
 export function logout() {

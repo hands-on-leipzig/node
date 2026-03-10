@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollClass, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 
 const router = useRouter()
 const route = useRoute()
@@ -22,7 +23,7 @@ const emptyAddressState = () => ({
 
 const form = ref({
   name: '',
-  school: '',
+  schoolType: '',
   grade: '',
   teacherName: '',
   location: '',
@@ -139,7 +140,7 @@ async function submit() {
   try {
     const payload = {
       name: form.value.name.trim(),
-      school: form.value.school.trim() || undefined,
+      schoolType: form.value.schoolType || undefined,
       grade: form.value.grade.trim() || undefined,
       teacherName: form.value.teacherName.trim() || undefined,
       location: form.value.location.trim() || undefined,
@@ -167,7 +168,7 @@ async function submit() {
     voucherInvoiceName.value = null
     form.value = {
       name: '',
-      school: '',
+      schoolType: '',
       grade: '',
       teacherName: '',
       location: '',
@@ -240,7 +241,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-organization">{{ t('enroll.organization') }}</label>
+        <label for="class-organization">{{ t('enroll.schoolName') }}</label>
         <input
           id="class-organization"
           v-model="form.organization"
@@ -248,13 +249,13 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-school">{{ t('enrollClass.school') }}</label>
-        <input
-          id="class-school"
-          v-model="form.school"
-          type="text"
-          :placeholder="t('enrollClass.placeholderSchool')"
-        />
+        <label for="class-school-type">{{ t('enroll.schoolType') }}</label>
+        <select id="class-school-type" v-model="form.schoolType">
+          <option value="" disabled>{{ t('schoolTypes.none') }}</option>
+          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+            {{ t(opt.labelKey) }}
+          </option>
+        </select>
       </div>
       <div class="field">
         <label for="class-grade">{{ t('enrollClass.grade') }}</label>
@@ -425,7 +426,8 @@ function onFormFieldFocus(e) {
   color: #dc2626;
 }
 .form input,
-.form textarea {
+.form textarea,
+.form select {
   width: 100%;
   padding: 0.875rem 1rem;
   min-height: var(--touch-lg);
