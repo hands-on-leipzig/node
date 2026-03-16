@@ -153,6 +153,15 @@ export function listClasses() {
 }
 
 /**
+ * List open tasks for the current coach (GET /handson/node/tasks).
+ * Returns teams/classes that need action (e.g. pay invoice). Single call, no N+1.
+ * Response: { data: [ { type: 'team'|'class', id, name, ref, action: 'pay_invoice'|'action_required' } ] }
+ */
+export function getOpenTasks() {
+  return api.get('/tasks')
+}
+
+/**
  * Get a single team by id (for detail view).
  */
 export function getTeam(id) {

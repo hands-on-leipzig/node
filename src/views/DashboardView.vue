@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { listTeams, listClasses } from '@/services/draht'
+import { listTeams, listClasses, getOpenTasks } from '@/services/draht'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 
 const { t } = useI18n()
@@ -24,22 +24,9 @@ const classes = ref([])
 const loading = ref(true)
 const error = ref(null)
 
-/** Only teams that need an action from the coach. */
-const teamsWithActions = computed(() => teams.value.filter((t) => getTeamAction(t)))
-/** Only classes that need an action. */
-const classesWithActions = computed(() => classes.value.filter((c) => getClassAction(c)))
-const taskItems = computed(() => {
-  const items = []
-  teamsWithActions.value.forEach((team) => {
-    const action = getTeamAction(team)
-    if (action) items.push({ type: 'team', id: team.id, name: team.label || team.name || team.ref || '#' + team.id, ref: team.ref, action })
-  })
-  classesWithActions.value.forEach((cls) => {
-    const action = getClassAction(cls)
-    if (action) items.push({ type: 'class', id: cls.id, name: cls.label || cls.name || cls.ref || '#' + cls.id, ref: cls.ref, action })
-  })
-  return items
-})
+/** Tasks to do: built from getTeam/getClass detail responses (same data as team detail page). */
+const taskItems = ref([])
+const tasksLoading = ref(false)
 
 /** Mock upcoming events – replace with API feed later. */
 const upcomingEvents = ref([
@@ -48,61 +35,12 @@ const upcomingEvents = ref([
   { titleKey: 'dashboard.mockEventLandesfinale', dateKey: 'dashboard.mockEventLandesfinaleDate', locationKey: 'dashboard.mockEventLandesfinaleLocation' },
 ])
 
-/** Derive coach action for a team (e.g. pay invoice). Returns { label, icon } or null. */
-function getTeamAction(team) {
-  if (!team) return null
-  // Explicit flags from API
-  if (team.invoice_pending === true || team.action_required === 'invoice') {
+/** Map API action string to UI { label, icon }. */
+function actionFromApi(apiAction) {
+  if (apiAction === 'pay_invoice') {
     return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
   }
-  const billing = (team.status_billing || team.billing_status || '').toLowerCase()
-  if (billing === 'unpaid' || billing === 'pending' || billing === 'open') {
-    return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
-  }
-  if (team.action_required) {
-    const msg = typeof team.action_required === 'string' ? team.action_required : t('dashboard.actionRequired')
-    return { label: msg, icon: 'bi-exclamation-circle' }
-  }
-  // Timeline: step with status progress/warn that suggests invoice
-  const steps = team.timeline?.timeline ?? team.timeline
-  const arr = Array.isArray(steps) ? steps : []
-  for (const step of arr) {
-    if (step.status === 'warn' || step.status === 'progress') {
-      const sub = (step.de_sub || step.en_sub || '').toLowerCase()
-      if (sub.includes('rechnung') || sub.includes('invoice')) {
-        return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
-      }
-      return { label: t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
-    }
-  }
-  return null
-}
-
-/** Same for class if needed later. */
-function getClassAction(cls) {
-  if (!cls) return null
-  if (cls.invoice_pending === true || cls.action_required === 'invoice') {
-    return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
-  }
-  const billing = (cls.status_billing || cls.billing_status || '').toLowerCase()
-  if (billing === 'unpaid' || billing === 'pending' || billing === 'open') {
-    return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
-  }
-  if (cls.action_required) {
-    return { label: typeof cls.action_required === 'string' ? cls.action_required : t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
-  }
-  const steps = cls.timeline?.timeline ?? cls.timeline
-  const arr = Array.isArray(steps) ? steps : []
-  for (const step of arr) {
-    if (step.status === 'warn' || step.status === 'progress') {
-      const sub = (step.de_sub || step.en_sub || '').toLowerCase()
-      if (sub.includes('rechnung') || sub.includes('invoice')) {
-        return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
-      }
-      return { label: t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
-    }
-  }
-  return null
+  return { label: t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
 }
 
 async function loadLists() {
@@ -113,22 +51,41 @@ async function loadLists() {
       listTeams(),
       listClasses(),
     ])
+    let teamList = []
+    let classList = []
     if (teamsRes.status === 'fulfilled' && teamsRes.value?.data != null) {
       const d = teamsRes.value.data
-      teams.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    } else {
-      teams.value = []
+      teamList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
     }
     if (classesRes.status === 'fulfilled' && classesRes.value?.data != null) {
       const d = classesRes.value.data
-      classes.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    } else {
-      classes.value = []
+      classList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
     }
+    // Show list immediately so dashboard never hangs
+    teams.value = [...teamList]
+    classes.value = [...classList]
   } catch (e) {
     error.value = e.message || t('errors.loadFailed')
   } finally {
     loading.value = false
+  }
+  // Open tasks from single backend endpoint (GET node/tasks)
+  tasksLoading.value = true
+  taskItems.value = []
+  try {
+    const res = await getOpenTasks()
+    const data = res?.data?.data ?? (Array.isArray(res?.data) ? res.data : [])
+    taskItems.value = (Array.isArray(data) ? data : []).map((row) => ({
+      type: row.type || (row.id != null ? 'team' : 'class'),
+      id: row.id,
+      name: row.name ?? row.ref ?? '#' + row.id,
+      ref: row.ref,
+      action: actionFromApi(row.action),
+    }))
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('Dashboard open tasks failed', e)
+  } finally {
+    tasksLoading.value = false
   }
 }
 
@@ -170,7 +127,11 @@ onMounted(loadLists)
             {{ t('dashboard.tasksToDo') }}
             <span v-if="taskItems.length" class="dashboard-card-badge">{{ taskItems.length }}</span>
           </h2>
-          <div v-if="taskItems.length" class="dashboard-tasks-list">
+          <div v-if="tasksLoading" class="dashboard-empty">
+            <i class="bi bi-arrow-repeat spin"></i>
+            {{ t('dashboard.checkingTasks') }}
+          </div>
+          <div v-else-if="taskItems.length" class="dashboard-tasks-list">
             <button
               v-for="item in taskItems"
               :key="item.type + '-' + item.id"

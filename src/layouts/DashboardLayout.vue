@@ -3,7 +3,7 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getUserProfile, logout } from '@/auth/keycloak'
-import { setLocale } from '@/i18n'
+import { setLocale, showTranslationKeys, setShowTranslationKeys } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses } from '@/services/draht'
 
@@ -239,6 +239,16 @@ const userInitials = computed(() => {
                   >
                     EN
                   </button>
+                  <button
+                    type="button"
+                    class="profile-pill"
+                    :class="{ active: showTranslationKeys }"
+                    @click="setShowTranslationKeys(!showTranslationKeys)"
+                    :title="t('common.showTranslationKeys')"
+                  >
+                    <i class="bi" :class="showTranslationKeys ? 'bi-code-slash' : 'bi-translate'"></i>
+                    Keys
+                  </button>
                 </div>
               </div>
               <div class="profile-menu-section">
@@ -282,7 +292,7 @@ const userInitials = computed(() => {
       <header class="header">
         <h1 class="page-title">{{ pageTitle }}</h1>
       </header>
-      <div class="content">
+      <div class="content" :key="'content-' + showTranslationKeys">
         <RouterView />
       </div>
     </main>

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { isAuthenticated, login, logout, getUserProfile } from '@/auth/keycloak'
-import { setLocale } from '@/i18n'
+import { setLocale, showTranslationKeys, setShowTranslationKeys } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 
 const route = useRoute()
@@ -63,6 +63,18 @@ function doLogin() {
           @click="setLocale('en')"
         >
           EN
+        </button>
+      </div>
+      <div class="home-keys">
+        <button
+          type="button"
+          class="pill-btn"
+          :class="{ active: showTranslationKeys }"
+          @click="setShowTranslationKeys(!showTranslationKeys)"
+          :title="t('common.showTranslationKeys')"
+        >
+          <i class="bi" :class="showTranslationKeys ? 'bi-code-slash' : 'bi-translate'"></i>
+          {{ showTranslationKeys ? 'Keys' : 'Text' }}
         </button>
       </div>
     </div>
