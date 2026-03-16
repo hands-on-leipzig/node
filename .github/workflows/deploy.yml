@@ -48,7 +48,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.TEST_DEPLOY_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          PORT="${DEPLOY_PORT:-22}"
+          PORT="${TEST_DEPLOY_PORT:-22}"
           ssh-keyscan -p "$PORT" -H "${{ secrets.TEST_DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to test via rsync
