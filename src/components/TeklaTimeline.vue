@@ -83,6 +83,22 @@ function isPdfDoc(item) {
   return t === 'order' || t === 'invoice'
 }
 
+/** Invoice/order document status for display: 'paid' | 'open' | 'not_needed'. Null if not applicable. */
+function docStatus(item) {
+  if (!item) return null
+  const t = (item.type || '').toLowerCase()
+  if (t !== 'order' && t !== 'invoice') return null
+  if (item.payed === true) return 'paid'
+  if (item.not_needed === true) return 'not_needed'
+  return 'open'
+}
+
+function docStatusLabelKey(item) {
+  const s = docStatus(item)
+  if (!s) return null
+  return s === 'paid' ? 'detail.invoiceStatusPaid' : s === 'not_needed' ? 'detail.invoiceStatusNotNeeded' : 'detail.invoiceStatusOpen'
+}
+
 async function openPdf(item) {
   if (!props.teklaId || !item?.label) return
   const docType = (item.type || '').toLowerCase()
@@ -203,6 +219,9 @@ function cancelVersandaufschubForm() {
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                        {{ t(docStatusLabelKey(item)) }}
+                      </span>
                       <span v-if="item.link_text" class="tekla-doc-extra">{{ item.link_text }}</span>
                       <i class="bi bi-box-arrow-up-right tekla-doc-external"></i>
                     </a>
@@ -215,16 +234,16 @@ function cancelVersandaufschubForm() {
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
-                      <span v-if="item.payed !== undefined && item.payed" class="tekla-doc-paid" title="Paid">
-                        <i class="bi bi-check-circle-fill"></i>
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                        {{ t(docStatusLabelKey(item)) }}
                       </span>
                       <i class="bi bi-box-arrow-up-right tekla-doc-external"></i>
                     </button>
                     <span v-else class="tekla-doc-label">
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
-                      <span v-if="item.payed !== undefined && item.payed" class="tekla-doc-paid" title="Paid">
-                        <i class="bi bi-check-circle-fill"></i>
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                        {{ t(docStatusLabelKey(item)) }}
                       </span>
                     </span>
                   </li>
@@ -514,6 +533,22 @@ function cancelVersandaufschubForm() {
 .tekla-doc-paid {
   color: var(--color-success, #16a34a);
   margin-left: 0.25rem;
+}
+
+.tekla-doc-status {
+  margin-left: 0.25rem;
+  font-size: 0.8em;
+  opacity: 0.9;
+}
+.tekla-doc-status.paid {
+  color: var(--color-success, #16a34a);
+}
+.tekla-doc-status.open {
+  color: var(--color-warn, #ca8a04);
+}
+.tekla-doc-status.not_needed {
+  color: var(--color-fg-muted);
+  font-style: italic;
 }
 
 @keyframes stage-in {

@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEvents, getEventsNearest, validateVoucher } from '@/services/draht'
+import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEvents, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
@@ -71,6 +71,14 @@ const voucherMessage = ref('')
 const voucherType = ref(null)
 const voucherInvoiceId = ref(null)
 const voucherInvoiceName = ref(null)
+// Founder team: participants (first name, last name, date of birth, gender)
+const founderTeamPlayers = ref([])
+// Founder team: event to register for
+const founderTeamEventId = ref(null)
+const founderEvents = ref([])
+const founderEventsLoading = ref(false)
+const founderEventsNearest = ref([])
+const founderEventsNearestLoading = ref(false)
 // Step 6
 const deliveryAddress = ref(emptyAddressState())
 const invoiceAddress = ref(emptyAddressState())
@@ -82,8 +90,14 @@ const error = ref(null)
 const success = ref(false)
 const successMessage = ref('')
 
+const foundersTeamHasParticipantsStep = computed(
+  () => edition.value === 'founders' && foundersType.value === 'team'
+)
+
 const totalSteps = computed(() => {
-  const contentSteps = edition.value === 'future' ? 6 : 6 // Future: +1 step for on-site event
+  // Future: 6 content steps. Founders team: 7 (no voucher step). Founders class: 5 (no voucher step).
+  const contentSteps =
+    edition.value === 'future' ? 6 : foundersTeamHasParticipantsStep.value ? 7 : 5
   return 1 + contentSteps // Step 0 (voucher?) + rest
 })
 
@@ -98,8 +112,19 @@ const stepTitle = computed(() => {
   if (step.value === 2) return edition.value === 'future' ? t('wizard.stepFutureGroup') : t('wizard.stepVariant')
   if (step.value === 3) return edition.value === 'future' ? t('wizard.stepPupils') : t('wizard.stepTeamClass')
   if (step.value === 4) return t('wizard.stepData')
-  if (step.value === 5) return edition.value === 'future' ? t('wizard.stepOnSiteEvent') : t('wizard.stepVoucher')
-  if (step.value === 6) return edition.value === 'future' ? t('wizard.stepOrder') : t('wizard.stepAddresses')
+  if (step.value === 5) {
+    if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
+    if (foundersTeamHasParticipantsStep.value) return t('wizard.stepParticipants')
+    return t('wizard.stepAddresses') // Founders class: no voucher step, Addresses is step 5
+  }
+  if (step.value === 6) {
+    if (edition.value === 'future') return t('wizard.stepOrder')
+    if (foundersTeamHasParticipantsStep.value) return t('wizard.stepEvent')
+    return t('wizard.stepAddresses')
+  }
+  if (step.value === 7) return t('wizard.stepAddresses') // Founder team: Addresses (no voucher step)
+  if (step.value === 6 && edition.value === 'founders' && foundersType.value === 'class') return t('wizard.orderTitle')
+  if (step.value === 8 && foundersTeamHasParticipantsStep.value) return t('wizard.orderTitle')
   return ''
 })
 
@@ -154,6 +179,12 @@ const summaryItems = computed(() => {
 const selectedFutureEventLabel = computed(() => {
   if (!futureEventId.value || !futureEvents.value.length) return null
   const ev = futureEvents.value.find((e) => String(e.id) === String(futureEventId.value))
+  return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
+})
+
+const selectedFounderEventLabel = computed(() => {
+  if (!founderTeamEventId.value || !founderEvents.value.length) return null
+  const ev = founderEvents.value.find((e) => String(e.id) === String(founderTeamEventId.value))
   return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
 })
 
@@ -255,6 +286,8 @@ function openWizard() {
   voucherInvoiceName.value = null
   deliveryAddress.value = emptyAddressState()
   invoiceAddress.value = emptyAddressState()
+  founderTeamPlayers.value = []
+  founderTeamEventId.value = null
   step.value = 0
   error.value = null
   success.value = false
@@ -266,6 +299,23 @@ function close() {
 
 function isFilled(value) {
   return value !== null && value !== undefined && String(value).trim() !== ''
+}
+
+function addFounderParticipant() {
+  founderTeamPlayers.value = [...founderTeamPlayers.value, { firstname: '', name: '', gender: '', birthdayStr: '' }]
+}
+
+function removeFounderParticipant(idx) {
+  founderTeamPlayers.value = founderTeamPlayers.value.filter((_, i) => i !== idx)
+}
+
+function buildWizardPlayersPayload() {
+  return founderTeamPlayers.value.map((p) => ({
+    firstname: (p.firstname || '').trim() || '',
+    name: (p.name || '').trim() || '',
+    gender: (p.gender || '').trim() || '',
+    birthday: (p.birthdayStr || '').trim() || null,
+  }))
 }
 
 function getCreatedId(res) {
@@ -292,13 +342,17 @@ function canNext() {
   if (step.value === 2) return edition.value === 'future' ? futureGroup.value != null : foundersVariant.value != null
   if (step.value === 3) return edition.value === 'future' ? futurePupils.value != null : foundersType.value != null
   if (step.value === 4) return edition.value === 'future' ? true : !!formData.value.name?.trim()
+  if (step.value === 5 && foundersTeamHasParticipantsStep.value) return true // participants optional
   if (step.value === 5 && edition.value === 'future') {
     if (!futureOnSiteEvent.value) return false
     if (futureOnSiteEvent.value === 'yes') return !!futureEventId.value
     return true
   }
+  if (step.value === 5 && edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
   if (step.value === 5) return true
   if (step.value === 6) return true
+  if (step.value === 7 && foundersTeamHasParticipantsStep.value) return areAddressesValid()
+  if (step.value === 7) return true
   return false
 }
 
@@ -316,6 +370,13 @@ function next() {
   if (step.value === 4 && edition.value === 'future') {
     loadFutureEvents()
     loadFutureEventsNearest()
+  }
+  if (step.value === 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
+    addFounderParticipant()
+  }
+  if (step.value === 5 && foundersTeamHasParticipantsStep.value) {
+    loadFounderTeamEvents()
+    loadFounderTeamEventsNearest()
   }
   if (step.value < totalSteps.value) step.value++
 }
@@ -362,6 +423,39 @@ async function loadFutureEventsNearest() {
   }
 }
 
+async function loadFounderTeamEvents() {
+  founderEventsLoading.value = true
+  founderEvents.value = []
+  try {
+    const res = await getEvents()
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    founderEvents.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    founderEvents.value = []
+  } finally {
+    founderEventsLoading.value = false
+  }
+}
+
+async function loadFounderTeamEventsNearest() {
+  founderEventsNearestLoading.value = true
+  founderEventsNearest.value = []
+  try {
+    const country = formData.value.country?.trim() || undefined
+    const zip = formData.value.zip?.trim() || undefined
+    const program = foundersVariant.value === 'explore' ? 1 : 2
+    const res = await getEventsNearest(country, zip, program)
+    const data = res.data
+    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
+    founderEventsNearest.value = Array.isArray(list) ? list : []
+  } catch (_) {
+    founderEventsNearest.value = []
+  } finally {
+    founderEventsNearestLoading.value = false
+  }
+}
+
 async function loadAddresses() {
   try {
     const res = await getAddresses()
@@ -388,6 +482,21 @@ function buildAddressPayload(addr) {
 function buildInvoicePayload() {
   if (voucherType.value === '1' && voucherInvoiceId.value != null) return { addressId: voucherInvoiceId.value }
   return buildAddressPayload(invoiceAddress.value)
+}
+
+/** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
+function isDeliveryAddressValid() {
+  return !!buildAddressPayload(deliveryAddress.value)
+}
+
+/** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
+function isInvoiceAddressValid() {
+  if (voucherType.value === '1') return voucherInvoiceId.value != null
+  return !!buildAddressPayload(invoiceAddress.value)
+}
+
+function areAddressesValid() {
+  return isDeliveryAddressValid() && isInvoiceAddressValid()
 }
 
 function formatSubmitError(e) {
@@ -482,6 +591,10 @@ async function submit() {
     error.value = t('enroll.voucherInvalid')
     return
   }
+  if (!areAddressesValid()) {
+    error.value = t('wizard.addressesRequired')
+    return
+  }
   error.value = null
   submitting.value = true
   try {
@@ -509,6 +622,8 @@ async function submit() {
     } else {
       const isTeam = foundersType.value === 'team'
       const program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
+      const deliveryPayload = buildAddressPayload(deliveryAddress.value)
+      const invoicePayload = buildInvoicePayload()
       const payload = {
         program,
         name: formData.value.name.trim(),
@@ -517,12 +632,12 @@ async function submit() {
         organization: formData.value.organization?.trim() || undefined,
         country: formData.value.country?.trim() || undefined,
         zip: formData.value.zip?.trim() || undefined,
-        location: formData.value.city?.trim() || undefined,
-        state: formData.value.state?.trim() || undefined,
+        location: (formData.value.city || '').trim() || undefined,
+        state: (formData.value.state || '').trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         notes: formData.value.notes?.trim() || undefined,
-        deliveryAddress: buildAddressPayload(deliveryAddress.value),
-        invoiceAddress: buildInvoicePayload(),
+        deliveryAddress: deliveryPayload ?? undefined,
+        invoiceAddress: invoicePayload ?? undefined,
       }
       if (!isTeam) {
         payload.grade = formData.value.grade?.trim() || undefined
@@ -538,6 +653,16 @@ async function submit() {
       if (isTeam) res = await enrollTeam(payload)
       else res = await enrollClass(payload)
       const createdId = getCreatedId(res)
+      if (createdId && isTeam && founderTeamPlayers.value.length > 0) {
+        const allPlayers = buildWizardPlayersPayload()
+        const nonEmpty = allPlayers.filter((p) => p.firstname || p.name || p.gender || p.birthday)
+        if (nonEmpty.length > 0) {
+          await updateTeamPlayers(createdId, { players: nonEmpty })
+        }
+      }
+      if (createdId && isTeam && founderTeamEventId.value) {
+        await registerTeamForEvent(createdId, founderTeamEventId.value)
+      }
       successMessage.value = successMessageFor(isTeam ? 'team' : 'class')
       if (createdId) {
         setTimeout(() => {
@@ -814,13 +939,8 @@ watch(
                 <input v-model="formData.zip" type="text" placeholder=" " />
                 <label>{{ t('enroll.schoolZip') }}</label>
               </div>
-              <div class="field" :class="{ filled: isFilled(formData.city) }">
-                <input v-model="formData.city" type="text" placeholder=" " />
-                <label>{{ t('enroll.schoolCity') }}</label>
-              </div>
-              <div class="field" :class="{ filled: isFilled(formData.state) }">
-                <input v-model="formData.state" type="text" placeholder=" " />
-                <label>{{ t('enroll.schoolState') }}</label>
+              <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
+                <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
             </template>
             <template v-if="foundersType === 'class'">
@@ -847,24 +967,66 @@ watch(
             </div>
           </div>
 
-          <!-- Step 5: Voucher (Founders only) -->
-          <div v-show="step === 5 && edition !== 'future'" class="wizard-step wizard-step-form wizard-step-animate">
-            <div class="field" :class="{ filled: isFilled(voucher) }">
-              <input
-                v-model="voucher"
-                type="text"
-                placeholder=" "
-                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
-                @blur="onVoucherBlur"
-              />
-              <label>{{ t('enroll.voucher') }}</label>
-              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
-              <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
-              <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
+          <!-- Step 5: Participants (Founder team only) -->
+          <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
+            <p class="wizard-hint">{{ t('wizard.participantsHint') }}</p>
+            <div class="wizard-participants">
+              <div class="wizard-participant-row wizard-participant-header">
+                <span class="wizard-participant-label">{{ t('detail.firstname') }}</span>
+                <span class="wizard-participant-label">{{ t('detail.lastname') }}</span>
+                <span class="wizard-participant-label">{{ t('detail.dateOfBirth') }}</span>
+                <span class="wizard-participant-label">{{ t('detail.gender') }}</span>
+                <span></span>
+              </div>
+              <div
+                v-for="(p, idx) in founderTeamPlayers"
+                :key="'p-' + idx"
+                class="wizard-participant-row"
+              >
+                <input v-model="p.firstname" type="text" class="wizard-participant-input" :placeholder="t('detail.firstname')" />
+                <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
+                <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
+                <select v-model="p.gender" class="wizard-participant-select">
+                  <option value="">{{ t('detail.gender') }}</option>
+                  <option value="M">{{ t('detail.genderM') }}</option>
+                  <option value="F">{{ t('detail.genderF') }}</option>
+                  <option value="D">{{ t('detail.genderD') }}</option>
+                </select>
+                <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+              <button type="button" class="wizard-btn-add-participant" @click="addFounderParticipant">
+                <i class="bi bi-plus-lg"></i> {{ t('detail.addPlayer') }}
+              </button>
             </div>
-            <template v-if="voucherType === '1'">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
-            </template>
+          </div>
+
+          <!-- Step 6: Event (Founder team only) -->
+          <div v-show="step === 6 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
+            <p class="wizard-hint">{{ t('wizard.founderTeamEventHint') }}</p>
+            <div class="wizard-event-select-wrap">
+              <div class="wizard-event-dropdowns">
+                <EventSelectDropdown
+                  :title="t('wizard.eventSelectAllEvents')"
+                  :events="founderEvents"
+                  :loading="founderEventsLoading"
+                  :model-value="founderTeamEventId"
+                  :placeholder="t('wizard.founderTeamEventPlaceholder')"
+                  :event-label-fn="futureEventOptionLabel"
+                  @update:model-value="founderTeamEventId = $event"
+                />
+                <EventSelectDropdown
+                  :title="t('wizard.eventSelectNearest')"
+                  :events="founderEventsNearest"
+                  :loading="founderEventsNearestLoading"
+                  :model-value="founderTeamEventId"
+                  :placeholder="t('wizard.founderTeamEventPlaceholder')"
+                  :event-label-fn="futureEventOptionLabel"
+                  @update:model-value="founderTeamEventId = $event"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- Step 5: On-site event (Future only) -->
@@ -930,6 +1092,7 @@ watch(
 
           <!-- Step 6: Order overview (Future) -->
           <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
+            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> {{ t('wizard.addressesRequiredHint') }}</p>
             <div class="wizard-cart">
               <h3 class="wizard-cart-title">{{ t('wizard.orderTitle') }}</h3>
               <div class="wizard-cart-row">
@@ -981,8 +1144,28 @@ watch(
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
           </div>
 
-          <!-- Step 6: Addresses (Founders only) -->
-          <div v-show="step === 6 && edition !== 'future'" class="wizard-step wizard-step-form wizard-step-animate">
+          <!-- Step 5: Addresses (Founders class) / Step 7: Addresses (Founder team) – voucher available at checkout here -->
+          <div
+            v-show="(step === 5 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
+            class="wizard-step wizard-step-form wizard-step-animate"
+          >
+            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> {{ t('wizard.addressesRequiredHint') }}</p>
+            <div class="field" :class="{ filled: isFilled(voucher) }">
+              <input
+                v-model="voucher"
+                type="text"
+                placeholder=" "
+                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                @blur="onVoucherBlur"
+              />
+              <label>{{ t('enroll.voucher') }}</label>
+              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+              <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
+              <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
+            </div>
+            <template v-if="voucherType === '1'">
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+            </template>
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1'">
               <div class="field voucher-invoice-forced">
@@ -991,6 +1174,41 @@ watch(
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+          </div>
+
+          <!-- Step 6: Order overview / Checkout (Founders class) / Step 8: Order overview (Founder team) -->
+          <div
+            v-show="(step === 6 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
+            class="wizard-step wizard-step-form wizard-step-animate"
+          >
+            <div class="wizard-cart">
+              <h3 class="wizard-cart-title">{{ t('wizard.orderTitle') }}</h3>
+              <div class="wizard-cart-row">
+                <span>{{ t('wizard.orderEdition') }}</span>
+                <strong>{{ t('dashboard.editionFounders') }}</strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span>{{ foundersType === 'team' ? t('dashboard.team') : t('dashboard.class') }}</span>
+                <strong>{{ t(foundersVariant === 'explore' ? 'wizard.optionExplore' : 'wizard.optionChallenge') }}</strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span>{{ foundersType === 'team' ? t('enrollTeam.teamName') : t('enrollClass.className') }}</span>
+                <strong>{{ formData.name?.trim() || '—' }}</strong>
+              </div>
+              <div v-if="foundersType === 'team' && founderTeamEventId" class="wizard-cart-row">
+                <span>{{ t('wizard.stepEvent') }}</span>
+                <strong>{{ selectedFounderEventLabel || founderTeamEventId }}</strong>
+              </div>
+              <div v-if="foundersType === 'team' && founderTeamPlayers.length" class="wizard-cart-row">
+                <span>{{ t('detail.players') }}</span>
+                <strong>{{ founderTeamPlayers.filter((p) => p.firstname || p.name || p.gender || p.birthdayStr).length }}</strong>
+              </div>
+              <div v-if="voucher?.trim()" class="wizard-cart-row">
+                <span>{{ t('enroll.voucher') }}</span>
+                <strong>{{ voucherValid === true ? (voucherMessage || voucher) : voucher }}</strong>
+              </div>
+            </div>
+            <p class="wizard-hint">{{ t('wizard.orderReviewHint') }}</p>
           </div>
         </div>
 
@@ -1004,7 +1222,7 @@ watch(
           <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
             {{ t('wizard.next') }} <i class="bi bi-arrow-right"></i>
           </button>
-          <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim())" @click="submit">
+          <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
             <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
             <i v-else class="bi bi-check-lg"></i>
             {{ submitting ? t('wizard.submitting') : t('wizard.submit') }}
@@ -1100,6 +1318,79 @@ watch(
   max-width: 36rem;
   margin: 0 auto;
 }
+
+/* Participants step (founder team) */
+.wizard-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.wizard-participant-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(8rem, auto) minmax(6rem, auto) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+.wizard-participant-row.wizard-participant-header {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.25rem;
+}
+.wizard-participant-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: none;
+}
+.wizard-participant-input,
+.wizard-participant-select {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+.wizard-participant-input.wizard-participant-dob {
+  min-width: 0;
+}
+.wizard-participant-select {
+  cursor: pointer;
+}
+.wizard-participant-remove {
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wizard-participant-remove:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-error, #dc2626);
+}
+.wizard-btn-add-participant {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+}
+.wizard-btn-add-participant:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 /* Step 0: vertical layout for voucher / direct entry */
 .wizard-step-voucher {
   display: flex;
@@ -1332,6 +1623,14 @@ watch(
 .wizard-step-form .field {
   margin-bottom: 1.25rem;
   position: relative;
+}
+.wizard-place-display-wrap {
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+}
+.wizard-place-display {
+  font-size: 1rem;
+  color: var(--color-text);
 }
 .wizard-step-form input,
 .wizard-step-form textarea,

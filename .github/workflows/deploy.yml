@@ -1,0 +1,102 @@
+# Deploy workflow:
+# - Push/merge to main → deploy to TEST (secrets: TEST_DEPLOY_*)
+# - Publish a Release → deploy to PROD (secrets: DEPLOY_*)
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - prod
+
+jobs:
+  deploy-test:
+    name: Deploy to Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'test')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup SSH key
+        env:
+          DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TEST_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${DEPLOY_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "${{ secrets.TEST_DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to test via rsync
+        env:
+          DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
+        run: |
+          PORT="${DEPLOY_PORT:-22}"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p $PORT" \
+            dist/ \
+            ${{ secrets.TEST_DEPLOY_USER }}@${{ secrets.TEST_DEPLOY_HOST }}:${{ secrets.TEST_DEPLOY_PATH }}/
+
+  deploy-prod:
+    name: Deploy to Prod
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup SSH key
+        env:
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${DEPLOY_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to prod via rsync
+        env:
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          PORT="${DEPLOY_PORT:-22}"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p $PORT" \
+            dist/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
