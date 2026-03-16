@@ -10,7 +10,7 @@ import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import logoFirstFllV from '@/assets/first+fll_v.png'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
-import logoFuture from '@/assets/first_canopy_fll_future_edition_rgb_fullcolor_ohne_HG-Fläche.png'
+import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
