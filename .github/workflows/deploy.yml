@@ -55,7 +55,7 @@ jobs:
         env:
           DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
         run: |
-          PORT="${DEPLOY_PORT:-22}"
+          PORT="${TEST_DEPLOY_PORT:-22}"
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p $PORT" \
             dist/ \
