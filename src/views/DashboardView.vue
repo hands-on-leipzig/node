@@ -2,7 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { listTeams, listClasses, getOpenTasks } from '@/services/draht'
+import { fetchDocumentsConfig } from '@/services/documentsConfig'
+import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 
 const { t } = useI18n()
@@ -27,6 +30,14 @@ const error = ref(null)
 /** Tasks to do: built from getTeam/getClass detail responses (same data as team detail page). */
 const taskItems = ref([])
 const tasksLoading = ref(false)
+
+const documentsConfig = ref({
+  folderUrl: '',
+  title: '',
+  files: [],
+  graphMeta: null,
+})
+const documentsLoading = ref(true)
 
 /** Mock upcoming events – replace with API feed later. */
 const upcomingEvents = ref([
@@ -100,7 +111,15 @@ function goToTask(item) {
   else goClass(item.id)
 }
 
-onMounted(loadLists)
+onMounted(async () => {
+  loadLists()
+  documentsLoading.value = true
+  try {
+    documentsConfig.value = await fetchDocumentsConfig()
+  } finally {
+    documentsLoading.value = false
+  }
+})
 </script>
 
 <template>
@@ -164,6 +183,74 @@ onMounted(loadLists)
             <i class="bi bi-magic"></i>
             <span>{{ t('wizard.ctaButton') }}</span>
           </button>
+        </section>
+
+        <!-- Documents for download (SharePoint / shared folder) — always visible -->
+        <section class="dashboard-card dashboard-card-documents">
+          <h2 class="dashboard-card-title">
+            <i class="bi bi-cloud-arrow-down"></i>
+            {{ documentsConfig.title || t('dashboard.documentsForDownload') }}
+          </h2>
+          <div v-if="documentsLoading" class="dashboard-documents-loading">
+            <i class="bi bi-arrow-repeat spin"></i>
+            {{ t('dashboard.documentsLoadingList') }}
+          </div>
+          <template
+            v-else-if="documentsConfig.files?.length || documentsConfig.folderUrl"
+          >
+            <p class="dashboard-card-desc">{{ t('dashboard.documentsDescription') }}</p>
+            <p
+              v-if="
+                documentsConfig.graphMeta?.code === 'empty_or_unavailable' &&
+                documentsConfig.folderUrl &&
+                !documentsConfig.files?.length
+              "
+              class="dashboard-documents-graph-hint"
+            >
+              {{ t('dashboard.documentsGraphNoFiles') }}
+            </p>
+            <ul
+              v-if="documentsConfig.files?.length"
+              class="dashboard-documents-file-list"
+            >
+              <li v-for="(f, i) in documentsConfig.files" :key="i">
+                <a
+                  :href="f.url"
+                  class="dashboard-documents-file-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <i class="bi bi-file-earmark-arrow-down"></i>
+                  <span>{{ f.name }}</span>
+                </a>
+              </li>
+            </ul>
+            <a
+              v-if="documentsConfig.folderUrl"
+              :href="documentsConfig.folderUrl"
+              class="dashboard-documents-link"
+              :class="{ 'dashboard-documents-link-after-list': documentsConfig.files?.length }"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <i class="bi bi-folder2-open"></i>
+              {{ t('dashboard.openDocumentsFolder') }}
+            </a>
+          </template>
+          <template v-else-if="!documentsLoading">
+            <p class="dashboard-card-desc dashboard-documents-empty">
+              {{ t('dashboard.documentsNotConfigured') }}
+            </p>
+            <p class="dashboard-documents-hint">{{ t('dashboard.documentsNotConfiguredHint') }}</p>
+            <RouterLink
+              v-if="hasAdminRole()"
+              to="/dashboard/admin/documents"
+              class="dashboard-documents-link dashboard-documents-link-secondary"
+            >
+              <i class="bi bi-gear"></i>
+              {{ t('dashboard.documentsConfigureAdmin') }}
+            </RouterLink>
+          </template>
         </section>
 
         <!-- Section: Upcoming events (mock – replace with API later) -->
@@ -279,6 +366,100 @@ onMounted(loadLists)
 /* Tasks */
 .dashboard-card-tasks {
   border-left: 3px solid #b45309;
+}
+
+.dashboard-card-documents {
+  grid-column: 1 / -1;
+  border-left: 3px solid #2563eb;
+}
+.dashboard-documents-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: 0.5rem 0;
+}
+.dashboard-documents-graph-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+.dashboard-documents-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: white;
+  background: var(--color-accent);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.dashboard-documents-link:hover {
+  opacity: 0.92;
+  color: white;
+}
+.dashboard-documents-empty {
+  color: var(--color-text-muted);
+}
+.dashboard-documents-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+.dashboard-documents-file-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.dashboard-documents-file-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius);
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  transition: border-color 0.15s, background 0.15s;
+}
+.dashboard-documents-file-link:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg);
+  color: var(--color-accent);
+}
+.dashboard-documents-file-link .bi {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+.dashboard-documents-link-after-list {
+  margin-top: 0.25rem;
+  background: var(--color-bg-muted);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+}
+.dashboard-documents-link-after-list:hover {
+  opacity: 1;
+  background: var(--color-bg);
+}
+.dashboard-documents-link-secondary {
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+.dashboard-documents-link-secondary:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
 }
 
 .dashboard-tasks-list {

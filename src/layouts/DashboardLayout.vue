@@ -2,7 +2,7 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getUserProfile, logout } from '@/auth/keycloak'
+import { getUserProfile, logout, hasAdminRole } from '@/auth/keycloak'
 import { setLocale, showTranslationKeys, setShowTranslationKeys } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses } from '@/services/draht'
@@ -17,9 +17,18 @@ const teams = ref([])
 const classes = ref([])
 const sidebarLoading = ref(false)
 
-const navItems = [
-  { path: '/dashboard', nameKey: 'nav.dashboard', exact: true, icon: 'bi-grid-1x2-fill' },
-]
+const navItems = computed(() => {
+  const items = [{ path: '/dashboard', nameKey: 'nav.dashboard', exact: true, icon: 'bi-grid-1x2-fill' }]
+  if (hasAdminRole()) {
+    items.push({
+      path: '/dashboard/admin/documents',
+      nameKey: 'nav.adminDocuments',
+      exact: true,
+      icon: 'bi-folder2-open',
+    })
+  }
+  return items
+})
 
 async function loadSidebarLists() {
   sidebarLoading.value = true

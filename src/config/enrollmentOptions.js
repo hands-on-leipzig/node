@@ -18,4 +18,5 @@ export const ENROLLMENT_OPTIONS = [
 export const EDITION_FOUNDERS = 'founders'
 export const EDITION_FUTURE = 'future'
 
-export const FUTURE_PUPIL_OPTIONS = [8, 16, 24, 32, 40, 48]
+/** Future Edition: nur 8 / 16 / 24 laut Anmeldelogik */
+export const FUTURE_PUPIL_OPTIONS = [8, 16, 24]

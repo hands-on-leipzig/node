@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { initKeycloak, isAuthenticated, hasCoachRole, login } from '@/auth/keycloak'
+import { initKeycloak, isAuthenticated, hasCoachRole, hasAdminRole, login } from '@/auth/keycloak'
 
 const routes = [
   {
@@ -49,6 +49,12 @@ const routes = [
         component: () => import('@/views/ClassDetailView.vue'),
         meta: { titleKey: 'nav.classDetail' },
       },
+      {
+        path: 'admin/documents',
+        name: 'admin-documents',
+        component: () => import('@/views/AdminDocumentsView.vue'),
+        meta: { titleKey: 'nav.adminDocuments', requiresAdmin: true },
+      },
     ],
   },
 ]
@@ -79,6 +85,9 @@ router.beforeEach(async (to) => {
     // Only users with realm role "coach" may access the app
     if (!hasCoachRole()) {
       return { name: 'home', query: { forbidden: '1' } }
+    }
+    if (to.meta.requiresAdmin && !hasAdminRole()) {
+      return { name: 'dashboard' }
     }
   }
   return true

@@ -1,23 +1,43 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
-import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
+import CustomSelect from '@/components/CustomSelect.vue'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
+import {
+  FUTURE_GROUP_PRICE_EUR,
+  FUTURE_GROUP_PRODUCT_REFS,
+  FUTURE_SEASON_SET_UNIT_EUR,
+  FUTURE_SEASON_SET_PRODUCT_REF,
+  FUTURE_TEAM_EVENT_UNIT_EUR,
+  FUTURE_TEAM_EVENT_PRODUCT_REF,
+  FUTURE_PUPIL_COUNTS,
+  futureMaxEventTeams,
+} from '@/config/futureEditionConfig'
 
 const router = useRouter()
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+const LOGIC_PDF = 'CRM-Anmeldelogik FIRST LEGO League Future Edition - Asana.pdf'
 
 const group = computed(() => {
   const g = route.query.group
   return g === '5' || g === '8' ? g : null
 })
 
-const step = ref('pupils') // 'pupils' | 'form'
-const selectedPupils = ref(null) // 8 | 16 | 24
+/** voucher | pupils | seasonSets | teams | form */
+const step = ref('voucher')
+
+const selectedPupils = ref(null)
+/** 0 = kein Set, 1 oder 2 Saisonsets */
+const seasonSetCount = ref(1)
+const registerEventTeams = ref(false)
+const teamCount = ref(1)
+/** { players: [{ firstname, name, gender, birthdayStr }] }[] */
+const eventTeams = ref([])
 
 const emptyAddressState = () => ({
   useExisting: true,
@@ -48,6 +68,59 @@ const voucherType = ref(null)
 const voucherInvoiceId = ref(null)
 const voucherInvoiceName = ref(null)
 
+const pdfHref = computed(() => {
+  const base = import.meta.env.BASE_URL || '/'
+  return base.replace(/\/?$/, '/') + encodeURIComponent(LOGIC_PDF)
+})
+
+const maxTeams = computed(() =>
+  selectedPupils.value ? futureMaxEventTeams(selectedPupils.value) : 1
+)
+
+function formatMoney(eur) {
+  try {
+    return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(eur)
+  } catch {
+    return `${eur} €`
+  }
+}
+
+function syncEventTeamsArray() {
+  const n = registerEventTeams.value ? Math.min(Math.max(1, teamCount.value), maxTeams.value) : 0
+  while (eventTeams.value.length < n) {
+    eventTeams.value.push({ players: [] })
+  }
+  eventTeams.value = eventTeams.value.slice(0, n)
+}
+
+watch([registerEventTeams, teamCount, maxTeams, selectedPupils], syncEventTeamsArray)
+
+const genderOptions = computed(() => [
+  { value: '', label: t('detail.gender') },
+  { value: 'M', label: t('detail.genderM') },
+  { value: 'F', label: t('detail.genderF') },
+  { value: 'D', label: t('detail.genderD') },
+])
+
+function emptyPlayer() {
+  return { firstname: '', name: '', gender: '', birthdayStr: '' }
+}
+
+function addPlayer(teamIdx) {
+  const t = eventTeams.value[teamIdx]
+  if (!t) return
+  t.players = [...(t.players || []), emptyPlayer()]
+}
+
+function removePlayer(teamIdx, pIdx) {
+  const t = eventTeams.value[teamIdx]
+  if (!t?.players) return
+  t.players = t.players.filter((_, i) => i !== pIdx)
+}
+
 onMounted(() => {
   if (!group.value) {
     router.replace({ name: 'dashboard' })
@@ -68,33 +141,6 @@ async function loadAddresses() {
     form.value.deliveryAddress = { ...form.value.deliveryAddress, useExisting: false }
     form.value.invoiceAddress = { ...form.value.invoiceAddress, useExisting: false }
   }
-}
-
-function choosePupils(num) {
-  selectedPupils.value = num
-  step.value = 'form'
-  loadAddresses()
-}
-
-function buildAddressPayload(addr) {
-  if (addr.useExisting && addr.addressId) {
-    return { addressId: addr.addressId }
-  }
-  const n = addr.new || {}
-  if (!n.street && !n.city && !n.country) return undefined
-  return {
-    street: n.street?.trim() || undefined,
-    postalCode: n.postalCode?.trim() || undefined,
-    city: n.city?.trim() || undefined,
-    country: n.country?.trim() || undefined,
-  }
-}
-
-function buildInvoiceAddressPayload() {
-  if (voucherType.value === '1' && voucherInvoiceId.value != null) {
-    return { addressId: voucherInvoiceId.value }
-  }
-  return buildAddressPayload(form.value.invoiceAddress)
 }
 
 async function onVoucherBlur() {
@@ -136,6 +182,97 @@ async function onVoucherBlur() {
   }
 }
 
+function goVoucherNext() {
+  if (form.value.voucher?.trim() && voucherValid.value === false) return
+  step.value = 'pupils'
+}
+
+function choosePupils(num) {
+  selectedPupils.value = num
+  teamCount.value = 1
+  seasonSetCount.value = 1
+  registerEventTeams.value = false
+  eventTeams.value = []
+  step.value = 'seasonSets'
+}
+
+function seasonNext() {
+  step.value = 'teams'
+  syncEventTeamsArray()
+}
+
+function teamsNext() {
+  loadAddresses()
+  step.value = 'form'
+}
+
+function buildAddressPayload(addr) {
+  if (addr.useExisting && addr.addressId) {
+    return { addressId: addr.addressId }
+  }
+  const n = addr.new || {}
+  if (!n.street && !n.city && !n.country) return undefined
+  return {
+    street: n.street?.trim() || undefined,
+    postalCode: n.postalCode?.trim() || undefined,
+    city: n.city?.trim() || undefined,
+    country: n.country?.trim() || undefined,
+  }
+}
+
+function buildInvoiceAddressPayload() {
+  if (voucherType.value === '1' && voucherInvoiceId.value != null) {
+    return { addressId: voucherInvoiceId.value }
+  }
+  return buildAddressPayload(form.value.invoiceAddress)
+}
+
+/** Snapshot + refs for DRAHT order lines (prices from catalog later) */
+function buildPricingPayload() {
+  const p = selectedPupils.value
+  const groupLine = p
+    ? {
+        productRef: FUTURE_GROUP_PRODUCT_REFS[p],
+        quantity: 1,
+        unitPriceEurPlaceholder: FUTURE_GROUP_PRICE_EUR[p],
+      }
+    : null
+  const seasonLines =
+    seasonSetCount.value > 0
+      ? [
+          {
+            productRef: FUTURE_SEASON_SET_PRODUCT_REF,
+            quantity: seasonSetCount.value,
+            unitPriceEurPlaceholder: FUTURE_SEASON_SET_UNIT_EUR,
+          },
+        ]
+      : []
+  const teamLines =
+    registerEventTeams.value && teamCount.value > 0
+      ? [
+          {
+            productRef: FUTURE_TEAM_EVENT_PRODUCT_REF,
+            quantity: teamCount.value,
+            unitPriceEurPlaceholder: FUTURE_TEAM_EVENT_UNIT_EUR,
+          },
+        ]
+      : []
+  return {
+    lines: [groupLine, ...seasonLines, ...teamLines].filter(Boolean),
+  }
+}
+
+function playersToPayload(players) {
+  return (players || []).map((p) => ({
+    firstname: (p.firstname || '').trim(),
+    name: (p.name || '').trim(),
+    gender: p.gender || '',
+    birthday: p.birthdayStr
+      ? Math.floor(new Date(p.birthdayStr).getTime() / 1000)
+      : null,
+  }))
+}
+
 async function submit() {
   if (!form.value.name?.trim()) {
     error.value = t('enrollFuture.nameRequired')
@@ -149,9 +286,21 @@ async function submit() {
   success.value = false
   submitting.value = true
   try {
+    const eventTeamsPayload = registerEventTeams.value
+      ? eventTeams.value.map((team, i) => ({
+          index: i + 1,
+          players: playersToPayload(team.players),
+        }))
+      : []
+
     const payload = {
       group: group.value,
       pupils: selectedPupils.value,
+      seasonSetCount: seasonSetCount.value,
+      registerEventTeams: registerEventTeams.value,
+      eventTeamCount: registerEventTeams.value ? teamCount.value : 0,
+      eventTeams: eventTeamsPayload,
+      pricing: buildPricingPayload(),
       name: form.value.name.trim(),
       schoolType: form.value.schoolType || undefined,
       location: form.value.location.trim() || undefined,
@@ -169,6 +318,12 @@ async function submit() {
     voucherType.value = null
     voucherInvoiceId.value = null
     voucherInvoiceName.value = null
+    step.value = 'voucher'
+    selectedPupils.value = null
+    seasonSetCount.value = 1
+    registerEventTeams.value = false
+    teamCount.value = 1
+    eventTeams.value = []
     form.value = {
       name: '',
       schoolType: '',
@@ -189,8 +344,14 @@ async function submit() {
 
 function back() {
   if (step.value === 'form') {
+    step.value = 'teams'
+  } else if (step.value === 'teams') {
+    step.value = 'seasonSets'
+  } else if (step.value === 'seasonSets') {
     step.value = 'pupils'
     selectedPupils.value = null
+  } else if (step.value === 'pupils') {
+    step.value = 'voucher'
   } else {
     router.push({ name: 'dashboard' })
   }
@@ -202,47 +363,213 @@ function onFormFieldFocus(e) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
   }
 }
+
+const stepIndex = computed(() => {
+  const s = ['voucher', 'pupils', 'seasonSets', 'teams', 'form'].indexOf(step.value)
+  return s >= 0 ? s : 0
+})
 </script>
 
 <template>
   <div class="enroll-page">
-    <div class="enroll-view">
+    <div class="enroll-view enroll-view-wide">
       <div class="enroll-head">
         <div class="enroll-icon future-icon">
           <i class="bi bi-stars"></i>
         </div>
         <h2>{{ t('enrollFuture.title') }}</h2>
         <p class="description">{{ t('enrollFuture.description', { group: group || '—' }) }}</p>
+        <a :href="pdfHref" class="logic-pdf-link" target="_blank" rel="noopener noreferrer">
+          <i class="bi bi-file-earmark-pdf"></i> {{ t('enrollFuture.openLogicPdf') }}
+        </a>
+        <p class="pricing-disclaimer">{{ t('enrollFuture.pricingDisclaimer') }}</p>
+        <div class="step-dots" aria-hidden="true">
+          <span
+            v-for="(lbl, i) in ['0', '1', '2', '3', '4']"
+            :key="i"
+            class="dot"
+            :class="{ active: stepIndex >= i }"
+          />
+        </div>
       </div>
 
-      <!-- Step 1: Choose number of pupils -->
-      <div v-if="step === 'pupils' && group" class="pupils-step">
-        <p class="pupils-question">{{ t('enrollFuture.howManyPupils') }}</p>
-        <p class="pupils-hint">{{ t('enrollFuture.pupilsFlexibleHint') }}</p>
-        <div class="pupils-options pupils-options-grid">
+      <!-- Step 0: Voucher -->
+      <div v-if="step === 'voucher' && group" class="step-block">
+        <h3 class="step-title">{{ t('enrollFuture.stepVoucher') }}</h3>
+        <p class="step-lead">{{ t('enrollFuture.stepVoucherLead') }}</p>
+        <div class="field">
+          <label for="fv-voucher">{{ t('enroll.voucherCodeLabel') }}</label>
+          <input
+            id="fv-voucher"
+            v-model="form.voucher"
+            type="text"
+            :placeholder="t('enroll.placeholderVoucher')"
+            @input="
+              voucherValid = null;
+              voucherMessage = '';
+              voucherType = null;
+              voucherInvoiceId = null;
+              voucherInvoiceName = null;
+            "
+            @blur="onVoucherBlur"
+          />
+          <p v-if="voucherChecking" class="field-hint checking">
+            <i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}
+          </p>
+          <p v-else-if="voucherValid === true" class="field-hint valid">
+            <i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}
+          </p>
+          <p v-else-if="voucherValid === false" class="field-hint invalid">
+            <i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}
+          </p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" @click="back">
+            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+          </button>
           <button
-            v-for="num in FUTURE_PUPIL_OPTIONS"
+            type="button"
+            class="btn btn-primary"
+            :disabled="!!(form.voucher?.trim() && voucherValid === false)"
+            @click="goVoucherNext"
+          >
+            {{ t('enrollFuture.continue') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Gruppengröße -->
+      <div v-else-if="step === 'pupils' && group" class="step-block">
+        <h3 class="step-title">{{ t('enrollFuture.stepGroupSize') }}</h3>
+        <p class="step-lead">{{ t('enrollFuture.stepGroupSizeLead') }}</p>
+        <div class="option-cards">
+          <button
+            v-for="num in FUTURE_PUPIL_COUNTS"
             :key="num"
             type="button"
-            class="pupils-btn"
+            class="option-card"
             @click="choosePupils(num)"
           >
-            {{ num }}
+            <span class="option-card-main">{{ num }} {{ t('enrollFuture.pupils') }}</span>
+            <span class="option-card-price">{{ formatMoney(FUTURE_GROUP_PRICE_EUR[num]) }}</span>
           </button>
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i>
-            {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
           </button>
         </div>
       </div>
 
-      <!-- Step 2: Form -->
-      <form v-else-if="step === 'form' && group" @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
-        <p class="form-context">
-          {{ t('enrollFuture.groupLabel', { group: group }) }} · {{ selectedPupils }} {{ t('enrollFuture.pupils') }}
-        </p>
+      <!-- Step 2: Saisonset -->
+      <div v-else-if="step === 'seasonSets' && group" class="step-block">
+        <h3 class="step-title">{{ t('enrollFuture.stepSeasonSets') }}</h3>
+        <p class="step-lead">{{ t('enrollFuture.stepSeasonSetsLead') }}</p>
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input v-model.number="seasonSetCount" type="radio" :value="0" />
+            <span class="radio-card-body">
+              <strong>{{ t('enrollFuture.seasonNone') }}</strong>
+              <span class="muted">{{ formatMoney(0) }}</span>
+            </span>
+          </label>
+          <label class="radio-card">
+            <input v-model.number="seasonSetCount" type="radio" :value="1" />
+            <span class="radio-card-body">
+              <strong>{{ t('enrollFuture.seasonOne') }}</strong>
+              <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR) }}</span>
+            </span>
+          </label>
+          <label class="radio-card">
+            <input v-model.number="seasonSetCount" type="radio" :value="2" />
+            <span class="radio-card-body">
+              <strong>{{ t('enrollFuture.seasonTwo') }}</strong>
+              <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</span>
+            </span>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" @click="back">
+            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+          </button>
+          <button type="button" class="btn btn-primary" @click="seasonNext">
+            {{ t('enrollFuture.continue') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Event / Teams (optional) -->
+      <div v-else-if="step === 'teams' && group" class="step-block">
+        <h3 class="step-title">{{ t('enrollFuture.stepTeams') }}</h3>
+        <p class="step-lead">{{ t('enrollFuture.stepTeamsLead', { max: maxTeams }) }}</p>
+        <label class="check-row">
+          <input v-model="registerEventTeams" type="checkbox" @change="syncEventTeamsArray" />
+          {{ t('enrollFuture.registerTeamsNow') }}
+        </label>
+        <template v-if="registerEventTeams">
+          <div class="field">
+            <label>{{ t('enrollFuture.teamCountLabel') }}</label>
+            <select v-model.number="teamCount" class="select-input">
+              <option v-for="n in maxTeams" :key="n" :value="n">
+                {{ n }} {{ n === 1 ? t('enrollFuture.teamSingular') : t('enrollFuture.teamPlural') }}
+                — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * n) }}
+              </option>
+            </select>
+          </div>
+          <div v-for="(team, ti) in eventTeams" :key="'team-' + ti" class="team-block">
+            <h4 class="team-block-title">{{ t('enrollFuture.teamBlockTitle', { n: ti + 1 }) }}</h4>
+            <p class="muted small">{{ t('enrollFuture.teamParticipantsHint') }}</p>
+            <div v-for="(pl, pi) in team.players" :key="'p-' + ti + '-' + pi" class="player-row">
+              <input v-model="pl.firstname" :placeholder="t('detail.firstname')" class="inp-sm" />
+              <input v-model="pl.name" :placeholder="t('detail.lastname')" class="inp-sm" />
+              <CustomSelect v-model="pl.gender" class="sel-sm" :options="genderOptions" :placeholder="t('detail.gender')" />
+              <input v-model="pl.birthdayStr" type="date" class="inp-sm" />
+              <button type="button" class="btn-icon" :aria-label="t('enrollFuture.removeParticipant')" @click="removePlayer(ti, pi)">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" @click="addPlayer(ti)">
+              <i class="bi bi-person-plus"></i> {{ t('enrollFuture.addParticipant') }}
+            </button>
+          </div>
+        </template>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" @click="back">
+            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+          </button>
+          <button type="button" class="btn btn-primary" @click="teamsNext">
+            {{ t('enrollFuture.continue') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 4: Stammdaten -->
+      <form
+        v-else-if="step === 'form' && group"
+        class="form step-block"
+        @submit.prevent="submit"
+        @focusin="onFormFieldFocus"
+      >
+        <h3 class="step-title">{{ t('enrollFuture.stepDetails') }}</h3>
+        <div class="summary-box">
+          <p>
+            <strong>{{ t('enrollFuture.groupLabel', { group }) }}</strong> · {{ selectedPupils }}
+            {{ t('enrollFuture.pupils') }} — {{ formatMoney(FUTURE_GROUP_PRICE_EUR[selectedPupils]) }}
+          </p>
+          <p>
+            {{ seasonSetCount === 0 ? t('enrollFuture.seasonNone') : seasonSetCount === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo') }}
+            —
+            {{
+              seasonSetCount === 0
+                ? formatMoney(0)
+                : formatMoney(FUTURE_SEASON_SET_UNIT_EUR * seasonSetCount)
+            }}
+          </p>
+          <p v-if="registerEventTeams">
+            {{ teamCount }}× {{ t('enrollFuture.teamEventLine') }} — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * teamCount) }}
+          </p>
+          <p v-else class="muted">{{ t('enrollFuture.noTeamsInOrder') }}</p>
+        </div>
 
         <div class="field">
           <label for="future-name">{{ t('enrollFuture.nameLabel') }} <span class="required">*</span></label>
@@ -265,45 +592,15 @@ function onFormFieldFocus(e) {
         </div>
         <div class="field">
           <label for="future-location">{{ t('enroll.location') }}</label>
-          <input
-            id="future-location"
-            v-model="form.location"
-            type="text"
-            :placeholder="t('enrollClass.placeholderLocation')"
-          />
+          <input id="future-location" v-model="form.location" type="text" />
         </div>
         <div class="field">
           <label for="future-zip">{{ t('enroll.postalCode') }}</label>
-          <input
-            id="future-zip"
-            v-model="form.zip"
-            type="text"
-            :placeholder="t('enrollClass.placeholderZip')"
-          />
+          <input id="future-zip" v-model="form.zip" type="text" />
         </div>
         <div class="field">
           <label for="future-organization">{{ t('enroll.schoolName') }}</label>
           <input id="future-organization" v-model="form.organization" type="text" />
-        </div>
-        <div class="field">
-          <label for="future-voucher">{{ t('enroll.voucher') }}</label>
-          <input
-            id="future-voucher"
-            v-model="form.voucher"
-            type="text"
-            :placeholder="t('enroll.placeholderVoucher')"
-            @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
-            @blur="onVoucherBlur"
-          />
-          <p v-if="voucherChecking" class="field-hint checking">
-            <i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}
-          </p>
-          <p v-else-if="voucherValid === true" class="field-hint valid">
-            <i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}
-          </p>
-          <p v-else-if="voucherValid === false" class="field-hint invalid">
-            <i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}
-          </p>
         </div>
 
         <AddressSelector
@@ -332,26 +629,18 @@ function onFormFieldFocus(e) {
 
         <div class="field">
           <label for="future-notes">{{ t('enrollClass.notes') }}</label>
-          <textarea
-            id="future-notes"
-            v-model="form.notes"
-            rows="3"
-            :placeholder="t('enrollClass.optionalNotes')"
-          />
+          <textarea id="future-notes" v-model="form.notes" rows="3" />
         </div>
 
         <div v-if="error" class="message error">
-          <i class="bi bi-exclamation-circle"></i>
-          {{ error }}
+          <i class="bi bi-exclamation-circle"></i> {{ error }}
         </div>
         <div v-if="success" class="message success">
-          <i class="bi bi-check-circle-fill"></i>
-          {{ t('enrollFuture.success') }}
+          <i class="bi bi-check-circle-fill"></i> {{ t('enrollFuture.success') }}
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i>
-            {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
           </button>
           <button type="submit" class="btn btn-primary" :disabled="submitting">
             <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
@@ -369,7 +658,6 @@ function onFormFieldFocus(e) {
   min-height: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
   padding: 1.5rem 0;
 }
 .enroll-view {
@@ -377,8 +665,39 @@ function onFormFieldFocus(e) {
   width: 100%;
   text-align: left;
 }
+.enroll-view-wide {
+  max-width: 40rem;
+}
 .enroll-head {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.logic-pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  margin-top: 0.5rem;
+}
+.pricing-disclaimer {
+  font-size: 0.8rem;
+  color: var(--color-text-subtle);
+  margin: 0.75rem 0 0;
+  line-height: 1.4;
+}
+.step-dots {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+.step-dots .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+.step-dots .dot.active {
+  background: var(--color-accent);
 }
 .enroll-icon.future-icon {
   background: rgba(34, 197, 94, 0.15);
@@ -388,72 +707,169 @@ function onFormFieldFocus(e) {
   font-size: var(--text-2xl);
   font-weight: 600;
   margin-bottom: 0.35rem;
-  color: var(--color-text);
 }
 .description {
   font-size: var(--text-lg);
   color: var(--color-text-muted);
   line-height: 1.5;
 }
-.pupils-step {
+.step-block {
   margin-top: 0.5rem;
 }
-.pupils-question {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  color: var(--color-text);
+.step-title {
+  font-size: 1.1rem;
+  margin: 0 0 0.35rem;
+}
+.step-lead {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 1rem;
+  line-height: 1.45;
+}
+.option-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
-.pupils-hint {
-  margin: 0.35rem 0 1.25rem;
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-}
-.pupils-options {
+.option-card {
   display: flex;
-  gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-}
-.pupils-options.pupils-options-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-.pupils-btn {
-  flex: 1;
-  min-width: 5rem;
-  padding: 1.25rem 1.5rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-text);
-  background: var(--color-bg-elevated);
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  padding: 1rem 1.25rem;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 0.2s, background 0.2s;
+  text-align: left;
+  transition: border-color 0.15s;
 }
-.pupils-btn:hover {
+.option-card:hover {
+  border-color: var(--color-accent);
+}
+.option-card-main {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+.option-card-price {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.radio-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.radio-card:has(input:checked) {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
 }
-.form-context {
-  font-size: var(--text-base);
+.radio-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: var(--text-sm);
+}
+.radio-card-body .ref {
+  font-size: 0.7rem;
+  color: var(--color-text-subtle);
+  font-family: ui-monospace, monospace;
+}
+.muted {
   color: var(--color-text-muted);
-  margin-bottom: 1.25rem;
-  padding: 0.5rem 0;
 }
-.form .field {
-  margin-bottom: 1.25rem;
+.small {
+  font-size: 0.85rem;
 }
-.form label,
-.form .label {
-  display: block;
-  font-size: var(--text-base);
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
   font-weight: 500;
+}
+.select-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
   color: var(--color-text);
-  margin-bottom: 0.5rem;
+  font-size: var(--text-base);
+}
+.team-block {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.team-block-title {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-base);
+}
+.player-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(5rem, auto) minmax(7rem, auto) auto;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+@media (max-width: 640px) {
+  .player-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.inp-sm,
+.sel-sm {
+  padding: 0.45rem 0.5rem;
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.btn-icon {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+.btn-sm {
+  font-size: var(--text-sm);
+  padding: 0.4rem 0.75rem;
+}
+.summary-box {
+  padding: 1rem;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.summary-box p {
+  margin: 0.25rem 0;
+}
+.field {
+  margin-bottom: 1.1rem;
+}
+.field label,
+.label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.35rem;
 }
 .required {
   color: #dc2626;
@@ -462,29 +878,22 @@ function onFormFieldFocus(e) {
 .form textarea,
 .form select {
   width: 100%;
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 0.875rem;
   min-height: var(--touch-lg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-family: inherit;
   background: var(--color-bg-elevated);
   color: var(--color-text);
   box-sizing: border-box;
 }
-.form textarea {
-  min-height: 5rem;
-  resize: vertical;
-}
 .field-hint {
   margin: 0.35rem 0 0;
-  font-size: var(--text-sm, 0.875rem);
+  font-size: var(--text-sm);
   display: flex;
   align-items: center;
   gap: 0.35rem;
-}
-.field-hint.checking {
-  color: var(--color-text-muted);
 }
 .field-hint.valid {
   color: #16a34a;
@@ -492,23 +901,18 @@ function onFormFieldFocus(e) {
 .field-hint.invalid {
   color: #dc2626;
 }
-.field-hint .spin {
+.spin {
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.voucher-invoice-forced .voucher-forced-msg {
-  margin-top: 0;
-}
-.voucher-invoice-name {
-  opacity: 0.9;
+  to {
+    transform: rotate(360deg);
+  }
 }
 .message {
   margin-bottom: 1rem;
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius);
-  font-size: var(--text-base);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -525,13 +929,13 @@ function onFormFieldFocus(e) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
 }
 .btn {
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1.15rem;
   min-height: var(--touch-lg);
   border-radius: var(--radius);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -541,7 +945,7 @@ function onFormFieldFocus(e) {
   gap: 0.5rem;
 }
 .btn:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 .btn-primary {
@@ -551,8 +955,5 @@ function onFormFieldFocus(e) {
 .btn-ghost {
   background: transparent;
   color: var(--color-text-muted);
-}
-.btn-ghost:hover {
-  color: var(--color-text);
 }
 </style>

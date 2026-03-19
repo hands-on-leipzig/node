@@ -11,6 +11,7 @@ node_modules
 .DS_Store
 dist
 dist-ssr
+data/documents-config.json
 coverage
 *.local
 

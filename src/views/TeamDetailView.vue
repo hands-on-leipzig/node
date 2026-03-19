@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, getEvents, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { getTeam, getEvents, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
@@ -24,8 +24,6 @@ const savingPlayers = ref(false)
 // Event nachmelden
 const events = ref([])
 const eventsLoading = ref(false)
-const eventsNearest = ref([])
-const eventsNearestLoading = ref(false)
 const registerEventId = ref('')
 const registeringEvent = ref(false)
 const registerEventError = ref(null)
@@ -234,26 +232,6 @@ async function loadEvents() {
   }
 }
 
-async function loadEventsNearest() {
-  eventsNearestLoading.value = true
-  eventsNearest.value = []
-  registerEventError.value = null
-  try {
-    const addr = team.value?.overview?.delivery_address || team.value?.overview?.billing_address
-    const country = addr?.country ?? undefined
-    const zip = addr?.zip ?? undefined
-    const program = team.value?.program ?? undefined
-    const res = await getEventsNearest(country, zip, program)
-    const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    eventsNearest.value = Array.isArray(list) ? list : []
-  } catch (_) {
-    eventsNearest.value = []
-  } finally {
-    eventsNearestLoading.value = false
-  }
-}
-
 async function submitRegisterForEvent() {
   const eventId = registerEventId.value?.trim()
   if (!id.value || !eventId) return
@@ -284,15 +262,19 @@ function eventLabel(ev) {
   return name
 }
 
+/** Request change of event (e.g. contact/organizer). Placeholder for now. */
+function requestEventChange() {
+  // TODO: open contact form or mailto
+  if (import.meta.env.DEV) console.info('Request event change for team', id.value)
+}
+
 onMounted(async () => {
   await fetchTeam()
   loadEvents()
-  loadEventsNearest()
 })
 watch(id, async () => {
   await fetchTeam()
   loadEvents()
-  loadEventsNearest()
 })
 </script>
 
@@ -344,8 +326,6 @@ watch(id, async () => {
           </dd>
           <dt>{{ t('enroll.organization') }}</dt>
           <dd>{{ (team.organization && team.organization.name) || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.event') }}</dt>
-          <dd>{{ (team.event && (team.event.label || team.event.ref)) || t('detail.noData') }}</dd>
           <dt>{{ t('detail.ort') }}</dt>
           <dd>{{ team.ort || t('detail.noData') }}</dd>
           <dt>{{ t('detail.institution') }}</dt>
@@ -353,12 +333,20 @@ watch(id, async () => {
         </dl>
       </section>
 
-      <!-- 3b) Team für Event nachmelden -->
+      <!-- 3b) Event (right column): current event or enroll -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('teamDetail.registerForEvent') }}</h3>
-        <p class="detail-hint">{{ t('teamDetail.registerForEventHint') }}</p>
-        <div class="detail-register-event">
-          <div class="detail-event-dropdowns">
+        <h3 class="detail-section-title">{{ t('teamDetail.event') }}</h3>
+        <template v-if="team.event && (team.event.label || team.event.ref)">
+          <p class="detail-event-current">{{ team.event.label || team.event.ref }}</p>
+          <button type="button" class="detail-btn" @click="requestEventChange">
+            <i class="bi bi-pencil-square"></i>
+            {{ t('teamDetail.requestEventChange') }}
+          </button>
+        </template>
+        <template v-else>
+          <p class="detail-hint">{{ t('teamDetail.noEventRegistered') }}</p>
+          <p class="detail-hint detail-hint-sm">{{ t('teamDetail.registerForEventHint') }}</p>
+          <div class="detail-register-event">
             <EventSelectDropdown
               :title="t('wizard.eventSelectAllEvents')"
               :events="events"
@@ -368,29 +356,20 @@ watch(id, async () => {
               :event-label-fn="eventLabel"
               @update:model-value="registerEventId = $event"
             />
-            <EventSelectDropdown
-              :title="t('wizard.eventSelectNearest')"
-              :events="eventsNearest"
-              :loading="eventsNearestLoading"
-              :model-value="registerEventId"
-              :placeholder="t('teamDetail.selectEvent')"
-              :event-label-fn="eventLabel"
-              @update:model-value="registerEventId = $event"
-            />
+            <button
+              type="button"
+              class="detail-btn detail-btn-primary"
+              :disabled="!registerEventId || registeringEvent"
+              @click="submitRegisterForEvent"
+            >
+              <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
+              <i v-else class="bi bi-calendar-check"></i>
+              {{ registeringEvent ? t('teamDetail.registering') : t('teamDetail.registerForEventButton') }}
+            </button>
           </div>
-          <button
-            type="button"
-            class="detail-btn detail-btn-primary"
-            :disabled="!registerEventId || registeringEvent"
-            @click="submitRegisterForEvent"
-          >
-            <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
-            <i v-else class="bi bi-calendar-check"></i>
-            {{ registeringEvent ? t('teamDetail.registering') : t('teamDetail.registerForEventButton') }}
-          </button>
-        </div>
-        <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
-        <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> {{ t('teamDetail.registerEventSuccess') }}</p>
+          <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
+          <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> {{ t('teamDetail.registerEventSuccess') }}</p>
+        </template>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
@@ -705,6 +684,14 @@ watch(id, async () => {
   color: var(--color-text-muted);
   margin: 0 0 0.75rem;
 }
+.detail-hint-sm {
+  margin-bottom: 0.5rem;
+}
+.detail-event-current {
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0 0 0.75rem;
+}
 .detail-register-event {
   display: flex;
   flex-direction: column;
@@ -713,7 +700,7 @@ watch(id, async () => {
 .detail-event-dropdowns {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 .detail-event-select {
   min-width: 14rem;

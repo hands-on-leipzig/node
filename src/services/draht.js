@@ -131,7 +131,10 @@ export function enrollClass(payload) {
 }
 
 /**
- * Enroll a future edition group (5+ or 8+). Payload: group ('5'|'8'), pupils (8|16|24), name, school, location, addresses, etc.
+ * Future edition enrollment. Payload includes:
+ * group, pupils (8|16|24), seasonSetCount (0–2), registerEventTeams, eventTeamCount, eventTeams[{index, players[]}],
+ * pricing.lines[{ productRef, quantity, unitPriceEurPlaceholder }], name, addresses, voucher, …
+ * DRAHT should create order from productRef + quantity; ignore placeholder prices when catalog is authoritative.
  * Backend endpoint to be implemented; may return 501 until then.
  */
 export function enrollFuture(payload) {
@@ -159,6 +162,37 @@ export function listClasses() {
  */
 export function getOpenTasks() {
   return api.get('/tasks')
+}
+
+/**
+ * Coach dashboard: documents config only (GET /handson/node/documents-config).
+ */
+export function getDocumentsConfig() {
+  return api.get('/documents-config')
+}
+
+/**
+ * SharePoint folder file list via Microsoft Graph (GET /handson/node/documents-folder-files).
+ */
+export function getDocumentsFolderFiles() {
+  return api.get('/documents-folder-files')
+}
+
+/**
+ * Update documents folder URL (admin only on server). PUT /handson/node/documents-config
+ */
+export function putDocumentsConfig(payload) {
+  return api.put('/documents-config', payload)
+}
+
+/** Admin: MS Graph token + GET /sites/root diagnostic */
+export function getDocumentsGraphStatus() {
+  return api.get('/documents-graph-status')
+}
+
+/** Admin: probe folder URL (Graph) without saving */
+export function postDocumentsProbeFolder(url) {
+  return api.post('/documents-probe-folder', { url: url || '' })
 }
 
 /**
