@@ -207,13 +207,13 @@ function onFormFieldFocus(e) {
       <div class="enroll-icon">
         <i class="bi bi-mortarboard-fill"></i>
       </div>
-      <h2>{{ t('enrollClass.title') }}</h2>
-      <p class="description">{{ t('enrollClass.description') }}</p>
+      <h2><I18nText k="enrollClass.title" /></h2>
+      <p class="description"><I18nText k="enrollClass.description" /></p>
     </div>
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
       <div class="field">
-        <label for="class-name">{{ t('enrollClass.className') }} <span class="required">*</span></label>
+        <label for="class-name"><I18nText k="enrollClass.className" /> <span class="required">*</span></label>
         <input
           id="class-name"
           v-model="form.name"
@@ -223,7 +223,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-location">{{ t('enroll.location') }}</label>
+        <label for="class-location"><I18nText k="enroll.location" /></label>
         <input
           id="class-location"
           v-model="form.location"
@@ -232,7 +232,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-zip">{{ t('enroll.postalCode') }}</label>
+        <label for="class-zip"><I18nText k="enroll.postalCode" /></label>
         <input
           id="class-zip"
           v-model="form.zip"
@@ -241,7 +241,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-organization">{{ t('enroll.schoolName') }}</label>
+        <label for="class-organization"><I18nText k="enroll.schoolName" /></label>
         <input
           id="class-organization"
           v-model="form.organization"
@@ -249,16 +249,16 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-school-type">{{ t('enroll.schoolType') }}</label>
+        <label for="class-school-type"><I18nText k="enroll.schoolType" /></label>
         <select id="class-school-type" v-model="form.schoolType">
-          <option value="" disabled>{{ t('schoolTypes.none') }}</option>
+          <option value="" disabled><I18nText k="schoolTypes.none" /></option>
           <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
             {{ t(opt.labelKey) }}
           </option>
         </select>
       </div>
       <div class="field">
-        <label for="class-grade">{{ t('enrollClass.grade') }}</label>
+        <label for="class-grade"><I18nText k="enrollClass.grade" /></label>
         <input
           id="class-grade"
           v-model="form.grade"
@@ -267,7 +267,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-teacher">{{ t('enrollClass.teacherName') }}</label>
+        <label for="class-teacher"><I18nText k="enrollClass.teacherName" /></label>
         <input
           id="class-teacher"
           v-model="form.teacherName"
@@ -276,7 +276,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-description">{{ t('enrollClass.description') }}</label>
+        <label for="class-description"><I18nText k="enrollClass.description" /></label>
         <input
           id="class-description"
           v-model="form.description"
@@ -285,7 +285,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-players-total">{{ t('enrollClass.playersTotal') }}</label>
+        <label for="class-players-total"><I18nText k="enrollClass.playersTotal" /></label>
         <input
           id="class-players-total"
           v-model="form.playersTotal"
@@ -296,7 +296,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="class-voucher">{{ t('enroll.voucher') }}</label>
+        <label for="class-voucher"><I18nText k="enroll.voucher" /></label>
         <input
           id="class-voucher"
           v-model="form.voucher"
@@ -306,7 +306,7 @@ function onFormFieldFocus(e) {
           @blur="onVoucherBlur"
         />
         <p v-if="voucherChecking" class="field-hint checking">
-          <i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}
+          <i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" />
         </p>
         <p v-else-if="voucherValid === true" class="field-hint valid">
           <i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}
@@ -324,10 +324,10 @@ function onFormFieldFocus(e) {
       />
       <template v-if="voucherType === '1'">
         <div class="field voucher-invoice-forced">
-          <label class="label">{{ t('enroll.invoiceAddress') }}</label>
+          <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
           <p class="field-hint valid voucher-forced-msg">
             <i class="bi bi-info-circle-fill"></i>
-            {{ t('enroll.voucherInvoiceForced') }}
+            <I18nText k="enroll.voucherInvoiceForced" />
             <span v-if="voucherInvoiceName" class="voucher-invoice-name"> ({{ voucherInvoiceName }})</span>
           </p>
         </div>
@@ -341,7 +341,7 @@ function onFormFieldFocus(e) {
       />
 
       <div class="field">
-        <label for="class-notes">{{ t('enrollClass.notes') }}</label>
+        <label for="class-notes"><I18nText k="enrollClass.notes" /></label>
         <textarea
           id="class-notes"
           v-model="form.notes"
@@ -355,17 +355,18 @@ function onFormFieldFocus(e) {
       </div>
       <div v-if="success" class="message success">
         <i class="bi bi-check-circle-fill"></i>
-        {{ t('enrollClass.success') }}
+        <I18nText k="enrollClass.success" />
       </div>
       <div class="actions">
         <button type="button" class="btn btn-ghost" @click="back">
           <i class="bi bi-arrow-left"></i>
-          {{ t('enrollClass.back') }}
+          <I18nText k="enrollClass.back" />
         </button>
         <button type="submit" class="btn btn-primary" :disabled="submitting">
           <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
           <i v-else class="bi bi-check-lg"></i>
-          {{ submitting ? t('enrollClass.submitting') : t('enrollClass.submit') }}
+          <I18nText v-if="submitting" k="enrollClass.submitting" />
+          <I18nText v-else k="enrollClass.submit" />
         </button>
       </div>
     </form>

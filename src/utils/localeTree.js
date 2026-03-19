@@ -13,6 +13,54 @@ export function buildLocaleTreeFromFlatEntries(entries) {
   return finalizeState(root)
 }
 
+/**
+ * Tree for bilingual rows: { path, en, de } per leaf.
+ * @param {Array<{ path: string, en: string, de: string }>} rows
+ */
+export function buildLocaleTreeFromBilingualRows(rows) {
+  const root = emptyState()
+  for (const row of rows) {
+    const parts = row.path.split('.').filter(Boolean)
+    if (parts.length === 0) continue
+    addBilingualPath(root, parts, row)
+  }
+  return finalizeBilingualState(root)
+}
+
+/**
+ * @param {{ branchMap: Map<string, ReturnType<typeof emptyState>>, leaves: Array<{ path: string, en: string, de: string, segment: string }> }} state
+ * @param {string[]} parts
+ * @param {{ path: string, en: string, de: string }} row
+ */
+function addBilingualPath(state, parts, row) {
+  if (parts.length === 1) {
+    state.leaves.push({
+      path: row.path,
+      en: row.en,
+      de: row.de,
+      segment: parts[0],
+    })
+    return
+  }
+  const head = parts[0]
+  if (!state.branchMap.has(head)) {
+    state.branchMap.set(head, emptyState())
+  }
+  addBilingualPath(state.branchMap.get(head), parts.slice(1), row)
+}
+
+function finalizeBilingualState(state) {
+  const branches = [...state.branchMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, sub]) => ({
+      key,
+      node: finalizeBilingualState(sub),
+      count: countUnderState(sub),
+    }))
+  const leaves = [...state.leaves].sort((a, b) => a.path.localeCompare(b.path))
+  return { branches, leaves }
+}
+
 function emptyState() {
   return { branchMap: new Map(), leaves: [] }
 }

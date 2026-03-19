@@ -2,8 +2,14 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { isAuthenticated, login, logout, getUserProfile } from '@/auth/keycloak'
-import { setLocale, showTranslationKeys, setShowTranslationKeys } from '@/i18n'
+import { isAuthenticated, login, logout, getUserProfile, hasAdminRole } from '@/auth/keycloak'
+import {
+  setLocale,
+  showTranslationKeys,
+  setShowTranslationKeys,
+  translationEditMode,
+  setTranslationEditMode,
+} from '@/i18n'
 import { theme, setTheme } from '@/theme'
 
 const route = useRoute()
@@ -83,26 +89,28 @@ function doLogin() {
       <div class="hero-logo">
         <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="logo-img" />
       </div>
-      <h1>{{ t('common.appName') }}</h1>
-      <p class="tagline">{{ t('home.tagline') }}</p>
+      <h1><I18nText k="common.appName" /></h1>
+      <p class="tagline"><I18nText k="home.tagline" /></p>
       <div class="actions">
         <div v-if="showForbidden" class="forbidden-message">
-          <p><i class="bi bi-shield-exclamation"></i> {{ t('auth.forbiddenMessage') }}</p>
+          <p><i class="bi bi-shield-exclamation"></i> <I18nText k="auth.forbiddenMessage" /></p>
           <button type="button" class="btn btn-secondary" @click="logout">
-            {{ t('auth.logout') }}
+            <I18nText k="auth.logout" />
           </button>
         </div>
         <template v-else-if="authenticated">
-          <p class="welcome">{{ t('home.welcome', { name: user?.name ?? t('common.coach') }) }}</p>
+          <p class="welcome">
+            <I18nText k="home.welcome" :values="{ name: user?.name || t('common.coach') }" />
+          </p>
           <button class="btn btn-primary" @click="goDashboard">
             <i class="bi bi-speedometer2"></i>
-            {{ t('home.goToDashboard') }}
+            <I18nText k="home.goToDashboard" />
           </button>
         </template>
         <template v-else>
           <button class="btn btn-primary" @click="doLogin">
             <i class="bi bi-box-arrow-in-right"></i>
-            {{ t('home.signInWithSso') }}
+            <I18nText k="home.signInWithSso" />
           </button>
         </template>
       </div>

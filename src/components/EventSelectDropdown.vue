@@ -142,7 +142,7 @@ watch(() => props.events.length, () => {
           >
             <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
           </button>
-          <p v-if="!loading && events.length === 0" class="event-select-empty">{{ t('wizard.eventSelectNoEvents') }}</p>
+          <p v-if="!loading && events.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
         </div>
       </Transition>
     </div>

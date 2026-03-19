@@ -3,7 +3,13 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getUserProfile, logout, hasAdminRole } from '@/auth/keycloak'
-import { setLocale, showTranslationKeys, setShowTranslationKeys } from '@/i18n'
+import {
+  setLocale,
+  showTranslationKeys,
+  setShowTranslationKeys,
+  translationEditMode,
+  setTranslationEditMode,
+} from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses } from '@/services/draht'
 
@@ -86,11 +92,6 @@ function isActive(item) {
   return route.path.startsWith(item.path)
 }
 
-const pageTitle = computed(() => {
-  const key = route.meta?.titleKey
-  return key ? t(key) : t('nav.dashboard')
-})
-
 function closeSidebar() {
   sidebarOpen.value = false
 }
@@ -169,7 +170,7 @@ const userInitials = computed(() => {
           <span class="sidebar-item-icon">
             <img src="@/assets/hot.png" alt="" class="sidebar-logo" />
           </span>
-          <span class="flyout">{{ t('common.appName') }}</span>
+          <span class="flyout"><I18nText k="common.appName" /></span>
         </RouterLink>
       </div>
       <nav class="sidebar-nav">
@@ -184,7 +185,7 @@ const userInitials = computed(() => {
           <span class="sidebar-item-icon">
             <i class="bi" :class="item.icon"></i>
           </span>
-          <span class="flyout">{{ t(item.nameKey) }}</span>
+          <span class="flyout"><I18nText :k="item.nameKey" /></span>
         </RouterLink>
         <div v-if="sidebarLoading" class="sidebar-list-loading">
           <i class="bi bi-arrow-repeat spin"></i>
@@ -221,22 +222,28 @@ const userInitials = computed(() => {
             />
             <span v-else class="profile-avatar-initials">{{ userInitials }}</span>
           </button>
-          <span class="flyout profile-flyout">{{ user?.name ?? t('common.coach') }}</span>
+          <span class="flyout profile-flyout">
+            <template v-if="user?.name">{{ user.name }}</template>
+            <I18nText v-else k="common.coach" />
+          </span>
           <Transition name="profile-menu">
             <div v-if="profileMenuOpen" class="profile-menu" role="menu">
               <div class="profile-menu-header">
-                <span class="profile-menu-name">{{ user?.name ?? t('common.coach') }}</span>
+                <span class="profile-menu-name">
+                  <template v-if="user?.name">{{ user.name }}</template>
+                  <I18nText v-else k="common.coach" />
+                </span>
               </div>
               <button type="button" class="profile-menu-item" role="menuitem" disabled>
                 <i class="bi bi-gear"></i>
-                <span>{{ t('common.settings') }}</span>
+                <span><I18nText k="common.settings" /></span>
               </button>
               <button type="button" class="profile-menu-item" role="menuitem" disabled>
                 <i class="bi bi-question-circle"></i>
-                <span>{{ t('common.help') }}</span>
+                <span><I18nText k="common.help" /></span>
               </button>
               <div class="profile-menu-section">
-                <span class="profile-menu-label">{{ t('common.language') }}</span>
+                <span class="profile-menu-label"><I18nText k="common.language" /></span>
                 <div class="profile-menu-btns">
                   <button
                     type="button"
@@ -264,10 +271,21 @@ const userInitials = computed(() => {
                     <i class="bi" :class="showTranslationKeys ? 'bi-code-slash' : 'bi-translate'"></i>
                     Keys
                   </button>
+                  <button
+                    v-if="hasAdminRole()"
+                    type="button"
+                    class="profile-pill"
+                    :class="{ active: translationEditMode }"
+                    @click="setTranslationEditMode(!translationEditMode)"
+                    :title="t('common.translationEditMode')"
+                  >
+                    <i class="bi bi-pencil-square"></i>
+                    Edit
+                  </button>
                 </div>
               </div>
               <div class="profile-menu-section">
-                <span class="profile-menu-label">{{ t('common.theme') }}</span>
+                <span class="profile-menu-label"><I18nText k="common.theme" /></span>
                 <div class="profile-menu-btns">
                   <button
                     type="button"
@@ -276,7 +294,7 @@ const userInitials = computed(() => {
                     @click="setTheme('light')"
                   >
                     <i class="bi bi-sun-fill"></i>
-                    {{ t('common.light') }}
+                    <I18nText k="common.light" />
                   </button>
                   <button
                     type="button"
@@ -285,7 +303,7 @@ const userInitials = computed(() => {
                     @click="setTheme('dark')"
                   >
                     <i class="bi bi-moon-fill"></i>
-                    {{ t('common.dark') }}
+                    <I18nText k="common.dark" />
                   </button>
                 </div>
               </div>
@@ -296,7 +314,7 @@ const userInitials = computed(() => {
                 @click="doLogout"
               >
                 <i class="bi bi-box-arrow-right"></i>
-                <span>{{ t('nav.logOut') }}</span>
+                <span><I18nText k="nav.logOut" /></span>
               </button>
             </div>
           </Transition>
@@ -305,9 +323,12 @@ const userInitials = computed(() => {
     </aside>
     <main class="main">
       <header class="header">
-        <h1 class="page-title">{{ pageTitle }}</h1>
+        <h1 class="page-title">
+          <I18nText v-if="route.meta?.titleKey" :k="String(route.meta.titleKey)" tag="span" />
+          <I18nText v-else k="nav.dashboard" tag="span" />
+        </h1>
       </header>
-      <div class="content" :key="'content-' + showTranslationKeys">
+      <div class="content" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
         <RouterView />
       </div>
     </main>

@@ -66,7 +66,7 @@ watch(id, fetchClass)
   <div class="detail-view">
     <div v-if="loading" class="detail-loading">
       <i class="bi bi-arrow-repeat spin"></i>
-      {{ t('dashboard.loading') }}
+      <I18nText k="dashboard.loading" />
     </div>
     <div v-else-if="error" class="detail-error">
       <i class="bi bi-exclamation-circle"></i>
@@ -98,38 +98,74 @@ watch(id, fetchClass)
       <!-- 3) Coach infos (all fields, placeholder when missing) -->
       <section class="detail-section">
         <dl class="detail-meta">
-          <dt>{{ t('detail.coach') }}</dt>
+          <dt><I18nText k="detail.coach" /></dt>
           <dd>
             <template v-if="cls.coach">
-              {{ cls.coach.name || [cls.coach.firstname, cls.coach.lastname].filter(Boolean).join(' ') || t('detail.noData') }}
+              <template
+                v-if="cls.coach.name || [cls.coach.firstname, cls.coach.lastname].filter(Boolean).join(' ')"
+              >
+                {{ cls.coach.name || [cls.coach.firstname, cls.coach.lastname].filter(Boolean).join(' ') }}
+              </template>
+              <I18nText v-else k="detail.noData" />
               <span v-if="cls.coach.email" class="detail-meta-extra">{{ cls.coach.email }}</span>
             </template>
-            <template v-else>{{ t('detail.noData') }}</template>
+            <template v-else><I18nText k="detail.noData" /></template>
           </dd>
-          <dt>{{ t('enroll.organization') }}</dt>
-          <dd>{{ (cls.organization && cls.organization.name) || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.event') }}</dt>
-          <dd>{{ (cls.event && (cls.event.label || cls.event.ref)) || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.ort') }}</dt>
-          <dd>{{ cls.ort || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.institution') }}</dt>
-          <dd>{{ cls.institution || t('detail.noData') }}</dd>
+          <dt><I18nText k="enroll.organization" /></dt>
+          <dd>
+            <template v-if="cls.organization && cls.organization.name">{{ cls.organization.name }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
+          <dt><I18nText k="detail.event" /></dt>
+          <dd>
+            <template v-if="cls.event && (cls.event.label || cls.event.ref)">{{
+              cls.event.label || cls.event.ref
+            }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
+          <dt><I18nText k="detail.ort" /></dt>
+          <dd>
+            <template v-if="cls.ort">{{ cls.ort }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
+          <dt><I18nText k="detail.institution" /></dt>
+          <dd>
+            <template v-if="cls.institution">{{ cls.institution }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
         </dl>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('enroll.invoiceAddress') }} / {{ t('enroll.deliveryAddress') }}</h3>
-        <p class="detail-address-label">{{ t('detail.billingAddress') }}</p>
-        <p class="detail-address">{{ (cls.overview && cls.overview.billing_address && formatAddress(cls.overview.billing_address)) || t('detail.noData') }}</p>
-        <p class="detail-address-label">{{ t('detail.deliveryAddress') }}</p>
-        <p class="detail-address">{{ (cls.overview && cls.overview.delivery_address && formatAddress(cls.overview.delivery_address)) || t('detail.noData') }}</p>
+        <h3 class="detail-section-title"><I18nText k="enroll.invoiceAddress" /> / <I18nText k="enroll.deliveryAddress" /></h3>
+        <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
+        <p class="detail-address">
+          <template
+            v-if="cls.overview && cls.overview.billing_address && formatAddress(cls.overview.billing_address)"
+          >
+            {{ formatAddress(cls.overview.billing_address) }}
+          </template>
+          <I18nText v-else k="detail.noData" />
+        </p>
+        <p class="detail-address-label"><I18nText k="detail.deliveryAddress" /></p>
+        <p class="detail-address">
+          <template
+            v-if="cls.overview && cls.overview.delivery_address && formatAddress(cls.overview.delivery_address)"
+          >
+            {{ formatAddress(cls.overview.delivery_address) }}
+          </template>
+          <I18nText v-else k="detail.noData" />
+        </p>
       </section>
 
       <!-- 5) Note (always shown, placeholder when missing) -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('detail.note') }}</h3>
-        <p class="detail-notes">{{ cls.note_public || t('detail.noData') }}</p>
+        <h3 class="detail-section-title"><I18nText k="detail.note" /></h3>
+        <p class="detail-notes">
+          <template v-if="cls.note_public">{{ cls.note_public }}</template>
+          <I18nText v-else k="detail.noData" />
+        </p>
       </section>
       </div>
     </template>

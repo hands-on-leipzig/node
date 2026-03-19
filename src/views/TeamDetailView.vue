@@ -282,7 +282,7 @@ watch(id, async () => {
   <div class="detail-view">
     <div v-if="loading" class="detail-loading">
       <i class="bi bi-arrow-repeat spin"></i>
-      {{ t('dashboard.loading') }}
+      <I18nText k="dashboard.loading" />
     </div>
     <div v-else-if="error" class="detail-error">
       <i class="bi bi-exclamation-circle"></i>
@@ -316,36 +316,50 @@ watch(id, async () => {
       <!-- 3) Coach infos (all fields, placeholder when missing) -->
       <section class="detail-section">
         <dl class="detail-meta">
-          <dt>{{ t('detail.coach') }}</dt>
+          <dt><I18nText k="detail.coach" /></dt>
           <dd>
             <template v-if="team.coach">
-              {{ team.coach.name || [team.coach.firstname, team.coach.lastname].filter(Boolean).join(' ') || t('detail.noData') }}
+              <template
+                v-if="team.coach.name || [team.coach.firstname, team.coach.lastname].filter(Boolean).join(' ')"
+              >
+                {{ team.coach.name || [team.coach.firstname, team.coach.lastname].filter(Boolean).join(' ') }}
+              </template>
+              <I18nText v-else k="detail.noData" />
               <span v-if="team.coach.email" class="detail-meta-extra">{{ team.coach.email }}</span>
             </template>
-            <template v-else>{{ t('detail.noData') }}</template>
+            <template v-else><I18nText k="detail.noData" /></template>
           </dd>
-          <dt>{{ t('enroll.organization') }}</dt>
-          <dd>{{ (team.organization && team.organization.name) || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.ort') }}</dt>
-          <dd>{{ team.ort || t('detail.noData') }}</dd>
-          <dt>{{ t('detail.institution') }}</dt>
-          <dd>{{ team.institution || t('detail.noData') }}</dd>
+          <dt><I18nText k="enroll.organization" /></dt>
+          <dd>
+            <template v-if="team.organization && team.organization.name">{{ team.organization.name }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
+          <dt><I18nText k="detail.ort" /></dt>
+          <dd>
+            <template v-if="team.ort">{{ team.ort }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
+          <dt><I18nText k="detail.institution" /></dt>
+          <dd>
+            <template v-if="team.institution">{{ team.institution }}</template>
+            <I18nText v-else k="detail.noData" />
+          </dd>
         </dl>
       </section>
 
       <!-- 3b) Event (right column): current event or enroll -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('teamDetail.event') }}</h3>
+        <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
         <template v-if="team.event && (team.event.label || team.event.ref)">
           <p class="detail-event-current">{{ team.event.label || team.event.ref }}</p>
           <button type="button" class="detail-btn" @click="requestEventChange">
             <i class="bi bi-pencil-square"></i>
-            {{ t('teamDetail.requestEventChange') }}
+            <I18nText k="teamDetail.requestEventChange" />
           </button>
         </template>
         <template v-else>
-          <p class="detail-hint">{{ t('teamDetail.noEventRegistered') }}</p>
-          <p class="detail-hint detail-hint-sm">{{ t('teamDetail.registerForEventHint') }}</p>
+          <p class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
+          <p class="detail-hint detail-hint-sm"><I18nText k="teamDetail.registerForEventHint" /></p>
           <div class="detail-register-event">
             <EventSelectDropdown
               :title="t('wizard.eventSelectAllEvents')"
@@ -364,26 +378,41 @@ watch(id, async () => {
             >
               <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
               <i v-else class="bi bi-calendar-check"></i>
-              {{ registeringEvent ? t('teamDetail.registering') : t('teamDetail.registerForEventButton') }}
+              <I18nText v-if="registeringEvent" k="teamDetail.registering" />
+              <I18nText v-else k="teamDetail.registerForEventButton" />
             </button>
           </div>
           <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
-          <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> {{ t('teamDetail.registerEventSuccess') }}</p>
+          <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> <I18nText k="teamDetail.registerEventSuccess" /></p>
         </template>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('enroll.invoiceAddress') }} / {{ t('enroll.deliveryAddress') }}</h3>
-        <p class="detail-address-label">{{ t('detail.billingAddress') }}</p>
-        <p class="detail-address">{{ (team.overview && team.overview.billing_address && formatAddress(team.overview.billing_address)) || t('detail.noData') }}</p>
-        <p class="detail-address-label">{{ t('detail.deliveryAddress') }}</p>
-        <p class="detail-address">{{ (team.overview && team.overview.delivery_address && formatAddress(team.overview.delivery_address)) || t('detail.noData') }}</p>
+        <h3 class="detail-section-title"><I18nText k="enroll.invoiceAddress" /> / <I18nText k="enroll.deliveryAddress" /></h3>
+        <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
+        <p class="detail-address">
+          <template
+            v-if="team.overview && team.overview.billing_address && formatAddress(team.overview.billing_address)"
+          >
+            {{ formatAddress(team.overview.billing_address) }}
+          </template>
+          <I18nText v-else k="detail.noData" />
+        </p>
+        <p class="detail-address-label"><I18nText k="detail.deliveryAddress" /></p>
+        <p class="detail-address">
+          <template
+            v-if="team.overview && team.overview.delivery_address && formatAddress(team.overview.delivery_address)"
+          >
+            {{ formatAddress(team.overview.delivery_address) }}
+          </template>
+          <I18nText v-else k="detail.noData" />
+        </p>
       </section>
 
       <!-- Players + co-coaches (team only) -->
       <section class="detail-section detail-section-wide">
-        <h3 class="detail-section-title">{{ t('detail.players') }}</h3>
+        <h3 class="detail-section-title"><I18nText k="detail.players" /></h3>
         <div class="detail-players-block">
           <ul v-if="(team.players && team.players.length) || editingPlayers.length" class="detail-players-list">
             <li v-for="(p, idx) in displayedPlayers" :key="'p-' + idx" class="detail-player-row">
@@ -399,8 +428,8 @@ watch(id, async () => {
                 />
                 <input v-model="editingPlayer.birthdayStr" type="date" class="detail-player-input" />
                 <div class="detail-player-actions">
-                  <button type="button" class="detail-btn detail-btn-primary" @click="saveEditPlayer">{{ t('common.save') }}</button>
-                  <button type="button" class="detail-btn" @click="cancelEditPlayer">{{ t('common.cancel') }}</button>
+                  <button type="button" class="detail-btn detail-btn-primary" @click="saveEditPlayer"><I18nText k="common.save" /></button>
+                  <button type="button" class="detail-btn" @click="cancelEditPlayer"><I18nText k="common.cancel" /></button>
                 </div>
               </template>
               <template v-else>
@@ -413,9 +442,9 @@ watch(id, async () => {
               </template>
             </li>
           </ul>
-          <p v-else class="detail-empty-hint">{{ t('detail.noData') }}</p>
+          <p v-else class="detail-empty-hint"><I18nText k="detail.noData" /></p>
           <div class="detail-players-toolbar">
-            <button v-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer">{{ t('detail.addPlayer') }}</button>
+            <button v-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer"><I18nText k="detail.addPlayer" /></button>
             <template v-else>
               <input v-model="newPlayer.firstname" class="detail-player-input" :placeholder="t('detail.firstname')" />
               <input v-model="newPlayer.name" class="detail-player-input" :placeholder="t('detail.lastname')" />
@@ -427,15 +456,15 @@ watch(id, async () => {
                 :placeholder="t('detail.gender')"
               />
               <input v-model="newPlayer.birthdayStr" type="date" class="detail-player-input" />
-              <button type="button" class="detail-btn detail-btn-primary" @click="addPlayer">{{ t('detail.add') }}</button>
-              <button type="button" class="detail-btn" @click="cancelAddPlayer">{{ t('common.cancel') }}</button>
+              <button type="button" class="detail-btn detail-btn-primary" @click="addPlayer"><I18nText k="detail.add" /></button>
+              <button type="button" class="detail-btn" @click="cancelAddPlayer"><I18nText k="common.cancel" /></button>
             </template>
           </div>
-          <div v-if="savingPlayers" class="detail-saving-hint">{{ t('dashboard.loading') }}</div>
+          <div v-if="savingPlayers" class="detail-saving-hint"><I18nText k="dashboard.loading" /></div>
         </div>
 
-        <h4 class="detail-subsection-title">{{ t('detail.coCoaches') }}</h4>
-        <p v-if="!(team.co_coaches && team.co_coaches.length) && !(team.manual_co_coaches && team.manual_co_coaches.length)" class="detail-empty-hint">{{ t('detail.noData') }}</p>
+        <h4 class="detail-subsection-title"><I18nText k="detail.coCoaches" /></h4>
+        <p v-if="!(team.co_coaches && team.co_coaches.length) && !(team.manual_co_coaches && team.manual_co_coaches.length)" class="detail-empty-hint"><I18nText k="detail.noData" /></p>
         <template v-else>
           <p v-if="team.co_coaches && team.co_coaches.length" class="detail-coaches">
             <span v-for="(c, i) in team.co_coaches" :key="'c-' + i">{{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}</span>
@@ -448,8 +477,11 @@ watch(id, async () => {
 
       <!-- 5) Note (always shown, placeholder when missing) -->
       <section class="detail-section">
-        <h3 class="detail-section-title">{{ t('detail.note') }}</h3>
-        <p class="detail-notes">{{ team.note_public || t('detail.noData') }}</p>
+        <h3 class="detail-section-title"><I18nText k="detail.note" /></h3>
+        <p class="detail-notes">
+          <template v-if="team.note_public">{{ team.note_public }}</template>
+          <I18nText v-else k="detail.noData" />
+        </p>
       </section>
       </div>
     </template>

@@ -249,13 +249,13 @@ function onFormFieldFocus(e) {
       <div class="enroll-icon">
         <i class="bi bi-people-fill"></i>
       </div>
-      <h2>{{ t('enrollTeam.title') }}</h2>
-      <p class="description">{{ t('enrollTeam.description') }}</p>
+      <h2><I18nText k="enrollTeam.title" /></h2>
+      <p class="description"><I18nText k="enrollTeam.description" /></p>
     </div>
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
       <div class="field">
-        <label for="team-name">{{ t('enrollTeam.teamName') }} <span class="required">*</span></label>
+        <label for="team-name"><I18nText k="enrollTeam.teamName" /> <span class="required">*</span></label>
         <input
           id="team-name"
           v-model="form.name"
@@ -265,7 +265,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-school">{{ t('enrollTeam.schoolClub') }}</label>
+        <label for="team-school"><I18nText k="enrollTeam.schoolClub" /></label>
         <input
           id="team-school"
           v-model="form.schoolOrClub"
@@ -274,9 +274,9 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field field-select">
-        <label for="team-country">{{ t('enroll.schoolCountry') }}</label>
+        <label for="team-country"><I18nText k="enroll.schoolCountry" /></label>
         <select id="team-country" v-model="form.country">
-          <option value="">{{ t('enroll.selectCountry') }}</option>
+          <option value=""><I18nText k="enroll.selectCountry" /></option>
           <optgroup :label="t('enroll.countriesTop')">
             <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </optgroup>
@@ -286,7 +286,7 @@ function onFormFieldFocus(e) {
         </select>
       </div>
       <div class="field">
-        <label for="team-zip">{{ t('enroll.schoolZip') }}</label>
+        <label for="team-zip"><I18nText k="enroll.schoolZip" /></label>
         <input
           id="team-zip"
           v-model="form.zip"
@@ -295,7 +295,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-city">{{ t('enroll.schoolCity') }}</label>
+        <label for="team-city"><I18nText k="enroll.schoolCity" /></label>
         <input
           id="team-city"
           v-model="form.city"
@@ -304,7 +304,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-state">{{ t('enroll.schoolState') }}</label>
+        <label for="team-state"><I18nText k="enroll.schoolState" /></label>
         <input
           id="team-state"
           v-model="form.state"
@@ -312,7 +312,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-organization">{{ t('enroll.organization') }}</label>
+        <label for="team-organization"><I18nText k="enroll.organization" /></label>
         <input
           id="team-organization"
           v-model="form.organization"
@@ -320,7 +320,7 @@ function onFormFieldFocus(e) {
         />
       </div>
       <div class="field">
-        <label for="team-voucher">{{ t('enroll.voucher') }}</label>
+        <label for="team-voucher"><I18nText k="enroll.voucher" /></label>
         <input
           id="team-voucher"
           v-model="form.voucher"
@@ -330,7 +330,7 @@ function onFormFieldFocus(e) {
           @blur="onVoucherBlur"
         />
         <p v-if="voucherChecking" class="field-hint checking">
-          <i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}
+          <i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" />
         </p>
         <p v-else-if="voucherValid === true" class="field-hint valid">
           <i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}
@@ -348,10 +348,10 @@ function onFormFieldFocus(e) {
       />
       <template v-if="voucherType === '1'">
         <div class="field voucher-invoice-forced">
-          <label class="label">{{ t('enroll.invoiceAddress') }}</label>
+          <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
           <p class="field-hint valid voucher-forced-msg">
             <i class="bi bi-info-circle-fill"></i>
-            {{ t('enroll.voucherInvoiceForced') }}
+            <I18nText k="enroll.voucherInvoiceForced" />
             <span v-if="voucherInvoiceName" class="voucher-invoice-name"> ({{ voucherInvoiceName }})</span>
           </p>
         </div>
@@ -365,7 +365,7 @@ function onFormFieldFocus(e) {
       />
 
       <div class="field">
-        <label for="team-notes">{{ t('enrollTeam.notes') }}</label>
+        <label for="team-notes"><I18nText k="enrollTeam.notes" /></label>
         <textarea
           id="team-notes"
           v-model="form.notes"
@@ -379,17 +379,18 @@ function onFormFieldFocus(e) {
       </div>
       <div v-if="success" class="message success">
         <i class="bi bi-check-circle-fill"></i>
-        {{ t('enrollTeam.success') }}
+        <I18nText k="enrollTeam.success" />
       </div>
       <div class="actions">
         <button type="button" class="btn btn-ghost" @click="back">
           <i class="bi bi-arrow-left"></i>
-          {{ t('enrollTeam.back') }}
+          <I18nText k="enrollTeam.back" />
         </button>
         <button type="submit" class="btn btn-primary" :disabled="submitting">
           <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
           <i v-else class="bi bi-check-lg"></i>
-          {{ submitting ? t('enrollTeam.submitting') : t('enrollTeam.submit') }}
+          <I18nText v-if="submitting" k="enrollTeam.submitting" />
+          <I18nText v-else k="enrollTeam.submit" />
         </button>
       </div>
     </form>

@@ -377,12 +377,14 @@ const stepIndex = computed(() => {
         <div class="enroll-icon future-icon">
           <i class="bi bi-stars"></i>
         </div>
-        <h2>{{ t('enrollFuture.title') }}</h2>
-        <p class="description">{{ t('enrollFuture.description', { group: group || '—' }) }}</p>
+        <h2><I18nText k="enrollFuture.title" /></h2>
+        <p class="description">
+          <I18nText k="enrollFuture.description" :values="{ group: group || '—' }" />
+        </p>
         <a :href="pdfHref" class="logic-pdf-link" target="_blank" rel="noopener noreferrer">
-          <i class="bi bi-file-earmark-pdf"></i> {{ t('enrollFuture.openLogicPdf') }}
+          <i class="bi bi-file-earmark-pdf"></i> <I18nText k="enrollFuture.openLogicPdf" />
         </a>
-        <p class="pricing-disclaimer">{{ t('enrollFuture.pricingDisclaimer') }}</p>
+        <p class="pricing-disclaimer"><I18nText k="enrollFuture.pricingDisclaimer" /></p>
         <div class="step-dots" aria-hidden="true">
           <span
             v-for="(lbl, i) in ['0', '1', '2', '3', '4']"
@@ -395,10 +397,10 @@ const stepIndex = computed(() => {
 
       <!-- Step 0: Voucher -->
       <div v-if="step === 'voucher' && group" class="step-block">
-        <h3 class="step-title">{{ t('enrollFuture.stepVoucher') }}</h3>
-        <p class="step-lead">{{ t('enrollFuture.stepVoucherLead') }}</p>
+        <h3 class="step-title"><I18nText k="enrollFuture.stepVoucher" /></h3>
+        <p class="step-lead"><I18nText k="enrollFuture.stepVoucherLead" /></p>
         <div class="field">
-          <label for="fv-voucher">{{ t('enroll.voucherCodeLabel') }}</label>
+          <label for="fv-voucher"><I18nText k="enroll.voucherCodeLabel" /></label>
           <input
             id="fv-voucher"
             v-model="form.voucher"
@@ -414,7 +416,7 @@ const stepIndex = computed(() => {
             @blur="onVoucherBlur"
           />
           <p v-if="voucherChecking" class="field-hint checking">
-            <i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}
+            <i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" />
           </p>
           <p v-else-if="voucherValid === true" class="field-hint valid">
             <i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}
@@ -425,7 +427,7 @@ const stepIndex = computed(() => {
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
           </button>
           <button
             type="button"
@@ -433,15 +435,15 @@ const stepIndex = computed(() => {
             :disabled="!!(form.voucher?.trim() && voucherValid === false)"
             @click="goVoucherNext"
           >
-            {{ t('enrollFuture.continue') }}
+            <I18nText k="enrollFuture.continue" />
           </button>
         </div>
       </div>
 
       <!-- Step 1: Gruppengröße -->
       <div v-else-if="step === 'pupils' && group" class="step-block">
-        <h3 class="step-title">{{ t('enrollFuture.stepGroupSize') }}</h3>
-        <p class="step-lead">{{ t('enrollFuture.stepGroupSizeLead') }}</p>
+        <h3 class="step-title"><I18nText k="enrollFuture.stepGroupSize" /></h3>
+        <p class="step-lead"><I18nText k="enrollFuture.stepGroupSizeLead" /></p>
         <div class="option-cards">
           <button
             v-for="num in FUTURE_PUPIL_COUNTS"
@@ -450,65 +452,67 @@ const stepIndex = computed(() => {
             class="option-card"
             @click="choosePupils(num)"
           >
-            <span class="option-card-main">{{ num }} {{ t('enrollFuture.pupils') }}</span>
+            <span class="option-card-main">{{ num }} <I18nText k="enrollFuture.pupils" /></span>
             <span class="option-card-price">{{ formatMoney(FUTURE_GROUP_PRICE_EUR[num]) }}</span>
           </button>
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
           </button>
         </div>
       </div>
 
       <!-- Step 2: Saisonset -->
       <div v-else-if="step === 'seasonSets' && group" class="step-block">
-        <h3 class="step-title">{{ t('enrollFuture.stepSeasonSets') }}</h3>
-        <p class="step-lead">{{ t('enrollFuture.stepSeasonSetsLead') }}</p>
+        <h3 class="step-title"><I18nText k="enrollFuture.stepSeasonSets" /></h3>
+        <p class="step-lead"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
         <div class="radio-cards">
           <label class="radio-card">
             <input v-model.number="seasonSetCount" type="radio" :value="0" />
             <span class="radio-card-body">
-              <strong>{{ t('enrollFuture.seasonNone') }}</strong>
+              <strong><I18nText k="enrollFuture.seasonNone" /></strong>
               <span class="muted">{{ formatMoney(0) }}</span>
             </span>
           </label>
           <label class="radio-card">
             <input v-model.number="seasonSetCount" type="radio" :value="1" />
             <span class="radio-card-body">
-              <strong>{{ t('enrollFuture.seasonOne') }}</strong>
+              <strong><I18nText k="enrollFuture.seasonOne" /></strong>
               <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR) }}</span>
             </span>
           </label>
           <label class="radio-card">
             <input v-model.number="seasonSetCount" type="radio" :value="2" />
             <span class="radio-card-body">
-              <strong>{{ t('enrollFuture.seasonTwo') }}</strong>
+              <strong><I18nText k="enrollFuture.seasonTwo" /></strong>
               <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</span>
             </span>
           </label>
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
           </button>
           <button type="button" class="btn btn-primary" @click="seasonNext">
-            {{ t('enrollFuture.continue') }}
+            <I18nText k="enrollFuture.continue" />
           </button>
         </div>
       </div>
 
       <!-- Step 3: Event / Teams (optional) -->
       <div v-else-if="step === 'teams' && group" class="step-block">
-        <h3 class="step-title">{{ t('enrollFuture.stepTeams') }}</h3>
-        <p class="step-lead">{{ t('enrollFuture.stepTeamsLead', { max: maxTeams }) }}</p>
+        <h3 class="step-title"><I18nText k="enrollFuture.stepTeams" /></h3>
+        <p class="step-lead">
+          <I18nText k="enrollFuture.stepTeamsLead" :values="{ max: maxTeams }" />
+        </p>
         <label class="check-row">
           <input v-model="registerEventTeams" type="checkbox" @change="syncEventTeamsArray" />
-          {{ t('enrollFuture.registerTeamsNow') }}
+          <I18nText k="enrollFuture.registerTeamsNow" />
         </label>
         <template v-if="registerEventTeams">
           <div class="field">
-            <label>{{ t('enrollFuture.teamCountLabel') }}</label>
+            <label><I18nText k="enrollFuture.teamCountLabel" /></label>
             <select v-model.number="teamCount" class="select-input">
               <option v-for="n in maxTeams" :key="n" :value="n">
                 {{ n }} {{ n === 1 ? t('enrollFuture.teamSingular') : t('enrollFuture.teamPlural') }}
@@ -517,8 +521,10 @@ const stepIndex = computed(() => {
             </select>
           </div>
           <div v-for="(team, ti) in eventTeams" :key="'team-' + ti" class="team-block">
-            <h4 class="team-block-title">{{ t('enrollFuture.teamBlockTitle', { n: ti + 1 }) }}</h4>
-            <p class="muted small">{{ t('enrollFuture.teamParticipantsHint') }}</p>
+            <h4 class="team-block-title">
+              <I18nText k="enrollFuture.teamBlockTitle" :values="{ n: ti + 1 }" />
+            </h4>
+            <p class="muted small"><I18nText k="enrollFuture.teamParticipantsHint" /></p>
             <div v-for="(pl, pi) in team.players" :key="'p-' + ti + '-' + pi" class="player-row">
               <input v-model="pl.firstname" :placeholder="t('detail.firstname')" class="inp-sm" />
               <input v-model="pl.name" :placeholder="t('detail.lastname')" class="inp-sm" />
@@ -529,16 +535,16 @@ const stepIndex = computed(() => {
               </button>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" @click="addPlayer(ti)">
-              <i class="bi bi-person-plus"></i> {{ t('enrollFuture.addParticipant') }}
+              <i class="bi bi-person-plus"></i> <I18nText k="enrollFuture.addParticipant" />
             </button>
           </div>
         </template>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
           </button>
           <button type="button" class="btn btn-primary" @click="teamsNext">
-            {{ t('enrollFuture.continue') }}
+            <I18nText k="enrollFuture.continue" />
           </button>
         </div>
       </div>
@@ -550,14 +556,16 @@ const stepIndex = computed(() => {
         @submit.prevent="submit"
         @focusin="onFormFieldFocus"
       >
-        <h3 class="step-title">{{ t('enrollFuture.stepDetails') }}</h3>
+        <h3 class="step-title"><I18nText k="enrollFuture.stepDetails" /></h3>
         <div class="summary-box">
           <p>
-            <strong>{{ t('enrollFuture.groupLabel', { group }) }}</strong> · {{ selectedPupils }}
-            {{ t('enrollFuture.pupils') }} — {{ formatMoney(FUTURE_GROUP_PRICE_EUR[selectedPupils]) }}
+            <strong><I18nText k="enrollFuture.groupLabel" :values="{ group }" /></strong> · {{ selectedPupils }}
+            <I18nText k="enrollFuture.pupils" /> — {{ formatMoney(FUTURE_GROUP_PRICE_EUR[selectedPupils]) }}
           </p>
           <p>
-            {{ seasonSetCount === 0 ? t('enrollFuture.seasonNone') : seasonSetCount === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo') }}
+            <I18nText v-if="seasonSetCount === 0" k="enrollFuture.seasonNone" />
+            <I18nText v-else-if="seasonSetCount === 1" k="enrollFuture.seasonOne" />
+            <I18nText v-else k="enrollFuture.seasonTwo" />
             —
             {{
               seasonSetCount === 0
@@ -566,13 +574,13 @@ const stepIndex = computed(() => {
             }}
           </p>
           <p v-if="registerEventTeams">
-            {{ teamCount }}× {{ t('enrollFuture.teamEventLine') }} — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * teamCount) }}
+            {{ teamCount }}× <I18nText k="enrollFuture.teamEventLine" /> — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * teamCount) }}
           </p>
-          <p v-else class="muted">{{ t('enrollFuture.noTeamsInOrder') }}</p>
+          <p v-else class="muted"><I18nText k="enrollFuture.noTeamsInOrder" /></p>
         </div>
 
         <div class="field">
-          <label for="future-name">{{ t('enrollFuture.nameLabel') }} <span class="required">*</span></label>
+          <label for="future-name"><I18nText k="enrollFuture.nameLabel" /> <span class="required">*</span></label>
           <input
             id="future-name"
             v-model="form.name"
@@ -582,24 +590,24 @@ const stepIndex = computed(() => {
           />
         </div>
         <div class="field">
-          <label for="future-school-type">{{ t('enroll.schoolType') }}</label>
+          <label for="future-school-type"><I18nText k="enroll.schoolType" /></label>
           <select id="future-school-type" v-model="form.schoolType">
-            <option value="" disabled>{{ t('schoolTypes.none') }}</option>
+            <option value="" disabled><I18nText k="schoolTypes.none" /></option>
             <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
               {{ t(opt.labelKey) }}
             </option>
           </select>
         </div>
         <div class="field">
-          <label for="future-location">{{ t('enroll.location') }}</label>
+          <label for="future-location"><I18nText k="enroll.location" /></label>
           <input id="future-location" v-model="form.location" type="text" />
         </div>
         <div class="field">
-          <label for="future-zip">{{ t('enroll.postalCode') }}</label>
+          <label for="future-zip"><I18nText k="enroll.postalCode" /></label>
           <input id="future-zip" v-model="form.zip" type="text" />
         </div>
         <div class="field">
-          <label for="future-organization">{{ t('enroll.schoolName') }}</label>
+          <label for="future-organization"><I18nText k="enroll.schoolName" /></label>
           <input id="future-organization" v-model="form.organization" type="text" />
         </div>
 
@@ -611,10 +619,10 @@ const stepIndex = computed(() => {
         />
         <template v-if="voucherType === '1'">
           <div class="field voucher-invoice-forced">
-            <label class="label">{{ t('enroll.invoiceAddress') }}</label>
+            <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
             <p class="field-hint valid voucher-forced-msg">
               <i class="bi bi-info-circle-fill"></i>
-              {{ t('enroll.voucherInvoiceForced') }}
+              <I18nText k="enroll.voucherInvoiceForced" />
               <span v-if="voucherInvoiceName" class="voucher-invoice-name"> ({{ voucherInvoiceName }})</span>
             </p>
           </div>
@@ -628,7 +636,7 @@ const stepIndex = computed(() => {
         />
 
         <div class="field">
-          <label for="future-notes">{{ t('enrollClass.notes') }}</label>
+          <label for="future-notes"><I18nText k="enrollClass.notes" /></label>
           <textarea id="future-notes" v-model="form.notes" rows="3" />
         </div>
 
@@ -636,16 +644,17 @@ const stepIndex = computed(() => {
           <i class="bi bi-exclamation-circle"></i> {{ error }}
         </div>
         <div v-if="success" class="message success">
-          <i class="bi bi-check-circle-fill"></i> {{ t('enrollFuture.success') }}
+          <i class="bi bi-check-circle-fill"></i> <I18nText k="enrollFuture.success" />
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
-            <i class="bi bi-arrow-left"></i> {{ t('enrollFuture.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
           </button>
           <button type="submit" class="btn btn-primary" :disabled="submitting">
             <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
             <i v-else class="bi bi-check-lg"></i>
-            {{ submitting ? t('enrollFuture.submitting') : t('enrollFuture.submit') }}
+            <I18nText v-if="submitting" k="enrollFuture.submitting" />
+            <I18nText v-else k="enrollFuture.submit" />
           </button>
         </div>
       </form>

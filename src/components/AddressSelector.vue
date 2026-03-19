@@ -73,7 +73,7 @@ function setNewField(field, value) {
           :checked="modelValue.useExisting"
           @change="setMode(true)"
         />
-        <span>{{ t('enroll.useExistingAddress') }}</span>
+        <span><I18nText k="enroll.useExistingAddress" /></span>
       </label>
       <label class="radio-label">
         <input
@@ -82,7 +82,7 @@ function setNewField(field, value) {
           :checked="!modelValue.useExisting"
           @change="setMode(false)"
         />
-        <span>{{ t('enroll.enterNewAddress') }}</span>
+        <span><I18nText k="enroll.enterNewAddress" /></span>
       </label>
     </div>
     <template v-if="modelValue.useExisting">
@@ -97,7 +97,7 @@ function setNewField(field, value) {
     <template v-else>
       <div class="address-fields">
         <div class="field">
-          <label :for="idPrefix + '-street'">{{ t('enroll.street') }}</label>
+          <label :for="idPrefix + '-street'"><I18nText k="enroll.street" /></label>
           <input
             :id="idPrefix + '-street'"
             type="text"
@@ -107,7 +107,7 @@ function setNewField(field, value) {
         </div>
         <div class="field-row">
           <div class="field">
-            <label :for="idPrefix + '-postalCode'">{{ t('enroll.postalCode') }}</label>
+            <label :for="idPrefix + '-postalCode'"><I18nText k="enroll.postalCode" /></label>
             <input
               :id="idPrefix + '-postalCode'"
               type="text"
@@ -116,7 +116,7 @@ function setNewField(field, value) {
             />
           </div>
           <div class="field field-flex">
-            <label :for="idPrefix + '-city'">{{ t('enroll.city') }}</label>
+            <label :for="idPrefix + '-city'"><I18nText k="enroll.city" /></label>
             <input
               :id="idPrefix + '-city'"
               type="text"
@@ -126,7 +126,7 @@ function setNewField(field, value) {
           </div>
         </div>
         <div class="field">
-          <label :for="idPrefix + '-country'">{{ t('enroll.country') }}</label>
+          <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
           <input
             :id="idPrefix + '-country'"
             type="text"

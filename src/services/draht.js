@@ -196,10 +196,22 @@ export function postDocumentsProbeFolder(url) {
 }
 
 /**
- * Admin: create GitHub PR with updated locale file (POST /handson/node/translations-pr).
+ * Admin: create GitHub PR with updated locale file(s) (POST /handson/node/translations-pr).
  * Configure on server: Dolibarr constants HANDSON_GITHUB_TOKEN, HANDSON_GITHUB_REPO;
  * optional HANDSON_GITHUB_LOCALE_PATH_PREFIX (default src/locales).
- * @param {{ locale: 'en'|'de', messages: Record<string, unknown>, prTitle?: string, editorUsername?: string, baseBranch?: string }} payload
+ *
+ * **Combined (preferred):** `{ locales: { en: nested, de: nested }, prTitle?, editorUsername?, baseBranch? }` — one PR for both files.
+ *
+ * **Legacy:** `{ locale: 'en'|'de', messages: nested, ... }` — single file if DRAHT still supports it.
+ *
+ * @param {{
+ *   locales?: Record<'en'|'de', Record<string, unknown>>,
+ *   locale?: 'en'|'de',
+ *   messages?: Record<string, unknown>,
+ *   prTitle?: string,
+ *   editorUsername?: string,
+ *   baseBranch?: string,
+ * }} payload
  */
 export function postTranslationsPr(payload) {
   return api.post('/translations-pr', payload, { timeout: 120000 })

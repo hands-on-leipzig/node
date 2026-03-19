@@ -9,6 +9,26 @@ function unwrapApiData(data) {
 }
 
 /**
+ * Create one GitHub PR that updates both `en.js` and `de.js`.
+ * @param {{ en: Record<string, unknown>, de: Record<string, unknown> }} locales - Nested message trees per locale
+ * @param {string} [prTitle]
+ */
+export async function submitLocalesPullRequest(locales, prTitle) {
+  await updateToken(40)
+  if (!getToken()) {
+    throw new Error('Not signed in')
+  }
+  const profile = getUserProfile()
+  const res = await postTranslationsPr({
+    locales,
+    prTitle: prTitle || undefined,
+    editorUsername: profile?.username || profile?.name || '',
+  })
+  return unwrapApiData(res?.data) ?? res?.data
+}
+
+/**
+ * @deprecated Prefer {@link submitLocalesPullRequest} — one PR for all locales.
  * @param {'en'|'de'} locale
  * @param {Record<string, unknown>} messages
  * @param {string} [prTitle]

@@ -1,21 +1,34 @@
 <script setup>
-import AdminLocaleTreeNode from './AdminLocaleTreeNode.vue'
+import AdminLocaleNavNode from './AdminLocaleNavNode.vue'
 
 /**
- * Recursive collapsible groups for flat locale keys (dot paths).
+ * Left pane: collapsible key hierarchy (same pattern as the original editor tree).
+ * Leaf names scroll the matching row on the right.
  */
 defineProps({
   node: {
     type: Object,
     required: true,
   },
+  pathPrefix: {
+    type: String,
+    default: '',
+  },
 })
 
-const emit = defineEmits(['update-key'])
+const emit = defineEmits(['scroll-to-path'])
+
+function branchPath(prefix, key) {
+  return prefix ? `${prefix}.${key}` : key
+}
+
+function onScrollToLeaf(path) {
+  emit('scroll-to-path', path)
+}
 </script>
 
 <template>
-  <div class="locale-tree-node">
+  <div class="nav-node">
     <template v-for="branch in node.branches" :key="branch.key">
       <details class="locale-details">
         <summary class="locale-summary">
@@ -24,29 +37,27 @@ const emit = defineEmits(['update-key'])
           <span class="locale-summary-count">({{ branch.count }})</span>
         </summary>
         <div class="locale-details-inner">
-          <AdminLocaleTreeNode :node="branch.node" @update-key="(p, v) => emit('update-key', p, v)" />
+          <AdminLocaleNavNode
+            :node="branch.node"
+            :path-prefix="branchPath(pathPrefix, branch.key)"
+            @scroll-to-path="(p) => emit('scroll-to-path', p)"
+          />
         </div>
       </details>
     </template>
 
-    <div v-for="leaf in node.leaves" :key="leaf.path" class="locale-row">
-      <div class="locale-key-cell">
-        <span class="locale-key-text">{{ leaf.path }}</span>
-      </div>
-      <div class="locale-val-cell">
-        <textarea
-          class="admin-input locale-val"
-          rows="2"
-          :value="leaf.value"
-          @input="emit('update-key', leaf.path, $event.target.value)"
-        />
-      </div>
-    </div>
+    <ul v-if="node.leaves.length" class="nav-leaves">
+      <li v-for="leaf in node.leaves" :key="leaf.path">
+        <button type="button" class="nav-leaf" @click="onScrollToLeaf(leaf.path)">
+          {{ leaf.segment }}
+        </button>
+      </li>
+    </ul>
   </div>
 </template>
 
 <style scoped>
-.locale-tree-node {
+.nav-node {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -105,44 +116,30 @@ const emit = defineEmits(['update-key'])
   border-top: 1px solid var(--color-border, #dee2e6);
   background: var(--color-bg, #fff);
 }
-.locale-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 28%) 1fr;
-  gap: 0.5rem;
-  align-items: start;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--color-border, #e9ecef);
+.nav-leaves {
+  list-style: none;
+  margin: 0.15rem 0 0.35rem 0;
+  padding: 0 0 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
-.locale-row:last-child {
-  border-bottom: none;
-}
-.locale-key-cell {
-  min-width: 0;
-}
-.locale-key-text {
+.nav-leaf {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.2rem 0.35rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
   font-family: ui-monospace, monospace;
   font-size: 0.72rem;
+  color: var(--color-accent, #0d6efd);
+  cursor: pointer;
   word-break: break-word;
-  line-height: 1.35;
-  color: var(--color-text-muted, #495057);
 }
-.locale-val-cell {
-  min-width: 0;
-}
-.locale-val {
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--color-border, #dee2e6);
-  border-radius: var(--radius, 0.375rem);
-  background: var(--color-bg, #fff);
-  color: var(--color-text, #212529);
-  font-size: 0.875rem;
-  min-height: 2.5rem;
-  resize: vertical;
-  width: 100%;
-  box-sizing: border-box;
-}
-.locale-val:focus {
-  outline: none;
-  border-color: var(--color-accent, #0d6efd);
+.nav-leaf:hover {
+  text-decoration: underline;
+  background: var(--color-accent-soft, rgba(13, 110, 253, 0.08));
 }
 </style>

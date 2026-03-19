@@ -728,9 +728,9 @@ watch(
     <div class="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div class="wizard-hero">
         <div class="wizard-hero-content">
-          <p class="wizard-eyebrow">{{ t('wizard.stepEdition') }}</p>
-          <h2 id="wizard-title">{{ t('wizard.ctaTitle') }}</h2>
-          <p class="wizard-hero-text">{{ t('dashboard.intro') }}</p>
+          <p class="wizard-eyebrow"><I18nText k="wizard.stepEdition" /></p>
+          <h2 id="wizard-title"><I18nText k="wizard.ctaTitle" /></h2>
+          <p class="wizard-hero-text"><I18nText k="dashboard.intro" /></p>
           <div v-if="summaryItems.length" class="wizard-path">
             <div v-for="(item, idx) in summaryItems" :key="idx" class="wizard-path-step">
               <span class="wizard-path-icon">
@@ -766,21 +766,21 @@ watch(
           <!-- Step 0: Voucher-Code / Direkteinstieg -->
           <div v-show="step === 0" class="wizard-step wizard-step-voucher wizard-step-animate">
             <div class="wizard-step-voucher-inner">
-              <p class="wizard-question">{{ t('wizard.voucherCodeQuestion') }}</p>
-              <p class="wizard-hint">{{ t('wizard.voucherCodeHint') }}</p>
+              <p class="wizard-question"><I18nText k="wizard.voucherCodeQuestion" /></p>
+              <p class="wizard-hint"><I18nText k="wizard.voucherCodeHint" /></p>
               <div v-if="hasVoucherCode === null" class="wizard-options wizard-options-stack">
                 <button type="button" class="wizard-option wizard-option-card" @click="hasVoucherCode = 'yes'">
-                  <div class="wizard-option-main">{{ t('wizard.voucherCodeYes') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.voucherCodeYesDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.voucherCodeYes" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.voucherCodeYesDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" @click="chooseNoVoucher">
-                  <div class="wizard-option-main">{{ t('wizard.voucherCodeNo') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.voucherCodeNoDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.voucherCodeNo" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.voucherCodeNoDesc" /></div>
                 </button>
               </div>
               <div v-else-if="hasVoucherCode === 'yes'" class="wizard-voucher-code-form">
                 <div class="field" :class="{ filled: isFilled(voucher) }">
-                  <label>{{ t('enroll.voucherCodeLabel') }}</label>
+                  <label><I18nText k="enroll.voucherCodeLabel" /></label>
                   <input
                     v-model="voucher"
                     type="text"
@@ -789,12 +789,12 @@ watch(
                     @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
                     @blur="onVoucherBlur"
                   />
-                  <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+                  <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
                   <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
                   <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
                 </div>
                 <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null">
-                  <i class="bi bi-arrow-left"></i> {{ t('wizard.voucherCodeBack') }}
+                  <i class="bi bi-arrow-left"></i> <I18nText k="wizard.voucherCodeBack" />
                 </button>
               </div>
             </div>
@@ -804,15 +804,15 @@ watch(
           <div v-show="step === 1" class="wizard-step wizard-step-animate">
             <div class="wizard-options wizard-options-two">
               <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'founders' }" @click="selectEdition('founders')">
-                <div class="wizard-option-main">{{ t('dashboard.editionFounders') }}</div>
-                <div class="wizard-option-desc">{{ t('wizard.editionFoundersDesc') }}</div>
+                <div class="wizard-option-main"><I18nText k="dashboard.editionFounders" /></div>
+                <div class="wizard-option-desc"><I18nText k="wizard.editionFoundersDesc" /></div>
                 <div class="wizard-option-logos">
                   <img v-for="logo in foundersLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
                 </div>
               </button>
               <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'future' }" @click="selectEdition('future')">
-                <div class="wizard-option-main">{{ t('dashboard.editionFuture') }}</div>
-                <div class="wizard-option-desc">{{ t('wizard.editionFutureDesc') }}</div>
+                <div class="wizard-option-main"><I18nText k="dashboard.editionFuture" /></div>
+                <div class="wizard-option-desc"><I18nText k="wizard.editionFutureDesc" /></div>
                 <div class="wizard-option-logos wizard-option-logos-single">
                   <img v-for="logo in futureLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
                 </div>
@@ -826,13 +826,13 @@ watch(
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '5' }" @click="futureGroup = '5'">
                   <img :src="logoFuture" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('dashboard.optionFutureGroup5') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.futureGroup5Desc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup5" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.futureGroup5Desc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '8' }" @click="futureGroup = '8'">
                   <img :src="logoFuture" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('dashboard.optionFutureGroup8') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.futureGroup8Desc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup8" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.futureGroup8Desc" /></div>
                 </button>
               </div>
             </template>
@@ -840,13 +840,13 @@ watch(
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="foundersVariant = 'explore'">
                   <img :src="logoFllExploreV" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('wizard.optionExplore') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.optionExploreDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.optionExplore" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.optionExploreDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="foundersVariant = 'challenge'">
                   <img :src="logoFllChallengeV" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('wizard.optionChallenge') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.optionChallengeDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.optionChallenge" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.optionChallengeDesc" /></div>
                 </button>
               </div>
             </template>
@@ -855,8 +855,8 @@ watch(
           <!-- Step 3: Future = pupils, Founders = Team/Class -->
           <div v-show="step === 3" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
-              <p class="wizard-question">{{ t('enrollFuture.howManyPupils') }}</p>
-              <p class="wizard-hint">{{ t('enrollFuture.pupilsFlexibleHint') }}</p>
+              <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
+              <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
               <div class="wizard-options wizard-options-three wizard-options-grid">
                 <button
                   v-for="num in [8, 16, 32]"
@@ -874,7 +874,7 @@ watch(
                   :class="{ active: futurePupilsMode === 'custom' }"
                   @click="selectFuturePupilsMore"
                 >
-                  {{ t('wizard.morePupils') }}
+                  <I18nText k="wizard.morePupils" />
                 </button>
               </div>
               <div v-if="futurePupilsMode === 'custom'" class="wizard-counter">
@@ -887,13 +887,13 @@ watch(
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="foundersType = 'team'">
                   <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('dashboard.team') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.teamDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="foundersType = 'class'">
                   <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
-                  <div class="wizard-option-main">{{ t('dashboard.class') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.classDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>
                 </button>
               </div>
             </template>
@@ -903,19 +903,23 @@ watch(
           <div v-show="step === 4" class="wizard-step wizard-step-form wizard-step-animate">
             <div v-if="edition !== 'future'" class="field" :class="{ filled: isFilled(formData.name) }">
               <input v-model="formData.name" type="text" placeholder=" " />
-              <label>{{ foundersType === 'team' ? t('enrollTeam.teamName') : t('enrollClass.className') }} <span class="required">*</span></label>
+              <label>
+                <I18nText v-if="foundersType === 'team'" k="enrollTeam.teamName" />
+                <I18nText v-else k="enrollClass.className" />
+                <span class="required">*</span>
+              </label>
             </div>
             <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
               <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
-              <label>{{ t('enrollTeam.schoolClub') }}</label>
+              <label><I18nText k="enrollTeam.schoolClub" /></label>
             </div>
             <template v-if="foundersType === 'class' || edition === 'future'">
               <div class="field" :class="{ filled: isFilled(formData.organization) }">
                 <input v-model="formData.organization" type="text" placeholder=" " />
-                <label>{{ t('enroll.schoolName') }}</label>
+                <label><I18nText k="enroll.schoolName" /></label>
               </div>
               <div class="field field-select">
-                <label>{{ t('enroll.schoolType') }}</label>
+                <label><I18nText k="enroll.schoolType" /></label>
                 <select v-model="formData.schoolType">
                   <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
                     {{ t(opt.labelKey) }}
@@ -925,7 +929,7 @@ watch(
             </template>
             <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
               <div class="field field-select">
-                <label>{{ t('enroll.schoolCountry') }}</label>
+                <label><I18nText k="enroll.schoolCountry" /></label>
                 <select v-model="formData.country">
                   <optgroup :label="t('enroll.countriesTop')">
                     <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -937,7 +941,7 @@ watch(
               </div>
               <div class="field" :class="{ filled: isFilled(formData.zip) }">
                 <input v-model="formData.zip" type="text" placeholder=" " />
-                <label>{{ t('enroll.schoolZip') }}</label>
+                <label><I18nText k="enroll.schoolZip" /></label>
               </div>
               <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
                 <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
@@ -946,36 +950,36 @@ watch(
             <template v-if="foundersType === 'class'">
               <div class="field" :class="{ filled: isFilled(formData.grade) }">
                 <input v-model="formData.grade" type="text" placeholder=" " />
-                <label>{{ t('enrollClass.grade') }}</label>
+                <label><I18nText k="enrollClass.grade" /></label>
               </div>
               <div class="field" :class="{ filled: isFilled(formData.teacherName) }">
                 <input v-model="formData.teacherName" type="text" placeholder=" " />
-                <label>{{ t('enrollClass.teacherName') }}</label>
+                <label><I18nText k="enrollClass.teacherName" /></label>
               </div>
               <div class="field" :class="{ filled: isFilled(formData.description) }">
                 <input v-model="formData.description" type="text" placeholder=" " />
-                <label>{{ t('enrollClass.description') }}</label>
+                <label><I18nText k="enrollClass.description" /></label>
               </div>
               <div class="field" :class="{ filled: isFilled(formData.playersTotal) }">
                 <input v-model="formData.playersTotal" type="number" min="0" step="1" placeholder=" " />
-                <label>{{ t('enrollClass.playersTotal') }}</label>
+                <label><I18nText k="enrollClass.playersTotal" /></label>
               </div>
             </template>
             <div class="field" :class="{ filled: isFilled(formData.notes) }">
               <textarea v-model="formData.notes" rows="2" placeholder=" " />
-              <label>{{ t('enrollTeam.notes') }}</label>
+              <label><I18nText k="enrollTeam.notes" /></label>
             </div>
           </div>
 
           <!-- Step 5: Participants (Founder team only) -->
           <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
-            <p class="wizard-hint">{{ t('wizard.participantsHint') }}</p>
+            <p class="wizard-hint"><I18nText k="wizard.participantsHint" /></p>
             <div class="wizard-participants">
               <div class="wizard-participant-row wizard-participant-header">
-                <span class="wizard-participant-label">{{ t('detail.firstname') }}</span>
-                <span class="wizard-participant-label">{{ t('detail.lastname') }}</span>
-                <span class="wizard-participant-label">{{ t('detail.dateOfBirth') }}</span>
-                <span class="wizard-participant-label">{{ t('detail.gender') }}</span>
+                <span class="wizard-participant-label"><I18nText k="detail.firstname" /></span>
+                <span class="wizard-participant-label"><I18nText k="detail.lastname" /></span>
+                <span class="wizard-participant-label"><I18nText k="detail.dateOfBirth" /></span>
+                <span class="wizard-participant-label"><I18nText k="detail.gender" /></span>
                 <span></span>
               </div>
               <div
@@ -987,24 +991,24 @@ watch(
                 <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
                 <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
                 <select v-model="p.gender" class="wizard-participant-select">
-                  <option value="">{{ t('detail.gender') }}</option>
-                  <option value="M">{{ t('detail.genderM') }}</option>
-                  <option value="F">{{ t('detail.genderF') }}</option>
-                  <option value="D">{{ t('detail.genderD') }}</option>
+                  <option value=""><I18nText k="detail.gender" /></option>
+                  <option value="M"><I18nText k="detail.genderM" /></option>
+                  <option value="F"><I18nText k="detail.genderF" /></option>
+                  <option value="D"><I18nText k="detail.genderD" /></option>
                 </select>
                 <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
               <button type="button" class="wizard-btn-add-participant" @click="addFounderParticipant">
-                <i class="bi bi-plus-lg"></i> {{ t('detail.addPlayer') }}
+                <i class="bi bi-plus-lg"></i> <I18nText k="detail.addPlayer" />
               </button>
             </div>
           </div>
 
           <!-- Step 6: Event (Founder team only) -->
           <div v-show="step === 6 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
-            <p class="wizard-hint">{{ t('wizard.founderTeamEventHint') }}</p>
+            <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
             <div class="wizard-event-select-wrap">
               <div class="wizard-event-dropdowns">
                 <EventSelectDropdown
@@ -1032,9 +1036,9 @@ watch(
           <!-- Step 5: On-site event (Future only) -->
           <div v-show="step === 5 && edition === 'future'" class="wizard-step wizard-step-animate">
             <div class="wizard-step-voucher-inner wizard-step-onsite-event">
-              <p class="wizard-question">{{ t('wizard.onSiteEventQuestion') }}</p>
-              <p class="wizard-hint">{{ t('wizard.onSiteEventHint') }}</p>
-              <p class="wizard-hint wizard-hint-skip">{{ t('wizard.onSiteEventSkipHint') }}</p>
+              <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
+              <p class="wizard-hint"><I18nText k="wizard.onSiteEventHint" /></p>
+              <p class="wizard-hint wizard-hint-skip"><I18nText k="wizard.onSiteEventSkipHint" /></p>
               <div class="wizard-options wizard-options-stack">
                 <button
                   type="button"
@@ -1042,11 +1046,11 @@ watch(
                   :class="{ active: futureOnSiteEvent === 'yes' }"
                   @click="futureOnSiteEvent = 'yes'"
                 >
-                  <div class="wizard-option-main">{{ t('wizard.onSiteEventYes') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventYesDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.onSiteEventYes" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventYesDesc" /></div>
                 </button>
                 <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
-                  <p class="wizard-event-label">{{ t('wizard.onSiteEventSelect') }}</p>
+                  <p class="wizard-event-label"><I18nText k="wizard.onSiteEventSelect" /></p>
                   <div class="wizard-event-dropdowns">
                     <EventSelectDropdown
                       :title="t('wizard.eventSelectAllEvents')"
@@ -1074,8 +1078,8 @@ watch(
                   :class="{ active: futureOnSiteEvent === 'no' }"
                   @click="futureOnSiteEvent = 'no'; futureEventId = null"
                 >
-                  <div class="wizard-option-main">{{ t('wizard.onSiteEventNo') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventNoDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.onSiteEventNo" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventNoDesc" /></div>
                 </button>
                 <button
                   type="button"
@@ -1083,8 +1087,8 @@ watch(
                   :class="{ active: futureOnSiteEvent === 'skip' }"
                   @click="futureOnSiteEvent = 'skip'; futureEventId = null"
                 >
-                  <div class="wizard-option-main">{{ t('wizard.onSiteEventSkip') }}</div>
-                  <div class="wizard-option-desc">{{ t('wizard.onSiteEventSkipDesc') }}</div>
+                  <div class="wizard-option-main"><I18nText k="wizard.onSiteEventSkip" /></div>
+                  <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventSkipDesc" /></div>
                 </button>
               </div>
             </div>
@@ -1092,27 +1096,30 @@ watch(
 
           <!-- Step 6: Order overview (Future) -->
           <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
-            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> {{ t('wizard.addressesRequiredHint') }}</p>
+            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-cart">
-              <h3 class="wizard-cart-title">{{ t('wizard.orderTitle') }}</h3>
+              <h3 class="wizard-cart-title"><I18nText k="wizard.orderTitle" /></h3>
               <div class="wizard-cart-row">
-                <span>{{ t('wizard.orderEdition') }}</span>
-                <strong>{{ t('dashboard.editionFuture') }}</strong>
+                <span><I18nText k="wizard.orderEdition" /></span>
+                <strong><I18nText k="dashboard.editionFuture" /></strong>
               </div>
               <div class="wizard-cart-row">
-                <span>{{ t('wizard.orderGroup') }}</span>
-                <strong>{{ t(futureGroup === '5' ? 'dashboard.optionFutureGroup5' : 'dashboard.optionFutureGroup8') }}</strong>
+                <span><I18nText k="wizard.orderGroup" /></span>
+                <strong>
+                  <I18nText v-if="futureGroup === '5'" k="dashboard.optionFutureGroup5" tag="span" />
+                  <I18nText v-else k="dashboard.optionFutureGroup8" tag="span" />
+                </strong>
               </div>
               <div class="wizard-cart-row">
-                <span>{{ t('wizard.orderPupils') }}</span>
-                <strong>{{ futurePupils }} {{ t('enrollFuture.pupils') }}</strong>
+                <span><I18nText k="wizard.orderPupils" /></span>
+                <strong>{{ futurePupils }} <I18nText k="enrollFuture.pupils" /></strong>
               </div>
               <div v-if="formData.organization?.trim()" class="wizard-cart-row">
-                <span>{{ t('wizard.orderSchool') }}</span>
+                <span><I18nText k="wizard.orderSchool" /></span>
                 <strong>{{ formData.organization.trim() }}</strong>
               </div>
               <div v-if="futureOnSiteEvent === 'yes' && futureEventId" class="wizard-cart-row">
-                <span>{{ t('wizard.orderOnSiteEvent') }}</span>
+                <span><I18nText k="wizard.orderOnSiteEvent" /></span>
                 <strong>{{ selectedFutureEventLabel || futureEventId }}</strong>
               </div>
             </div>
@@ -1125,20 +1132,20 @@ watch(
                 @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
                 @blur="onVoucherBlur"
               />
-              <label>{{ t('enroll.voucher') }}</label>
-              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+              <label><I18nText k="enroll.voucher" /></label>
+              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
               <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
               <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
             </div>
             <template v-if="voucherType === '1'">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
             </template>
 
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1'">
               <div class="field voucher-invoice-forced">
-                <label class="label">{{ t('enroll.invoiceAddress') }}</label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+                <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
+                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
@@ -1149,7 +1156,7 @@ watch(
             v-show="(step === 5 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
-            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> {{ t('wizard.addressesRequiredHint') }}</p>
+            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="field" :class="{ filled: isFilled(voucher) }">
               <input
                 v-model="voucher"
@@ -1158,19 +1165,19 @@ watch(
                 @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
                 @blur="onVoucherBlur"
               />
-              <label>{{ t('enroll.voucher') }}</label>
-              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> {{ t('enroll.voucherChecking') }}</p>
+              <label><I18nText k="enroll.voucher" /></label>
+              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
               <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
               <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
             </div>
             <template v-if="voucherType === '1'">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
             </template>
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1'">
               <div class="field voucher-invoice-forced">
-                <label class="label">{{ t('enroll.invoiceAddress') }}</label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> {{ t('enroll.voucherInvoiceForced') }} <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+                <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
+                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
@@ -1182,50 +1189,64 @@ watch(
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <div class="wizard-cart">
-              <h3 class="wizard-cart-title">{{ t('wizard.orderTitle') }}</h3>
+              <h3 class="wizard-cart-title"><I18nText k="wizard.orderTitle" /></h3>
               <div class="wizard-cart-row">
-                <span>{{ t('wizard.orderEdition') }}</span>
-                <strong>{{ t('dashboard.editionFounders') }}</strong>
+                <span><I18nText k="wizard.orderEdition" /></span>
+                <strong><I18nText k="dashboard.editionFounders" /></strong>
               </div>
               <div class="wizard-cart-row">
-                <span>{{ foundersType === 'team' ? t('dashboard.team') : t('dashboard.class') }}</span>
-                <strong>{{ t(foundersVariant === 'explore' ? 'wizard.optionExplore' : 'wizard.optionChallenge') }}</strong>
+                <span>
+                  <I18nText v-if="foundersType === 'team'" k="dashboard.team" />
+                  <I18nText v-else k="dashboard.class" />
+                </span>
+                <strong>
+                  <I18nText v-if="foundersVariant === 'explore'" k="wizard.optionExplore" tag="span" />
+                  <I18nText v-else k="wizard.optionChallenge" tag="span" />
+                </strong>
               </div>
               <div class="wizard-cart-row">
-                <span>{{ foundersType === 'team' ? t('enrollTeam.teamName') : t('enrollClass.className') }}</span>
+                <span>
+                  <I18nText v-if="foundersType === 'team'" k="enrollTeam.teamName" />
+                  <I18nText v-else k="enrollClass.className" />
+                </span>
                 <strong>{{ formData.name?.trim() || '—' }}</strong>
               </div>
               <div v-if="foundersType === 'team' && founderTeamEventId" class="wizard-cart-row">
-                <span>{{ t('wizard.stepEvent') }}</span>
+                <span><I18nText k="wizard.stepEvent" /></span>
                 <strong>{{ selectedFounderEventLabel || founderTeamEventId }}</strong>
               </div>
               <div v-if="foundersType === 'team' && founderTeamPlayers.length" class="wizard-cart-row">
-                <span>{{ t('detail.players') }}</span>
+                <span><I18nText k="detail.players" /></span>
                 <strong>{{ founderTeamPlayers.filter((p) => p.firstname || p.name || p.gender || p.birthdayStr).length }}</strong>
               </div>
               <div v-if="voucher?.trim()" class="wizard-cart-row">
-                <span>{{ t('enroll.voucher') }}</span>
+                <span><I18nText k="enroll.voucher" /></span>
                 <strong>{{ voucherValid === true ? (voucherMessage || voucher) : voucher }}</strong>
               </div>
             </div>
-            <p class="wizard-hint">{{ t('wizard.orderReviewHint') }}</p>
+            <p class="wizard-hint"><I18nText k="wizard.orderReviewHint" /></p>
           </div>
         </div>
 
         <div v-if="error" class="wizard-message error"><i class="bi bi-exclamation-circle"></i> {{ error }}</div>
-        <div v-if="success" class="wizard-message success"><i class="bi bi-check-circle-fill"></i> {{ successMessage || t('wizard.success') }}</div>
+        <div v-if="success" class="wizard-message success">
+          <i class="bi bi-check-circle-fill"></i>
+          <template v-if="successMessage">{{ successMessage }}</template>
+          <I18nText v-else k="wizard.success" />
+        </div>
 
         <div class="wizard-footer">
           <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
-            <i class="bi bi-arrow-left"></i> {{ t('wizard.back') }}
+            <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
           </button>
           <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
-            {{ t('wizard.next') }} <i class="bi bi-arrow-right"></i>
+            <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
           </button>
           <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
             <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
             <i v-else class="bi bi-check-lg"></i>
-            {{ submitting ? t('wizard.submitting') : t('wizard.submit') }}
+            <I18nText v-if="submitting" k="wizard.submitting" />
+            <I18nText v-else k="wizard.submit" />
           </button>
         </div>
       </div>

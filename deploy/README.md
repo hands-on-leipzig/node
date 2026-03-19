@@ -60,3 +60,10 @@ Set in Dolibarr (constants / setup):
 - Optional **`HANDSON_GITHUB_LOCALE_PATH_PREFIX`** — path inside repo to locale files (default **`src/locales`**)
 
 The SPA only needs **`VITE_DRAHT_API_URL`**; no separate i18n API.
+
+**Request body** (JSON):
+
+- **Combined (used by the admin UI):** `{ "locales": { "en": { …nested… }, "de": { …nested… } }, "prTitle": "optional", "editorUsername": "…" }` — DRAHT should create **one branch**, update **`en.js` and `de.js`**, and open **one pull request**.
+- **Legacy (single file):** `{ "locale": "en", "messages": { … }, "prTitle": "…", "editorUsername": "…" }` — optional if you still need backward compatibility.
+
+See **`deploy/draht-translations-pr-combined.md`** for PHP implementation notes for DRAHT.

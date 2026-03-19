@@ -229,22 +229,22 @@ onMounted(load)
   <div class="admin-documents">
     <header class="admin-documents-head">
       <RouterLink to="/dashboard" class="admin-back">
-        <i class="bi bi-arrow-left"></i> {{ t('admin.backToDashboard') }}
+        <i class="bi bi-arrow-left"></i> <I18nText k="admin.backToDashboard" />
       </RouterLink>
-      <h1>{{ t('admin.documentsTitle') }}</h1>
-      <p class="admin-lead">{{ t('admin.documentsLead') }}</p>
+      <h1><I18nText k="admin.documentsTitle" /></h1>
+      <p class="admin-lead"><I18nText k="admin.documentsLead" /></p>
     </header>
 
     <div v-if="loading" class="admin-loading">
-      <i class="bi bi-arrow-repeat spin"></i> {{ t('dashboard.loading') }}
+      <i class="bi bi-arrow-repeat spin"></i> <I18nText k="dashboard.loading" />
     </div>
     <form v-else class="admin-form" @submit.prevent="save">
       <fieldset class="admin-fieldset">
-        <legend>{{ t('admin.documentsFilesSection') }}</legend>
-        <p class="admin-hint admin-hint-block">{{ t('admin.documentsFilesHint') }}</p>
+        <legend><I18nText k="admin.documentsFilesSection" /></legend>
+        <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsFilesHint" /></p>
         <div class="admin-files-head">
-          <span class="admin-files-col-name">{{ t('admin.documentsFileName') }}</span>
-          <span class="admin-files-col-url">{{ t('admin.documentsFileUrl') }}</span>
+          <span class="admin-files-col-name"><I18nText k="admin.documentsFileName" /></span>
+          <span class="admin-files-col-url"><I18nText k="admin.documentsFileUrl" /></span>
           <span class="admin-files-col-act" aria-hidden="true" />
         </div>
         <div v-for="(row, idx) in files" :key="idx" class="admin-file-row">
@@ -272,12 +272,12 @@ onMounted(load)
           </button>
         </div>
         <button type="button" class="admin-add-file" @click="addFileRow">
-          <i class="bi bi-plus-lg"></i> {{ t('admin.documentsAddFile') }}
+          <i class="bi bi-plus-lg"></i> <I18nText k="admin.documentsAddFile" />
         </button>
       </fieldset>
 
       <label class="admin-label">
-        <span>{{ t('admin.documentsFolderUrl') }}</span>
+        <span><I18nText k="admin.documentsFolderUrl" /></span>
         <input
           v-model="folderUrl"
           type="url"
@@ -286,11 +286,11 @@ onMounted(load)
           autocomplete="off"
         />
       </label>
-      <p class="admin-hint">{{ t('admin.documentsFolderHint') }}</p>
+      <p class="admin-hint"><I18nText k="admin.documentsFolderHint" /></p>
 
       <fieldset class="admin-fieldset admin-graph-fieldset">
-        <legend>{{ t('admin.documentsGraphDebugTitle') }}</legend>
-        <p class="admin-hint admin-hint-block">{{ t('admin.documentsGraphDebugLead') }}</p>
+        <legend><I18nText k="admin.documentsGraphDebugTitle" /></legend>
+        <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsGraphDebugLead" /></p>
         <div class="admin-graph-actions">
           <button
             type="button"
@@ -299,7 +299,7 @@ onMounted(load)
             @click="runGraphStatus"
           >
             <i v-if="graphStatusLoading" class="bi bi-arrow-repeat spin"></i>
-            {{ t('admin.documentsGraphTestConnection') }}
+            <I18nText k="admin.documentsGraphTestConnection" />
           </button>
           <button
             type="button"
@@ -308,7 +308,7 @@ onMounted(load)
             @click="runProbeFolder"
           >
             <i v-if="probeLoading" class="bi bi-arrow-repeat spin"></i>
-            {{ t('admin.documentsProbeFolder') }}
+            <I18nText k="admin.documentsProbeFolder" />
           </button>
         </div>
         <div v-if="graphStatus" class="admin-graph-box">
@@ -330,10 +330,10 @@ onMounted(load)
                 {{ graphStatus.msClientSecretConfigured ? '✓' : '—' }}
               </li>
               <li v-if="graphStatus.handsonGraphDisabled">
-                <span class="admin-graph-warn">{{ t('admin.documentsGraphDisabledGlobal') }}</span>
+                <span class="admin-graph-warn"><I18nText k="admin.documentsGraphDisabledGlobal" /></span>
               </li>
               <li>
-                <span class="admin-graph-k">{{ t('admin.documentsGraphToken') }}</span>
+                <span class="admin-graph-k"><I18nText k="admin.documentsGraphToken" /></span>
                 {{ graphStatus.tokenRequestOk ? '✓ OK' : '✗' }}
                 <span v-if="graphStatus.tokenError" class="admin-graph-err small">{{ graphStatus.tokenError }}</span>
               </li>
@@ -348,40 +348,40 @@ onMounted(load)
             </ul>
             <div v-if="graphStatus.graphAccessMode" class="admin-graph-identity">
               <p class="admin-hint admin-hint-block">
-                <strong>{{ t('admin.documentsGraphIdentityTitle') }}</strong>
-                — {{ t('admin.documentsGraphIdentityExplainer') }}
+                <strong><I18nText k="admin.documentsGraphIdentityTitle" /></strong>
+                — <I18nText k="admin.documentsGraphIdentityExplainer" />
               </p>
               <ul class="admin-graph-list small">
                 <li>
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldMode') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldMode" /></span>
                   {{ graphAccessModeLabel(graphStatus) }}
                 </li>
                 <li>
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldActor') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldActor" /></span>
                   {{ graphAccessActorLabel(graphStatus) }}
                 </li>
                 <li v-if="graphStatus.msTenantId">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTenantConfigured') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTenantConfigured" /></span>
                   {{ graphStatus.msTenantId }}
                 </li>
                 <li v-if="graphStatus.msApplicationClientIdConfigured">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldClientConfigured') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldClientConfigured" /></span>
                   {{ graphStatus.msApplicationClientIdConfigured }}
                 </li>
                 <li v-if="graphStatus.graphTokenApplicationId">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenAppId') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenAppId" /></span>
                   {{ graphStatus.graphTokenApplicationId }}
                 </li>
                 <li v-if="graphStatus.graphTokenTenantId">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenTenantId') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenTenantId" /></span>
                   {{ graphStatus.graphTokenTenantId }}
                 </li>
                 <li v-if="graphStatus.graphTokenAudience">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenAudience') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenAudience" /></span>
                   {{ graphStatus.graphTokenAudience }}
                 </li>
                 <li v-if="formatGraphTokenRoles(graphStatus)">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenRoles') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenRoles" /></span>
                   {{ formatGraphTokenRoles(graphStatus) }}
                 </li>
               </ul>
@@ -389,7 +389,7 @@ onMounted(load)
           </template>
         </div>
         <div v-if="probeResult" class="admin-graph-box">
-          <strong>{{ t('admin.documentsProbeResult') }}</strong>
+          <strong><I18nText k="admin.documentsProbeResult" /></strong>
           <p v-if="probeResult.error" class="admin-graph-err">{{ probeResult.message }}</p>
           <template v-else>
             <p :class="probeResult.readable ? 'admin-graph-ok' : 'admin-graph-warn'">
@@ -397,32 +397,32 @@ onMounted(load)
             </p>
             <div v-if="probeResult.graphAccessMode" class="admin-graph-identity">
               <p class="admin-hint admin-hint-block small">
-                <strong>{{ t('admin.documentsGraphIdentityTitle') }}</strong>
-                — {{ t('admin.documentsGraphIdentityExplainerShort') }}
+                <strong><I18nText k="admin.documentsGraphIdentityTitle" /></strong>
+                — <I18nText k="admin.documentsGraphIdentityExplainerShort" />
               </p>
               <ul class="admin-graph-list small">
                 <li>
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldMode') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldMode" /></span>
                   {{ graphAccessModeLabel(probeResult) }}
                 </li>
                 <li>
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldActor') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldActor" /></span>
                   {{ graphAccessActorLabel(probeResult) }}
                 </li>
                 <li v-if="probeResult.msTenantId">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTenantConfigured') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTenantConfigured" /></span>
                   {{ probeResult.msTenantId }}
                 </li>
                 <li v-if="probeResult.msApplicationClientIdConfigured">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldClientConfigured') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldClientConfigured" /></span>
                   {{ probeResult.msApplicationClientIdConfigured }}
                 </li>
                 <li v-if="probeResult.graphTokenApplicationId">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenAppId') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenAppId" /></span>
                   {{ probeResult.graphTokenApplicationId }}
                 </li>
                 <li v-if="formatGraphTokenRoles(probeResult)">
-                  <span class="admin-graph-k">{{ t('admin.documentsGraphFieldTokenRoles') }}</span>
+                  <span class="admin-graph-k"><I18nText k="admin.documentsGraphFieldTokenRoles" /></span>
                   {{ formatGraphTokenRoles(probeResult) }}
                 </li>
               </ul>
@@ -432,33 +432,33 @@ onMounted(load)
                 Sharing-API HTTP: {{ probeResult.shareListHttp }}
               </li>
               <li v-if="probeResult.shareDriveItemHttp != null">
-                {{ t('admin.documentsProbeShareDriveItemHttp') }}: {{ probeResult.shareDriveItemHttp }}
+                <I18nText k="admin.documentsProbeShareDriveItemHttp" />: {{ probeResult.shareDriveItemHttp }}
               </li>
               <li v-if="probeResult.spoSiteHttp != null">Site-API HTTP: {{ probeResult.spoSiteHttp }}</li>
               <li v-if="probeResult.spoChildrenHttp != null">
                 Ordner-Liste HTTP: {{ probeResult.spoChildrenHttp }}
               </li>
-              <li v-if="probeResult.via">{{ t('admin.documentsProbeVia') }}: {{ probeResult.via }}</li>
+              <li v-if="probeResult.via"><I18nText k="admin.documentsProbeVia" />: {{ probeResult.via }}</li>
               <li v-if="probeResult.fileCount != null">
-                {{ t('admin.documentsProbeFileCount') }}: {{ probeResult.fileCount }}
+                <I18nText k="admin.documentsProbeFileCount" />: {{ probeResult.fileCount }}
               </li>
             </ul>
             <pre v-if="probeResult.graphErrorSnippet" class="admin-graph-pre">{{ probeResult.graphErrorSnippet }}</pre>
           </template>
         </div>
         <p v-if="graphOrProbeHas403" class="admin-hint admin-hint-block admin-graph-403-hint">
-          {{ t('admin.documentsGraph403Hint') }}
+          <I18nText k="admin.documentsGraph403Hint" />
         </p>
       </fieldset>
 
       <label class="admin-check">
         <input v-model="skipGraphFileListing" type="checkbox" />
-        <span>{{ t('admin.documentsSkipGraph') }}</span>
+        <span><I18nText k="admin.documentsSkipGraph" /></span>
       </label>
-      <p class="admin-hint">{{ t('admin.documentsSkipGraphHint') }}</p>
+      <p class="admin-hint"><I18nText k="admin.documentsSkipGraphHint" /></p>
 
       <label class="admin-label">
-        <span>{{ t('admin.documentsCardTitle') }}</span>
+        <span><I18nText k="admin.documentsCardTitle" /></span>
         <input
           v-model="title"
           type="text"
@@ -466,13 +466,13 @@ onMounted(load)
           :placeholder="t('admin.documentsCardTitlePlaceholder')"
         />
       </label>
-      <p class="admin-hint">{{ t('admin.documentsTitleHint') }}</p>
+      <p class="admin-hint"><I18nText k="admin.documentsTitleHint" /></p>
 
       <p v-if="error" class="admin-error"><i class="bi bi-exclamation-circle"></i> {{ error }}</p>
-      <p v-if="success" class="admin-success"><i class="bi bi-check-circle"></i> {{ t('admin.documentsSaved') }}</p>
+      <p v-if="success" class="admin-success"><i class="bi bi-check-circle"></i> <I18nText k="admin.documentsSaved" /></p>
 
       <div v-if="saveProbe" class="admin-save-probe">
-        <strong>{{ t('admin.documentsSaveProbeTitle') }}</strong>
+        <strong><I18nText k="admin.documentsSaveProbeTitle" /></strong>
         <template v-if="saveProbe.skipped">
           <p class="admin-hint">{{ saveProbeSkipMessage(saveProbe.reason) }}</p>
         </template>
@@ -490,7 +490,8 @@ onMounted(load)
 
       <button type="submit" class="admin-save" :disabled="saving">
         <i v-if="saving" class="bi bi-arrow-repeat spin"></i>
-        {{ saving ? t('common.save') + '…' : t('admin.documentsSave') }}
+        <template v-if="saving"><I18nText k="common.save" />…</template>
+        <I18nText v-else k="admin.documentsSave" />
       </button>
     </form>
   </div>

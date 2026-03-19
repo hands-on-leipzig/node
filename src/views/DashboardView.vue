@@ -126,7 +126,7 @@ onMounted(async () => {
   <div class="dashboard-view">
     <div v-if="loading" class="dashboard-loading">
       <i class="bi bi-arrow-repeat spin"></i>
-      {{ t('dashboard.loading') }}
+      <I18nText k="dashboard.loading" />
     </div>
     <div v-else-if="error" class="dashboard-error">
       <i class="bi bi-exclamation-circle"></i>
@@ -134,8 +134,8 @@ onMounted(async () => {
     </div>
     <template v-else>
       <header class="dashboard-header">
-        <h1 class="dashboard-title">{{ t('dashboard.cockpitTitle') }}</h1>
-        <p class="dashboard-subtitle">{{ t('dashboard.cockpitSubtitle') }}</p>
+        <h1 class="dashboard-title"><I18nText k="dashboard.cockpitTitle" /></h1>
+        <p class="dashboard-subtitle"><I18nText k="dashboard.cockpitSubtitle" /></p>
       </header>
 
       <div class="dashboard-grid">
@@ -143,12 +143,12 @@ onMounted(async () => {
         <section class="dashboard-card dashboard-card-tasks">
           <h2 class="dashboard-card-title">
             <i class="bi bi-list-check"></i>
-            {{ t('dashboard.tasksToDo') }}
+            <I18nText k="dashboard.tasksToDo" />
             <span v-if="taskItems.length" class="dashboard-card-badge">{{ taskItems.length }}</span>
           </h2>
           <div v-if="tasksLoading" class="dashboard-empty">
             <i class="bi bi-arrow-repeat spin"></i>
-            {{ t('dashboard.checkingTasks') }}
+            <I18nText k="dashboard.checkingTasks" />
           </div>
           <div v-else-if="taskItems.length" class="dashboard-tasks-list">
             <button
@@ -168,7 +168,7 @@ onMounted(async () => {
           </div>
           <p v-else class="dashboard-empty">
             <i class="bi bi-check-circle"></i>
-            {{ t('dashboard.noPendingTasks') }}
+            <I18nText k="dashboard.noPendingTasks" />
           </p>
         </section>
 
@@ -176,12 +176,12 @@ onMounted(async () => {
         <section class="dashboard-card dashboard-card-register">
           <h2 class="dashboard-card-title">
             <i class="bi bi-plus-circle"></i>
-            {{ t('dashboard.registerNew') }}
+            <I18nText k="dashboard.registerNew" />
           </h2>
-          <p class="dashboard-card-desc">{{ t('dashboard.intro') }}</p>
+          <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
           <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
             <i class="bi bi-magic"></i>
-            <span>{{ t('wizard.ctaButton') }}</span>
+            <span><I18nText k="wizard.ctaButton" /></span>
           </button>
         </section>
 
@@ -189,16 +189,17 @@ onMounted(async () => {
         <section class="dashboard-card dashboard-card-documents">
           <h2 class="dashboard-card-title">
             <i class="bi bi-cloud-arrow-down"></i>
-            {{ documentsConfig.title || t('dashboard.documentsForDownload') }}
+            <template v-if="documentsConfig.title">{{ documentsConfig.title }}</template>
+            <I18nText v-else k="dashboard.documentsForDownload" />
           </h2>
           <div v-if="documentsLoading" class="dashboard-documents-loading">
             <i class="bi bi-arrow-repeat spin"></i>
-            {{ t('dashboard.documentsLoadingList') }}
+            <I18nText k="dashboard.documentsLoadingList" />
           </div>
           <template
             v-else-if="documentsConfig.files?.length || documentsConfig.folderUrl"
           >
-            <p class="dashboard-card-desc">{{ t('dashboard.documentsDescription') }}</p>
+            <p class="dashboard-card-desc"><I18nText k="dashboard.documentsDescription" /></p>
             <p
               v-if="
                 documentsConfig.graphMeta?.code === 'empty_or_unavailable' &&
@@ -207,7 +208,7 @@ onMounted(async () => {
               "
               class="dashboard-documents-graph-hint"
             >
-              {{ t('dashboard.documentsGraphNoFiles') }}
+              <I18nText k="dashboard.documentsGraphNoFiles" />
             </p>
             <ul
               v-if="documentsConfig.files?.length"
@@ -234,21 +235,21 @@ onMounted(async () => {
               rel="noopener noreferrer"
             >
               <i class="bi bi-folder2-open"></i>
-              {{ t('dashboard.openDocumentsFolder') }}
+              <I18nText k="dashboard.openDocumentsFolder" />
             </a>
           </template>
           <template v-else-if="!documentsLoading">
             <p class="dashboard-card-desc dashboard-documents-empty">
-              {{ t('dashboard.documentsNotConfigured') }}
+              <I18nText k="dashboard.documentsNotConfigured" />
             </p>
-            <p class="dashboard-documents-hint">{{ t('dashboard.documentsNotConfiguredHint') }}</p>
+            <p class="dashboard-documents-hint"><I18nText k="dashboard.documentsNotConfiguredHint" /></p>
             <RouterLink
               v-if="hasAdminRole()"
               to="/dashboard/admin/documents"
               class="dashboard-documents-link dashboard-documents-link-secondary"
             >
               <i class="bi bi-gear"></i>
-              {{ t('dashboard.documentsConfigureAdmin') }}
+              <I18nText k="dashboard.documentsConfigureAdmin" />
             </RouterLink>
           </template>
         </section>
@@ -257,12 +258,14 @@ onMounted(async () => {
         <section class="dashboard-card dashboard-card-events">
           <h2 class="dashboard-card-title">
             <i class="bi bi-calendar-event"></i>
-            {{ t('dashboard.upcomingEvents') }}
+            <I18nText k="dashboard.upcomingEvents" />
           </h2>
           <ul class="dashboard-events-list">
             <li v-for="(ev, idx) in upcomingEvents" :key="idx" class="dashboard-event-item">
-              <span class="dashboard-event-title">{{ t(ev.titleKey) }}</span>
-              <span class="dashboard-event-meta">{{ t(ev.dateKey) }} · {{ t(ev.locationKey) }}</span>
+              <span class="dashboard-event-title"><I18nText :k="ev.titleKey" /></span>
+              <span class="dashboard-event-meta">
+                <I18nText :k="ev.dateKey" /> · <I18nText :k="ev.locationKey" />
+              </span>
             </li>
           </ul>
         </section>

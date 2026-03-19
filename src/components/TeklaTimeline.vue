@@ -220,7 +220,7 @@ function cancelVersandaufschubForm() {
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
-                        {{ t(docStatusLabelKey(item)) }}
+                        <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                       <span v-if="item.link_text" class="tekla-doc-extra">{{ item.link_text }}</span>
                       <i class="bi bi-box-arrow-up-right tekla-doc-external"></i>
@@ -235,7 +235,7 @@ function cancelVersandaufschubForm() {
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
-                        {{ t(docStatusLabelKey(item)) }}
+                        <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                       <i class="bi bi-box-arrow-up-right tekla-doc-external"></i>
                     </button>
@@ -243,7 +243,7 @@ function cancelVersandaufschubForm() {
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ item.label }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
-                        {{ t(docStatusLabelKey(item)) }}
+                        <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                     </span>
                   </li>
@@ -262,26 +262,27 @@ function cancelVersandaufschubForm() {
                         :placeholder="t('detail.versandaufschub')"
                       />
                       <button type="button" class="tekla-btn tekla-btn-primary" @click="submitVersandaufschub">
-                        {{ t('common.save') }}
+                        <I18nText k="common.save" />
                       </button>
                       <button v-if="versandaufschub" type="button" class="tekla-btn" @click="clearVersandaufschub">
-                        {{ t('detail.versandaufschubClear') }}
+                        <I18nText k="detail.versandaufschubClear" />
                       </button>
                       <button type="button" class="tekla-btn" @click="cancelVersandaufschubForm">
-                        {{ t('common.cancel') }}
+                        <I18nText k="common.cancel" />
                       </button>
                     </div>
                   </template>
                   <template v-else>
                     <span v-if="versandaufschub" class="tekla-versandaufschub-text">
-                      {{ t('detail.versandaufschubBis') }} {{ formatVersandaufschubDate(versandaufschub) }}
+                      <I18nText k="detail.versandaufschubBis" /> {{ formatVersandaufschubDate(versandaufschub) }}
                     </span>
                     <button
                       type="button"
                       class="tekla-versandaufschub-btn"
                       @click="openVersandaufschubForm"
                     >
-                      {{ versandaufschub ? t('detail.versandaufschubChange') : t('detail.versandaufschubSet') }}
+                      <I18nText v-if="versandaufschub" k="detail.versandaufschubChange" />
+                      <I18nText v-else k="detail.versandaufschubSet" />
                     </button>
                   </template>
                 </div>
