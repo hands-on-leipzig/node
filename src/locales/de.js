@@ -55,7 +55,7 @@ export default {
         "documentsFolderHint": "Vollständige URL zum freigegebenen Ordner (in SharePoint „Link kopieren“ auf dem Ordner). Coaches können den Ordner in einem neuen Tab öffnen.",
         "documentsSkipGraph": "Nur Ordner-Link — keine Dateiliste über Microsoft Graph",
         "documentsSkipGraphHint": "Leer lassen, damit das Coach-Dashboard Dateinamen aus SharePoint lädt (dieselben MS_CLIENT_* wie in DRAHT; Azure-App braucht Sites.Read.All oder Files.Read.All). Anhaken, wenn nur der Ordner-Button und manuelle Links unten reichen.",
-        "documentsCardTitle": "Titel der Karte (optional)",
+        "documentsCardTitle": "Titel der Dashboard-Karte (optional)",
         "documentsCardTitlePlaceholder": "Leer lassen für Standard",
         "documentsTitleHint": "Wenn leer, erscheint „Dokumente zum Download“.",
         "documentsSave": "Speichern",
@@ -119,7 +119,7 @@ export default {
             "skip_unknown": "Nicht geprüft."
         },
         "i18nEditorTitle": "Übersetzungen",
-        "i18nEditorLead": "Texte bearbeiten und einen GitHub-Pull-Request erzeugen. Der PR wird vom DRAHT-Backend erstellt (GitHub-Token in Dolibarr). Zugriff wie bei den Dokumenteinstellungen.",
+        "i18nEditorLead": "Hier können alle Texte angepasst werden.",
         "i18nEditorTabEn": "Englisch (en.js)",
         "i18nEditorTabDe": "Deutsch (de.js)",
         "i18nEditorFilter": "Keys / Text filtern",
@@ -130,8 +130,10 @@ export default {
         "i18nEditorDirty": "Lokale Änderungen (seit Seitenaufruf).",
         "i18nEditorColKey": "Schlüssel",
         "i18nEditorColValue": "Text",
+        "i18nEditorFilterFlatHint": "Filter aktiv: alle Treffer als flache Liste. Filter leeren, um wieder zusammenklappbare Bereiche zu nutzen.",
+        "i18nEditorNoKeys": "Keine Texte passen zu diesem Filter.",
         "i18nEditorPrCreated": "Pull-Request:",
-        "i18nEditorGithubPrHint": "Server: Dolibarr-Konstanten HANDSON_GITHUB_TOKEN und HANDSON_GITHUB_REPO (owner/repo) setzen. Optional: HANDSON_GITHUB_LOCALE_PATH_PREFIX (Standard src/locales). Siehe deploy/README.md."
+        "i18nEditorGithubPrHint": "Nach Änderungen, bevor die Seite geschlossen wird, muss ein Github PR erzeugt werden! Klick auf den Button und warten auf Bestätigung :)."
     },
     "detail": {
         "backToDashboard": "Zurück zum Dashboard",
