@@ -10,6 +10,7 @@ Vue 3 frontend for coaches: SSO login via Keycloak and enrollment of teams and c
 - **Dashboard** with quick actions to enroll a team or a class
 - **Enroll team** – name, school/club, category, notes → created in DRAHT
 - **Enroll class** – name, school, grade, teacher, notes → created in DRAHT
+- **Admin: translations** – edit `en.js` / `de.js` strings and open a **GitHub pull request** via DRAHT (`HANDSON_GITHUB_*` in Dolibarr; see `deploy/README.md`)
 
 ## Project setup
 

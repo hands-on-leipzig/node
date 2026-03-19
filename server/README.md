@@ -1,10 +1,5 @@
-# Backend for “documents for download”
+# server/
 
-Configuration is stored in **DRAHT** (not in this repo):
+Translation pull requests are created by the **DRAHT** backend (`POST …/handson/node/translations-pr`), not by a separate Node process.
 
-- **GET** `…/handson/node/documents-config` — config. **`…/documents-folder-files`** — Graph file list for configured folder.
-- **PUT** same path — update (Keycloak client role `node-admin` on client `node`, or realm `admin`; Dolibarr admin API user; or `HANDSON_NODE_DOCUMENTS_ADMIN_CONTACT_IDS`).
-
-File on server: `DOL_DATA_ROOT/handson/node_documents_config.json`.
-
-See `deploy/README.md` in the project root.
+Configure **`HANDSON_GITHUB_TOKEN`**, **`HANDSON_GITHUB_REPO`**, and optionally **`HANDSON_GITHUB_LOCALE_PATH_PREFIX`** in Dolibarr. Details: **`deploy/README.md`**.

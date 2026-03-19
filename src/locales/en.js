@@ -34,6 +34,7 @@ export default {
     teamDetail: 'Team',
     classDetail: 'Class',
     adminDocuments: 'Documents (admin)',
+    adminTranslations: 'Translations (admin)',
     logOut: 'Log out',
   },
   admin: {
@@ -131,6 +132,25 @@ export default {
       skip_global_disable: 'Graph globally disabled on server — not probed.',
       skip_unknown: 'Not probed.',
     },
+    i18nEditorTitle: 'Translations',
+    i18nEditorLead:
+      'Edit locale strings and open a GitHub pull request. The PR is created by the DRAHT backend (GitHub token stored in Dolibarr). Access is limited to the same admins as the documents settings.',
+    i18nEditorTabEn: 'English (en.js)',
+    i18nEditorTabDe: 'German (de.js)',
+    i18nEditorFilter: 'Filter keys / text',
+    i18nEditorPrTitle: 'PR title (optional)',
+    i18nEditorPrTitlePlaceholder: 'Leave empty for an automatic title',
+    i18nEditorReset: 'Reset tab to copy loaded with the page',
+    i18nEditorOpenPr: 'Create GitHub pull request',
+    i18nEditorDirty: 'You have local edits (relative to when this page was opened).',
+    i18nEditorColKey: 'Key',
+    i18nEditorColValue: 'Value',
+    i18nEditorFilterFlatHint:
+      'Filter active: showing a flat list of all matches. Clear the filter to use collapsible sections again.',
+    i18nEditorNoKeys: 'No strings match this filter.',
+    i18nEditorPrCreated: 'Pull request:',
+    i18nEditorGithubPrHint:
+      'Server: set Dolibarr constants HANDSON_GITHUB_TOKEN and HANDSON_GITHUB_REPO (owner/repo). Optional: HANDSON_GITHUB_LOCALE_PATH_PREFIX (default src/locales). See deploy/README.md.',
   },
   detail: {
     backToDashboard: 'Back to dashboard',

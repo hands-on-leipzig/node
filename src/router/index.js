@@ -55,6 +55,12 @@ const routes = [
         component: () => import('@/views/AdminDocumentsView.vue'),
         meta: { titleKey: 'nav.adminDocuments', requiresAdmin: true },
       },
+      {
+        path: 'admin/translations',
+        name: 'admin-translations',
+        component: () => import('@/views/AdminTranslationsView.vue'),
+        meta: { titleKey: 'nav.adminTranslations', requiresAdmin: true },
+      },
     ],
   },
 ]

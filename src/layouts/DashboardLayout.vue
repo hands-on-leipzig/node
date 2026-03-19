@@ -26,6 +26,12 @@ const navItems = computed(() => {
       exact: true,
       icon: 'bi-folder2-open',
     })
+    items.push({
+      path: '/dashboard/admin/translations',
+      nameKey: 'nav.adminTranslations',
+      exact: true,
+      icon: 'bi-translate',
+    })
   }
   return items
 })

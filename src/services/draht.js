@@ -196,6 +196,16 @@ export function postDocumentsProbeFolder(url) {
 }
 
 /**
+ * Admin: create GitHub PR with updated locale file (POST /handson/node/translations-pr).
+ * Configure on server: Dolibarr constants HANDSON_GITHUB_TOKEN, HANDSON_GITHUB_REPO;
+ * optional HANDSON_GITHUB_LOCALE_PATH_PREFIX (default src/locales).
+ * @param {{ locale: 'en'|'de', messages: Record<string, unknown>, prTitle?: string, editorUsername?: string, baseBranch?: string }} payload
+ */
+export function postTranslationsPr(payload) {
+  return api.post('/translations-pr', payload, { timeout: 120000 })
+}
+
+/**
  * Get a single team by id (for detail view).
  */
 export function getTeam(id) {

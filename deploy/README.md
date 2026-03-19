@@ -48,3 +48,15 @@ DRAHT uses **client credentials** (app-only). Check these in order:
 Use **GET** `node/documents-graph-status` and the admin **Ordner testieren** probe: note which line shows **403** (Sharing-API, **Freigabe driveItem**, Site-API, Ordner-Liste) to see which call fails.
 
 **DRAHT back office:** on **Handson → handsonindex** (`custom/handson/handsonindex.php`), admins get a **SharePoint folder link** form that runs the same Graph probe (no Node required).
+
+## Translations admin → GitHub PR
+
+Handled by **DRAHT** — **POST** `node/translations-pr` (same admin rules as documents: Keycloak `node-admin` / realm `admin`, Dolibarr admin, or **`HANDSON_NODE_DOCUMENTS_ADMIN_CONTACT_IDS`**).
+
+Set in Dolibarr (constants / setup):
+
+- **`HANDSON_GITHUB_TOKEN`** — fine-grained or classic PAT with `contents: write` and `pull_requests: write` on the repo
+- **`HANDSON_GITHUB_REPO`** — `owner/repo` (e.g. `myorg/node`)
+- Optional **`HANDSON_GITHUB_LOCALE_PATH_PREFIX`** — path inside repo to locale files (default **`src/locales`**)
+
+The SPA only needs **`VITE_DRAHT_API_URL`**; no separate i18n API.
