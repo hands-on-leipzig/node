@@ -1,5 +1,7 @@
 # Deploy / SPA reload
 
+The built app includes **`/build-info.json`** (from `public/build-info.json`): CI writes `builtAt` + `sha` before `npm run build`. The **translations admin** page polls it after a successful PR to show when a new deployment is live.
+
 So that reload and direct URLs (e.g. `/dashboard`) work:
 
 - **Apache**: The built `dist/` folder includes `.htaccess` (from `public/.htaccess`). Ensure `mod_rewrite` is enabled; no extra config needed.

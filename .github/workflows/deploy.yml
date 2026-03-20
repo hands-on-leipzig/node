@@ -38,6 +38,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Write site build-info.json
+        run: |
+          node -e "require('fs').writeFileSync('public/build-info.json', JSON.stringify({ builtAt: new Date().toISOString(), sha: process.env.GITHUB_SHA || '' }))"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
       - name: Build
         run: npm run build
 
@@ -77,6 +83,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Write site build-info.json
+        run: |
+          node -e "require('fs').writeFileSync('public/build-info.json', JSON.stringify({ builtAt: new Date().toISOString(), sha: process.env.GITHUB_SHA || '' }))"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
 
       - name: Build
         run: npm run build

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import enSource from '@/locales/en.js'
@@ -15,6 +15,12 @@ import {
   clearLocaleDraft,
   countLocaleDraftKeys,
 } from '@/utils/localeDrafts'
+import {
+  fetchSiteBuildInfo,
+  isLocalDevBuildInfo,
+  formatBuildInfoShort,
+  buildInfoFingerprint,
+} from '@/utils/siteBuildInfo'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -32,6 +38,63 @@ const flatEn = ref({})
 const flatDe = ref({})
 const draftTick = ref(0)
 const editorRoot = ref(null)
+
+/** Current deployed build (from /build-info.json). */
+const siteBuildInfo = ref(null)
+const siteBuildFetchDone = ref(false)
+/** After a successful PR: watch for new deploy. */
+const deployWatch = ref(null) // 'polling' | 'ready' | 'timeout' | 'local-skip' | null
+
+let deployPollTimer = null
+
+function stopDeployWatch() {
+  if (deployPollTimer != null) {
+    clearInterval(deployPollTimer)
+    deployPollTimer = null
+  }
+}
+
+async function refreshSiteBuild() {
+  siteBuildInfo.value = await fetchSiteBuildInfo()
+  siteBuildFetchDone.value = true
+}
+
+function startDeployWatchAfterPr() {
+  stopDeployWatch()
+  deployWatch.value = null
+  void (async () => {
+    const baseline = await fetchSiteBuildInfo()
+    if (!baseline) {
+      deployWatch.value = 'timeout'
+      return
+    }
+    if (isLocalDevBuildInfo(baseline)) {
+      deployWatch.value = 'local-skip'
+      return
+    }
+    const fp = buildInfoFingerprint(baseline)
+    deployWatch.value = 'polling'
+    const started = Date.now()
+    const maxMs = 30 * 60 * 1000
+    deployPollTimer = setInterval(async () => {
+      if (Date.now() - started > maxMs) {
+        stopDeployWatch()
+        deployWatch.value = 'timeout'
+        return
+      }
+      const next = await fetchSiteBuildInfo()
+      if (next && buildInfoFingerprint(next) !== fp) {
+        stopDeployWatch()
+        deployWatch.value = 'ready'
+        siteBuildInfo.value = next
+      }
+    }, 5000)
+  })()
+}
+
+function reloadPage() {
+  window.location.reload()
+}
 
 const allPaths = computed(() => {
   const s = new Set([...Object.keys(flatEn.value), ...Object.keys(flatDe.value)])
@@ -112,6 +175,8 @@ function updateKey(path, locale, value) {
 }
 
 function resetAllDrafts() {
+  stopDeployWatch()
+  deployWatch.value = null
   clearLocaleDraft('en')
   clearLocaleDraft('de')
   flatEn.value = flattenLocaleStrings(deepCloneLocale(baseEn))
@@ -196,6 +261,7 @@ async function openPr() {
       clearLocaleDraft('de')
       flatEn.value = flattenLocaleStrings(deepCloneLocale(baseEn))
       flatDe.value = flattenLocaleStrings(deepCloneLocale(baseDe))
+      startDeployWatchAfterPr()
     }
     dirty.value = countLocaleDraftKeys('en') > 0 || countLocaleDraftKeys('de') > 0
     draftTick.value++
@@ -209,6 +275,11 @@ async function openPr() {
 onMounted(() => {
   hydrateFlatsFromBaseAndDrafts()
   applyRouteQuery()
+  void refreshSiteBuild()
+})
+
+onUnmounted(() => {
+  stopDeployWatch()
 })
 
 watch(
@@ -226,6 +297,35 @@ watch(
     <p class="admin-lead">{{ t('admin.i18nEditorLead') }}</p>
 
     <p class="admin-github-hint">{{ t('admin.i18nEditorGithubPrHint') }}</p>
+
+    <p v-if="siteBuildFetchDone && siteBuildInfo" class="admin-build-meta">
+      <i class="bi bi-cpu me-1" aria-hidden="true" />
+      {{ t('admin.i18nEditorSiteBuild', { info: formatBuildInfoShort(siteBuildInfo) }) }}
+    </p>
+    <p v-else-if="siteBuildFetchDone" class="admin-build-meta admin-build-meta--warn">
+      {{ t('admin.i18nEditorSiteBuildUnknown') }}
+    </p>
+
+    <div v-if="deployWatch === 'polling'" class="admin-deploy-banner admin-deploy-banner--wait" role="status">
+      <i class="bi bi-hourglass-split me-2" aria-hidden="true" />
+      {{ t('admin.i18nEditorDeployWatching') }}
+    </div>
+    <div v-else-if="deployWatch === 'ready'" class="admin-deploy-banner admin-deploy-banner--ready">
+      <p class="admin-deploy-banner-text">
+        <i class="bi bi-check-circle me-2" aria-hidden="true" />
+        {{ t('admin.i18nEditorDeployReady') }}
+      </p>
+      <button type="button" class="admin-deploy-reload" @click="reloadPage">
+        {{ t('admin.i18nEditorReloadPage') }}
+      </button>
+    </div>
+    <div v-else-if="deployWatch === 'timeout'" class="admin-deploy-banner admin-deploy-banner--warn" role="alert">
+      {{ t('admin.i18nEditorDeployTimeout') }}
+    </div>
+    <div v-else-if="deployWatch === 'local-skip'" class="admin-deploy-banner admin-deploy-banner--warn">
+      {{ t('admin.i18nEditorDeployLocalSkip') }}
+    </div>
+
     <p v-if="draftEnCount > 0 || draftDeCount > 0" class="admin-draft-hint">
       {{ t('admin.i18nEditorDraftHint', { en: draftEnCount, de: draftDeCount }) }}
     </p>
@@ -406,6 +506,67 @@ watch(
   color: var(--color-text-muted, #6c757d);
   margin-bottom: 1rem;
   line-height: 1.45;
+}
+.admin-build-meta {
+  font-size: var(--text-sm, 0.8125rem);
+  color: var(--color-text-muted, #495057);
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--color-surface-alt, #f1f3f5);
+  border-radius: 0.35rem;
+  border: 1px solid var(--color-border, #e9ecef);
+  line-height: 1.4;
+}
+.admin-build-meta--warn {
+  color: var(--bs-warning-text-emphasis, #997404);
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+  border-color: var(--bs-warning-border-subtle, #ffecb5);
+}
+.admin-deploy-banner {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-deploy-banner--wait {
+  background: var(--bs-info-bg-subtle, #cff4fc);
+  border: 1px solid var(--bs-info-border-subtle, #9eeaf9);
+  color: var(--bs-info-text-emphasis, #055160);
+}
+.admin-deploy-banner--ready {
+  background: var(--bs-success-bg-subtle, #d1e7dd);
+  border: 1px solid var(--bs-success-border-subtle, #a3cfbb);
+  color: var(--bs-success-text-emphasis, #0a3622);
+  flex-direction: column;
+  align-items: stretch;
+}
+.admin-deploy-banner--warn {
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+  border: 1px solid var(--bs-warning-border-subtle, #ffecb5);
+  color: var(--bs-warning-text-emphasis, #997404);
+}
+.admin-deploy-banner-text {
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.admin-deploy-reload {
+  align-self: flex-start;
+  padding: 0.35rem 0.75rem;
+  font-weight: 600;
+  border-radius: 0.35rem;
+  border: none;
+  cursor: pointer;
+  background: var(--bs-success, #198754);
+  color: #fff;
+}
+.admin-deploy-reload:hover {
+  filter: brightness(1.05);
 }
 .admin-draft-hint {
   font-size: var(--text-sm, 0.875rem);

@@ -144,7 +144,14 @@ export default {
         "i18nEditorNoKeys": "No strings match this filter.",
         "i18nEditorPrCreated": "Pull request:",
         "i18nEditorGithubPrHint": "Server: set Dolibarr constants HANDSON_GITHUB_TOKEN and HANDSON_GITHUB_REPO (owner/repo). Optional: HANDSON_GITHUB_LOCALE_PATH_PREFIX (default src/locales). See deploy/README.md.",
-        "i18nEditorDraftHint": "Unsaved edits are kept in this browser (localStorage): {en} English key(s), {de} German key(s). One pull request updates both locale files. Reset or a successful PR clears drafts."
+        "i18nEditorDraftHint": "Unsaved edits are kept in this browser (localStorage): {en} English key(s), {de} German key(s). One pull request updates both locale files. Reset or a successful PR clears drafts.",
+        "i18nEditorSiteBuild": "This site build: {info}",
+        "i18nEditorSiteBuildUnknown": "Could not read build info (missing build-info.json).",
+        "i18nEditorDeployWatching": "Waiting for a new deployment… When GitHub Actions finishes, this turns green — then reload.",
+        "i18nEditorDeployReady": "New build is live. Reload the page to load updated translations from the server.",
+        "i18nEditorReloadPage": "Reload page",
+        "i18nEditorDeployTimeout": "No new build detected yet. Check GitHub Actions or try reloading in a few minutes.",
+        "i18nEditorDeployLocalSkip": "Deploy detection only works on the server (CI writes build-info.json). After merge, reload once your test environment has deployed."
     },
     "detail": {
         "backToDashboard": "Back to dashboard",

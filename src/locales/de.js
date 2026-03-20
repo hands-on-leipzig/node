@@ -144,7 +144,14 @@ export default {
         "i18nEditorNoKeys": "Keine Texte passen zu diesem Filter.",
         "i18nEditorPrCreated": "Pull-Request:",
         "i18nEditorGithubPrHint": "Nach Änderungen, bevor die Seite geschlossen wird, muss ein Github PR erzeugt werden! Klick auf den Button und warten auf Bestätigung :).",
-        "i18nEditorDraftHint": "Nicht gespeicherte Änderungen bleiben im Browser (localStorage): {en} englische, {de} deutsche Schlüssel. Ein Pull-Request aktualisiert beide Locale-Dateien. Zurücksetzen oder erfolgreicher PR löscht die Entwürfe."
+        "i18nEditorDraftHint": "Nicht gespeicherte Änderungen bleiben im Browser (localStorage): {en} englische, {de} deutsche Schlüssel. Ein Pull-Request aktualisiert beide Locale-Dateien. Zurücksetzen oder erfolgreicher PR löscht die Entwürfe.",
+        "i18nEditorSiteBuild": "Aktueller Site-Build: {info}",
+        "i18nEditorSiteBuildUnknown": "Build-Info nicht lesbar (build-info.json fehlt).",
+        "i18nEditorDeployWatching": "Warte auf neues Deployment… Wenn GitHub Actions fertig ist, wird das hier grün — dann neu laden.",
+        "i18nEditorDeployReady": "Neuer Build ist live. Seite neu laden, um die aktualisierten Übersetzungen vom Server zu holen.",
+        "i18nEditorReloadPage": "Seite neu laden",
+        "i18nEditorDeployTimeout": "Noch kein neuer Build erkannt. GitHub Actions prüfen oder später manuell neu laden.",
+        "i18nEditorDeployLocalSkip": "Deployment-Status funktioniert nur auf dem Server (CI schreibt build-info.json). Nach dem Merge neu laden, sobald die Testumgebung deployed ist."
     },
     "detail": {
         "backToDashboard": "Zurück zum Dashboard",
