@@ -222,7 +222,7 @@ export default {
         "mockEventLandesfinale": "Landesfinale Sachsen",
         "mockEventLandesfinaleDate": "Mai 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Hier kannst du dein Team oder deine Klasse für die FIRST LEGO League anmelden.",
+        "intro": "Melde Teams, Klassen und Gruppen an.",
         "enrollTeam": "Team anmelden",
         "enrollTeamDesc": "Team für den Wettbewerb registrieren.",
         "enrollClass": "Klasse anmelden",
