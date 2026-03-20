@@ -1,0 +1,144 @@
+# Auto-approve and merge translation PRs opened by DRAHT (branch i18n/*, files under src/locales/).
+#
+# Security: only runs for pull requests that:
+# - target `main`
+# - come from the same repository (not a fork)
+# - change files under src/locales/
+# - use a head branch whose name starts with `i18n/` (matches DRAHT)
+#
+# Branch protection: the default GITHUB_TOKEN acts as github-actions[bot]. That approval counts
+# toward "required approving reviews" only if your rules allow it (often you need 0 reviews or
+# a ruleset bypass). See deploy/github-i18n-auto-merge.md
+
+name: Auto-merge locale PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+    paths:
+      - 'src/locales/**'
+
+concurrency:
+  group: i18n-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  approve-and-merge:
+    name: Approve and merge translation PR
+    runs-on: ubuntu-latest
+    # Never run for forks or draft PRs; require DRAHT branch naming.
+    if: >
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.fork == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'i18n/')
+    steps:
+      - name: Approve and merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = pr.number;
+
+            const mergeMethod = 'squash'; // change to 'merge' or 'rebase' if you prefer
+
+            core.info(`Processing PR #${pull_number} (${pr.head.ref} → ${pr.base.ref})`);
+
+            // Optional: ensure only locale files are touched (paths filter already limits triggers;
+            // this blocks if someone adds extra files in the same PR.)
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+            const bad = files.filter((f) => !f.filename.startsWith('src/locales/'));
+            if (bad.length > 0) {
+              core.setFailed(
+                `Refusing auto-merge: non-locale files in PR: ${bad.map((f) => f.filename).join(', ')}`
+              );
+              return;
+            }
+
+            // Approve (ignore if we already left an approval in a previous run)
+            try {
+              await github.rest.pulls.createReview({
+                owner,
+                repo,
+                pull_number,
+                event: 'APPROVE',
+                body:
+                  'Auto-approved by **i18n-locale-pr-auto-merge** (locales-only PR from `i18n/*`).',
+              });
+            } catch (e) {
+              const msg = e.message || String(e);
+              if (!/already.*review|had already|unprocessable/i.test(msg)) {
+                throw e;
+              }
+              core.info(`Approve skipped or already present: ${msg}`);
+            }
+
+            // Wait until GitHub computes mergeable (and optional checks finish if required)
+            const maxAttempts = 36; // ~3 min @ 5s
+            for (let i = 0; i < maxAttempts; i++) {
+              const { data: updated } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number,
+              });
+
+              if (updated.merged) {
+                core.info('PR already merged.');
+                return;
+              }
+
+              if (updated.mergeable === null) {
+                core.info(`mergeable unknown (attempt ${i + 1}/${maxAttempts}), waiting…`);
+                await new Promise((r) => setTimeout(r, 5000));
+                continue;
+              }
+
+              if (updated.mergeable === false) {
+                core.setFailed(
+                  'PR is not mergeable (conflicts with base branch or failing required checks / rules).'
+                );
+                return;
+              }
+
+              try {
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number,
+                  merge_method: mergeMethod,
+                });
+                core.info(`Merged PR #${pull_number} (${mergeMethod}).`);
+                return;
+              } catch (e) {
+                const status = e.status || e.response?.status;
+                const msg = e.message || String(e);
+                if (status === 405 || /not mergeable|required|protected|review/i.test(msg)) {
+                  core.info(`Merge not ready yet (attempt ${i + 1}): ${msg}`);
+                  await new Promise((r) => setTimeout(r, 5000));
+                  continue;
+                }
+                if (status === 422 && /merged|already merged/i.test(msg)) {
+                  core.info('PR already merged.');
+                  return;
+                }
+                throw e;
+              }
+            }
+
+            core.setFailed(
+              'Timed out waiting to merge. Check branch protection, required checks, and review rules.'
+            );
