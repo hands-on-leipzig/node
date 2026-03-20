@@ -387,7 +387,7 @@ export default {
         "voucherCodeHint": "A valid code will pre-select program, number of participants, etc.",
         "voucherCodeYes": "Yes, I have a code",
         "voucherCodeYesDesc": "Enter your code – program and options will be set automatically.",
-        "voucherCodeNo": "No, I’ll choose manually",
+        "voucherCodeNo": "No, I’ll choose on my own",
         "voucherCodeNoDesc": "Select edition, program and all options yourself.",
         "voucherCodeBack": "Back to choice",
         "entryByCode": "Direct entry with code",
