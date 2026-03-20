@@ -762,7 +762,9 @@ watch(
           </button>
         </div>
 
-        <div class="wizard-body">
+        <div class="wizard-panel-main">
+          <div class="wizard-scroll">
+            <div class="wizard-body">
           <!-- Step 0: Voucher-Code / Direkteinstieg -->
           <div v-show="step === 0" class="wizard-step wizard-step-voucher wizard-step-animate">
             <div class="wizard-step-voucher-inner">
@@ -1226,28 +1228,30 @@ watch(
             </div>
             <p class="wizard-hint"><I18nText k="wizard.orderReviewHint" /></p>
           </div>
-        </div>
+            </div>
 
-        <div v-if="error" class="wizard-message error"><i class="bi bi-exclamation-circle"></i> {{ error }}</div>
-        <div v-if="success" class="wizard-message success">
-          <i class="bi bi-check-circle-fill"></i>
-          <template v-if="successMessage">{{ successMessage }}</template>
-          <I18nText v-else k="wizard.success" />
-        </div>
+            <div v-if="error" class="wizard-message error"><i class="bi bi-exclamation-circle"></i> {{ error }}</div>
+            <div v-if="success" class="wizard-message success">
+              <i class="bi bi-check-circle-fill"></i>
+              <template v-if="successMessage">{{ successMessage }}</template>
+              <I18nText v-else k="wizard.success" />
+            </div>
+          </div>
 
-        <div class="wizard-footer">
-          <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
-            <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
-          </button>
-          <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
-            <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
-          </button>
-          <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
-            <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
-            <i v-else class="bi bi-check-lg"></i>
-            <I18nText v-if="submitting" k="wizard.submitting" />
-            <I18nText v-else k="wizard.submit" />
-          </button>
+          <div class="wizard-footer">
+            <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
+              <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
+            </button>
+            <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
+              <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
+            </button>
+            <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
+              <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
+              <i v-else class="bi bi-check-lg"></i>
+              <I18nText v-if="submitting" k="wizard.submitting" />
+              <I18nText v-else k="wizard.submit" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1270,6 +1274,8 @@ watch(
 .wizard-modal {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
   display: grid;
   grid-template-columns: minmax(18rem, 38%) 1fr;
   background: var(--color-bg);
@@ -1318,12 +1324,30 @@ watch(
 .wizard-close i {
   font-size: 1.35rem;
 }
+/* Scroll lives on .wizard-scroll; body is content only */
 .wizard-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem 2rem 2rem;
+  flex: none;
+  overflow: visible;
+  padding: 1.5rem 2rem 1rem;
   display: flex;
   flex-direction: column;
+}
+.wizard-panel-main {
+  --wizard-footer-safe: 6.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.wizard-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: max(var(--wizard-footer-safe), calc(env(safe-area-inset-bottom, 0px) + 5.5rem));
 }
 .wizard-step {
   min-height: 8rem;
@@ -1765,7 +1789,7 @@ watch(
 }
 .wizard-back-link:hover { color: var(--color-text); }
 .wizard-message {
-  margin: 0 2rem 0;
+  margin: 0 2rem 1rem;
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   font-size: var(--text-sm);
@@ -1776,12 +1800,28 @@ watch(
 .wizard-message.error { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
 .wizard-message.success { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
 .wizard-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
   flex-shrink: 0;
-  padding: 1.25rem 2rem 1.75rem;
+  padding: 0.85rem 2rem max(1rem, env(safe-area-inset-bottom, 0px));
+  padding-top: 1rem;
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
+  background: var(--color-bg);
+  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.08);
+}
+@supports (backdrop-filter: blur(8px)) {
+  .wizard-footer {
+    background: color-mix(in srgb, var(--color-bg) 90%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
 }
 .wizard-footer .btn {
   padding: 0.9rem 1.4rem;
@@ -1874,6 +1914,9 @@ watch(
 .wizard-panel {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--color-bg);
 }
 .wizard-path {
@@ -1938,12 +1981,16 @@ watch(
 @media (max-width: 960px) {
   .wizard-modal {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
   .wizard-hero {
     padding: 2rem;
   }
   .wizard-hero-content {
     max-width: none;
+  }
+  .wizard-panel {
+    min-height: 0;
   }
 }
 
@@ -1953,6 +2000,10 @@ watch(
   .wizard-footer {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
+  }
+  .wizard-message {
+    margin-left: 1.25rem;
+    margin-right: 1.25rem;
   }
   .wizard-hero {
     padding: 1.75rem 1.25rem;
