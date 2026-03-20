@@ -223,7 +223,7 @@ export default {
         "mockEventStammtisch": "Coach get-together",
         "mockEventStammtischDate": "March 2026",
         "mockEventStammtischLocation": "Online",
-        "mockEventRegional": "Regional competition Leipzig",
+        "mockEventRegional": "D-A-CH Finals Leipzig",
         "mockEventRegionalDate": "April 2026",
         "mockEventRegionalLocation": "Leipzig",
         "mockEventLandesfinale": "State final Saxony",
