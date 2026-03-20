@@ -27,6 +27,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  actions: write # required to dispatch Deploy after merge (GITHUB_TOKEN merge does not trigger on.push)
 
 jobs:
   approve-and-merge:
@@ -122,6 +123,23 @@ jobs:
                   merge_method: mergeMethod,
                 });
                 core.info(`Merged PR #${pull_number} (${mergeMethod}).`);
+                // Merges performed with GITHUB_TOKEN do not emit `push` → Deploy would not run. Dispatch it.
+                try {
+                  await github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: 'deploy.yml',
+                    ref: pr.base.ref,
+                    inputs: { target: 'test' },
+                  });
+                  core.info(
+                    `Triggered workflow deploy.yml on ${pr.base.ref} (workflow_dispatch, target=test).`
+                  );
+                } catch (dispatchErr) {
+                  core.warning(
+                    `Locale PR merged but deploy.yml dispatch failed: ${dispatchErr?.message || dispatchErr}. Run Deploy manually if needed.`
+                  );
+                }
                 return;
               } catch (e) {
                 const status = e.status || e.response?.status;

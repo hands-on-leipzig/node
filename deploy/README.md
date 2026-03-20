@@ -70,4 +70,4 @@ See **`deploy/draht-translations-pr-combined.md`** for PHP implementation notes 
 
 ### Optional: merge locale PRs without manual review
 
-GitHub Actions workflow **`.github/workflows/i18n-locale-pr-auto-merge.yml`** can **approve and squash-merge** PRs that only touch `src/locales/**`, target `main`, and use a head branch named `i18n/*` (same pattern DRAHT uses). Branch protection still applies—see **`deploy/github-i18n-auto-merge.md`**.
+GitHub Actions workflow **`.github/workflows/i18n-locale-pr-auto-merge.yml`** can **approve and squash-merge** PRs that only touch `src/locales/**`, target `main`, and use a head branch named `i18n/*` (same pattern DRAHT uses). Branch protection still applies—see **`deploy/github-i18n-auto-merge.md`**. After a successful merge it **dispatches `deploy.yml`** with `target: test`, because merges using `GITHUB_TOKEN` do not trigger the normal `push` → Deploy run.

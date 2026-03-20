@@ -98,10 +98,11 @@ function onBackdrop(e) {
 </template>
 
 <style scoped>
+/* Above full-screen overlays (e.g. EnrollWizard uses 9999) */
 .tqem-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1080;
+  z-index: 10050;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;

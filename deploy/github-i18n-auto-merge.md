@@ -10,6 +10,7 @@ When a **pull request** is opened or updated against **`main`** and the diff tou
 2. **Double-checks** that every changed file path starts with `src/locales/` (so a mixed PR is not merged by mistake).
 3. **Approves** the PR as `github-actions[bot]`.
 4. **Merges** with **`squash`** (change `mergeMethod` in the workflow if you prefer merge commits or rebase).
+5. **Dispatches** the **Deploy** workflow (`deploy.yml`) with **`target: test`** — GitHub does **not** fire `on.push` for commits created by `GITHUB_TOKEN` in the same job, so this keeps test deploy in line with a normal merge to `main`.
 
 ## How this interacts with branch protection
 
