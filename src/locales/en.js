@@ -222,7 +222,7 @@ export default {
         "mockEventLandesfinale": "State final Saxony",
         "mockEventLandesfinaleDate": "May 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Here you can register your team or class for the FIRST LEGO League.",
+        "intro": "Register teams, classes or groups.",
         "enrollTeam": "Register a team",
         "enrollTeamDesc": "Register a team for the competition.",
         "enrollClass": "Register a class",
