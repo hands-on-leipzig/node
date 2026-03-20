@@ -222,7 +222,7 @@ export default {
         "mockEventLandesfinale": "Landesfinale Sachsen",
         "mockEventLandesfinaleDate": "Mai 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Melde Teams, Klassen und Gruppen an.",
+        "intro": "Test",
         "enrollTeam": "Team anmelden",
         "enrollTeamDesc": "Team für den Wettbewerb registrieren.",
         "enrollClass": "Klasse anmelden",
