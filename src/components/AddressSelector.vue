@@ -49,6 +49,11 @@ const addressOptions = computed(() =>
 
 /** Strict boolean — avoids radios stuck when useExisting is undefined/null. */
 const isExistingMode = computed(() => props.modelValue.useExisting !== false)
+const streetContextReady = computed(() => {
+  const country = (props.modelValue.new?.country || '').trim()
+  const zip = (props.modelValue.new?.postalCode || '').trim()
+  return country.length > 0 && zip.length >= 3
+})
 
 const countryOptions = computed(() => {
   const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
@@ -122,6 +127,7 @@ function onZipInput(value) {
   setNewField('postalCode', value)
   zipQuery.value = value || ''
   zipSuggestions.value = []
+  streetSuggestions.value = []
   if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
   const country = (props.modelValue.new?.country || '').toLowerCase()
   if (!country || !value || String(value).trim().length < 3) return
@@ -157,6 +163,9 @@ async function lookupZip(rawZip, country) {
       seen.add(key)
       return true
     }).slice(0, 6)
+    if (zipSuggestions.value.length === 1 && zipSuggestions.value[0].city) {
+      setNewField('city', zipSuggestions.value[0].city)
+    }
   } catch (_) {
     zipSuggestions.value = []
   } finally {
@@ -184,6 +193,7 @@ async function lookupStreet(street) {
   const country = (props.modelValue.new?.country || '').toLowerCase()
   const zip = (props.modelValue.new?.postalCode || '').trim()
   const city = (props.modelValue.new?.city || '').trim()
+  if (!country || zip.length < 3) return
   const qParts = [street, zip, city].filter(Boolean)
   if (qParts.length === 0) return
   const q = qParts.join(', ')
@@ -336,31 +346,16 @@ onBeforeUnmount(() => {
     </template>
     <template v-else>
       <div class="address-fields">
-        <div class="field">
-          <label :for="idPrefix + '-street'"><I18nText k="enroll.street" /></label>
-          <div class="autocomplete-wrap">
-            <input
-              :id="idPrefix + '-street'"
-              type="text"
-              :value="modelValue.new?.street"
-              @input="onStreetInput($event.target.value)"
-            />
-            <div v-if="streetLoading" class="autocomplete-state">
-              <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.voucherChecking') }}
-            </div>
-            <div v-else-if="streetSuggestions.length" class="autocomplete-list" role="listbox">
-              <button
-                v-for="(s, i) in streetSuggestions"
-                :key="idPrefix + '-street-s-' + i"
-                type="button"
-                class="autocomplete-item"
-                @click="applyStreetSuggestion(s)"
-              >
-                <span class="autocomplete-item-main">{{ s.street }}</span>
-                <span class="autocomplete-item-sub">{{ s.postalCode }} {{ s.city }}</span>
-              </button>
-            </div>
-          </div>
+        <div class="field field-select">
+          <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
+          <select
+            :id="idPrefix + '-country'"
+            :value="(modelValue.new?.country || '').toLowerCase()"
+            @change="onCountryChange($event.target.value)"
+          >
+            <option value=""><I18nText k="enroll.selectCountry" /></option>
+            <option v-for="opt in countryOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
         </div>
         <div class="field-row">
           <div class="field">
@@ -373,7 +368,7 @@ onBeforeUnmount(() => {
                 @input="onZipInput($event.target.value)"
               />
               <div v-if="zipLoading" class="autocomplete-state">
-                <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.voucherChecking') }}
+              <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
               </div>
               <div v-else-if="zipSuggestions.length" class="autocomplete-list" role="listbox">
                 <button
@@ -399,16 +394,36 @@ onBeforeUnmount(() => {
             />
           </div>
         </div>
-        <div class="field field-select">
-          <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
-          <select
-            :id="idPrefix + '-country'"
-            :value="(modelValue.new?.country || '').toLowerCase()"
-            @change="onCountryChange($event.target.value)"
-          >
-            <option value=""><I18nText k="enroll.selectCountry" /></option>
-            <option v-for="opt in countryOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+        <div class="field">
+          <label :for="idPrefix + '-street'"><I18nText k="enroll.street" /></label>
+          <div class="autocomplete-wrap">
+            <input
+              :id="idPrefix + '-street'"
+              type="text"
+              :disabled="!streetContextReady"
+              :placeholder="streetContextReady ? '' : t('enroll.postalCode')"
+              :value="modelValue.new?.street"
+              @input="onStreetInput($event.target.value)"
+            />
+            <div v-if="!streetContextReady" class="autocomplete-state">
+              <i class="bi bi-info-circle" /> <I18nText k="enroll.selectCountry" /> + <I18nText k="enroll.postalCode" />
+            </div>
+            <div v-if="streetLoading" class="autocomplete-state">
+              <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
+            </div>
+            <div v-else-if="streetSuggestions.length" class="autocomplete-list" role="listbox">
+              <button
+                v-for="(s, i) in streetSuggestions"
+                :key="idPrefix + '-street-s-' + i"
+                type="button"
+                class="autocomplete-item"
+                @click="applyStreetSuggestion(s)"
+              >
+                <span class="autocomplete-item-main">{{ s.street }}</span>
+                <span class="autocomplete-item-sub">{{ s.postalCode }} {{ s.city }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </template>

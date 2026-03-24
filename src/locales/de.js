@@ -320,6 +320,7 @@ export default {
         "placeholderVoucherCode": "Code eingeben",
         "voucherCodeLabel": "Voucher- / Direkteinstiegs-Code",
         "voucherChecking": "Gutschein wird geprüft…",
+        "addressLookupLoading": "Adresse wird gesucht…",
         "voucherValid": "Gutschein ist gültig.",
         "voucherInvalid": "Gutscheincode ist ungültig oder nicht anwendbar.",
         "voucherInvoiceForced": "Durch den Gutschein wurde die Rechnungsadresse automatisch gesetzt.",

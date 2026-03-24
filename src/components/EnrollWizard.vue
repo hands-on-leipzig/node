@@ -2054,6 +2054,29 @@ watch(
     grid-template-columns: 1fr;
     gap: 0.65rem;
   }
+  /* Future pupils step: compact 2x2 option grid on phones */
+  .wizard-options-three.wizard-options-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  .wizard-options-three .wizard-option {
+    min-height: 4.1rem;
+    padding: 0.75rem 0.6rem;
+    border-radius: 0.7rem;
+    font-size: 0.98rem;
+  }
+  .wizard-options-three .wizard-option:last-child {
+    grid-column: 1 / -1;
+    min-height: 3.8rem;
+  }
+  .wizard-step .wizard-question {
+    margin-bottom: 0.55rem;
+  }
+  .wizard-step .wizard-hint {
+    margin-top: 0.2rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+  }
   .wizard-option {
     width: 100%;
     min-height: 5.5rem;
@@ -2134,6 +2157,12 @@ watch(
   }
   .wizard-footer .btn {
     width: 100%;
+  }
+  .wizard-options-three.wizard-options-grid {
+    grid-template-columns: 1fr;
+  }
+  .wizard-options-three .wizard-option:last-child {
+    grid-column: auto;
   }
 }
 </style>

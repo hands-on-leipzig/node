@@ -320,6 +320,7 @@ export default {
         "placeholderVoucherCode": "Enter code",
         "voucherCodeLabel": "Voucher / direct entry code",
         "voucherChecking": "Checking voucher…",
+        "addressLookupLoading": "Looking up address…",
         "voucherValid": "Voucher is valid.",
         "voucherInvalid": "Voucher code is invalid or not applicable.",
         "voucherInvoiceForced": "Due to the voucher, the invoice address has been set automatically.",
