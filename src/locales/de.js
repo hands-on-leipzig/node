@@ -44,6 +44,7 @@ export default {
         "enrollFuture": "Future Edition",
         "teamDetail": "Team",
         "classDetail": "Klasse",
+        "groupDetail": "Gruppe",
         "adminDocuments": "Dokumente (Admin)",
         "adminTranslations": "Übersetzungen (Admin)",
         "logOut": "Abmelden"
@@ -243,6 +244,8 @@ export default {
         "noEnrollmentsYet": "Noch keine Anmeldungen. Registriere unten ein Team oder eine Klasse.",
         "actionRequired": "Aktion nötig",
         "payInvoice": "Rechnung bezahlen",
+        "registeredEntities": "Deine Anmeldungen",
+        "noRegisteredEntities": "Noch keine Anmeldungen vorhanden.",
         "teams": "Teams",
         "classes": "Klassen",
         "team": "Team",

@@ -44,6 +44,7 @@ export default {
         "enrollFuture": "Future edition",
         "teamDetail": "Team",
         "classDetail": "Class",
+        "groupDetail": "Group",
         "adminDocuments": "Documents (admin)",
         "adminTranslations": "Translations (admin)",
         "logOut": "Log out"
@@ -243,6 +244,8 @@ export default {
         "noEnrollmentsYet": "No enrollments yet. Register a team or class below.",
         "actionRequired": "Action required",
         "payInvoice": "Pay invoice",
+        "registeredEntities": "Your registrations",
+        "noRegisteredEntities": "No registrations yet.",
         "teams": "Teams",
         "classes": "Classes",
         "team": "Team",

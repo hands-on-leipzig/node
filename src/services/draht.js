@@ -50,7 +50,7 @@ handsonApi.interceptors.response.use((response) => response, responseErrorHandle
  * - type '2': no form change; effect is handled later in DRAHT.
  *
  * @param {string} code - Voucher code (e.g. user-entered ref)
- * @param {number} [program] - Optional program id (team: 1=explore, 2=challenge; class: 4 or 5). If omitted, validates without program.
+ * @param {number} [program] - Optional program id (team: 1/2, class: 4/5, future groups: 6/7). If omitted, validates without program.
  * @returns {Promise<{ valid: boolean, voucherType: '1'|'2'|null, invoiceAddressId: number|null, invoiceAddressName: string|null, data: object, message: string }>}
  */
 export async function validateVoucher(code, program = null) {
@@ -134,11 +134,10 @@ export function enrollClass(payload) {
  * Future edition enrollment. Payload includes:
  * group, pupils (8|16|24), seasonSetCount (0–2), registerEventTeams, eventTeamCount, eventTeams[{index, players[]}],
  * pricing.lines[{ productRef, quantity, unitPriceEurPlaceholder }], name, addresses, voucher, …
- * DRAHT should create order from productRef + quantity; ignore placeholder prices when catalog is authoritative.
- * Backend endpoint to be implemented; may return 501 until then.
+ * DRAHT creates a future group (program 6 for 5-8, program 7 for 8-16).
  */
 export function enrollFuture(payload) {
-  return api.post('/future', payload)
+  return api.post('/groups', payload)
 }
 
 /**
@@ -153,6 +152,13 @@ export function listTeams() {
  */
 export function listClasses() {
   return api.get('/classes')
+}
+
+/**
+ * List enrolled future groups for the current coach (GET /handson/node/groups).
+ */
+export function listGroups() {
+  return api.get('/groups')
 }
 
 /**
@@ -251,6 +257,13 @@ export function registerTeamForEvent(teamId, eventId) {
  */
 export function getClass(id) {
   return api.get('/classes/' + encodeURIComponent(id))
+}
+
+/**
+ * Get a single future group by id (for detail view).
+ */
+export function getGroup(id) {
+  return api.get('/groups/' + encodeURIComponent(id))
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
-import { listTeams, listClasses } from '@/services/draht'
+import { listTeams, listClasses, listGroups } from '@/services/draht'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +21,7 @@ const sidebarOpen = ref(false)
 const profileMenuOpen = ref(false)
 const teams = ref([])
 const classes = ref([])
+const groups = ref([])
 const sidebarLoading = ref(false)
 
 const navItems = computed(() => {
@@ -45,9 +46,10 @@ const navItems = computed(() => {
 async function loadSidebarLists() {
   sidebarLoading.value = true
   try {
-    const [teamsRes, classesRes] = await Promise.allSettled([
+    const [teamsRes, classesRes, groupsRes] = await Promise.allSettled([
       listTeams(),
       listClasses(),
+      listGroups(),
     ])
     if (teamsRes.status === 'fulfilled' && teamsRes.value?.data) {
       const d = teamsRes.value.data
@@ -56,6 +58,10 @@ async function loadSidebarLists() {
     if (classesRes.status === 'fulfilled' && classesRes.value?.data) {
       const d = classesRes.value.data
       classes.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    }
+    if (groupsRes.status === 'fulfilled' && groupsRes.value?.data) {
+      const d = groupsRes.value.data
+      groups.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
     }
   } finally {
     sidebarLoading.value = false
@@ -72,6 +78,11 @@ function classFlyoutLabel(cls) {
   const ref = cls.ref || '#' + cls.id
   return name + ' ' + ref
 }
+function groupFlyoutLabel(group) {
+  const name = group.name || t('dashboard.editionFuture')
+  const ref = group.ref || '#' + group.id
+  return name + ' ' + ref
+}
 function goTeam(id) {
   closeSidebar()
   router.push({ name: 'team-detail', params: { id } })
@@ -80,11 +91,18 @@ function goClass(id) {
   closeSidebar()
   router.push({ name: 'class-detail', params: { id } })
 }
+function goGroup(id) {
+  closeSidebar()
+  router.push({ name: 'group-detail', params: { id } })
+}
 function isTeamActive(id) {
   return route.name === 'team-detail' && route.params.id === String(id)
 }
 function isClassActive(id) {
   return route.name === 'class-detail' && route.params.id === String(id)
+}
+function isGroupActive(id) {
+  return route.name === 'group-detail' && route.params.id === String(id)
 }
 
 function isActive(item) {
@@ -202,6 +220,12 @@ const userInitials = computed(() => {
               <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
             </span>
             <span class="flyout">{{ classFlyoutLabel(cls) }}</span>
+          </div>
+          <div v-for="group in groups" :key="'group-' + group.id" class="sidebar-item sidebar-entry" :class="{ active: isGroupActive(group.id) }" :title="groupFlyoutLabel(group)" @click="goGroup(group.id)">
+            <span class="sidebar-item-icon">
+              <i class="bi bi-stars" aria-hidden="true"></i>
+            </span>
+            <span class="flyout">{{ groupFlyoutLabel(group) }}</span>
           </div>
         </template>
       </nav>

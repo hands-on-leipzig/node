@@ -411,7 +411,7 @@ async function loadFutureEventsNearest() {
   try {
     const country = formData.value.country?.trim() || undefined
     const zip = formData.value.zip?.trim() || undefined
-    const program = futureGroup.value || undefined
+    const program = futureGroup.value === '8' ? 7 : (futureGroup.value === '5' ? 6 : undefined)
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
@@ -513,8 +513,9 @@ function formatSubmitError(e) {
 
 /**
  * Apply preset from voucher/direct-entry API response.
- * Expected data (when API supports it): edition ('founders'|'future'), program (1|2|4|5),
- * or for future: group ('5'|'8'), pupils (number). Program: 1=Explore team, 2=Challenge team, 4=Explore class, 5=Challenge class.
+ * Expected data (when API supports it): edition ('founders'|'future'), program (1|2|4|5|6|7),
+ * or for future: group ('5'|'8'), pupils (number).
+ * Program: 1=Explore team, 2=Challenge team, 4=Explore class, 5=Challenge class, 6=Future 5-8, 7=Future 8-16.
  */
 function applyVoucherPreset(data) {
   if (!data || typeof data !== 'object') return
@@ -530,6 +531,11 @@ function applyVoucherPreset(data) {
     return
   }
   const program = data.program
+  if (program === 6 || program === 7) {
+    edition.value = 'future'
+    futureGroup.value = program === 7 ? '8' : '5'
+    return
+  }
   if (program === 1 || program === 2 || program === 4 || program === 5) {
     edition.value = 'founders'
     foundersVariant.value = program === 1 || program === 4 ? 'explore' : 'challenge'
@@ -1980,6 +1986,7 @@ watch(
 
 @media (max-width: 960px) {
   .wizard-modal {
+    height: 100dvh;
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
@@ -1992,21 +1999,136 @@ watch(
   .wizard-panel {
     min-height: 0;
   }
+  .wizard-footer .btn {
+    min-height: 2.75rem;
+  }
 }
 
 @media (max-width: 640px) {
+  .wizard-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .wizard-modal {
+    height: 100dvh;
+  }
   .wizard-header,
   .wizard-body,
   .wizard-footer {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
   }
+  .wizard-panel-main {
+    --wizard-footer-safe: 8.25rem;
+  }
   .wizard-message {
     margin-left: 1.25rem;
     margin-right: 1.25rem;
   }
   .wizard-hero {
-    padding: 1.75rem 1.25rem;
+    padding: 1rem 1.25rem;
+  }
+  .wizard-hero-content {
+    gap: 0.75rem;
+  }
+  .wizard-hero h2 {
+    font-size: 1.4rem;
+  }
+  .wizard-hero-text {
+    font-size: 0.92rem;
+    line-height: 1.35;
+  }
+  .wizard-path {
+    display: none;
+  }
+  .wizard-body {
+    padding-top: 1rem;
+  }
+  .wizard-step {
+    min-height: 5rem;
+  }
+  .wizard-options.wizard-options-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+  .wizard-option {
+    width: 100%;
+    min-height: 5.5rem;
+    padding: 1rem 1rem;
+    border-radius: 0.85rem;
+    font-size: 1rem;
+  }
+  .wizard-option-main {
+    font-size: 1.1rem;
+  }
+  .wizard-option-desc {
+    font-size: 0.9rem;
+  }
+  .wizard-counter {
+    width: 100%;
+    justify-content: center;
+  }
+  .wizard-participant-row.wizard-participant-header {
+    display: none;
+  }
+  .wizard-participant-row:not(.wizard-participant-header) {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-bg-elevated);
+  }
+  .wizard-participant-remove {
+    justify-self: end;
+  }
+  .wizard-step-form input,
+  .wizard-step-form textarea,
+  .wizard-step-form select {
+    font-size: 1rem;
+    padding: 1.2rem 0.9rem 0.72rem;
+  }
+  .wizard-step-form label {
+    left: 0.9rem;
+    top: 1rem;
+    font-size: 0.95rem;
+  }
+  .wizard-step-form .field.filled label,
+  .wizard-step-form .field:focus-within label {
+    top: 0.4rem;
+    font-size: 0.74rem;
+  }
+  .wizard-cart-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.75rem;
+  }
+  .wizard-footer {
+    gap: 0.5rem;
+  }
+  .wizard-footer .btn {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0.8rem 0.9rem;
+    font-size: 0.95rem;
+  }
+  .wizard-footer .btn .bi {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .wizard-header,
+  .wizard-body,
+  .wizard-footer {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+  .wizard-footer {
+    flex-wrap: wrap;
+  }
+  .wizard-footer .btn {
+    width: 100%;
   }
 }
 </style>

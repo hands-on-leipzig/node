@@ -2,7 +2,8 @@
  * Enrollment options shown on the dashboard.
  * Founders: type 'team'|'class', program (backend id).
  * Future: type 'future', group '5'|'8' (group 5+ or 8+); user then chooses 8, 16 or 24 pupils.
- * Program ids: 1 = Explore team, 2 = Challenge team, 4 = Explore class, 5 = Challenge class.
+ * Program ids: 1 = Explore team, 2 = Challenge team, 4 = Explore class, 5 = Challenge class,
+ * 6 = Future group 5-8, 7 = Future group 8-16.
  */
 export const ENROLLMENT_OPTIONS = [
   // Founders edition

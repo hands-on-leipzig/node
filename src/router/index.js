@@ -50,6 +50,12 @@ const routes = [
         meta: { titleKey: 'nav.classDetail' },
       },
       {
+        path: 'group/:id',
+        name: 'group-detail',
+        component: () => import('@/views/GroupDetailView.vue'),
+        meta: { titleKey: 'nav.groupDetail' },
+      },
+      {
         path: 'admin/documents',
         name: 'admin-documents',
         component: () => import('@/views/AdminDocumentsView.vue'),
