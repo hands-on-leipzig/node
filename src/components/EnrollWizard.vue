@@ -39,7 +39,7 @@ const futurePupils = ref(null)
 const futurePupilsMode = ref(null) // 'preset' | 'custom'
 const futurePupilsCustom = ref(40)
 // Future: optional on-site event registration (+100€)
-const futureOnSiteEvent = ref(null) // null | 'yes' | 'no' | 'skip'
+const futureOnSiteEvent = ref(null) // null | 'yes' | 'later'
 const futureEventId = ref(null)
 const futureEvents = ref([])
 const futureEventsLoading = ref(false)
@@ -94,16 +94,20 @@ const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
 )
 
-const totalSteps = computed(() => {
-  // Future: 6 content steps. Founders team: 7 (no voucher step). Founders class: 5 (no voucher step).
-  const contentSteps =
-    edition.value === 'future' ? 6 : foundersTeamHasParticipantsStep.value ? 7 : 5
-  return 1 + contentSteps // Step 0 (voucher?) + rest
+const lastStep = computed(() => {
+  // Step indexes: future ends at 6, founders class at 6, founders team at 8.
+  if (edition.value === 'future') return 6
+  if (foundersTeamHasParticipantsStep.value) return 8
+  if (edition.value === 'founders') return 6
+  // Before edition is selected only voucher + edition are reachable.
+  return 1
 })
 
+const totalSteps = computed(() => lastStep.value + 1)
+
 const progress = computed(() => {
-  if (totalSteps.value <= 1) return 0
-  return Math.round((step.value / (totalSteps.value - 1)) * 100)
+  if (lastStep.value <= 0) return 0
+  return Math.round((step.value / lastStep.value) * 100)
 })
 
 const stepTitle = computed(() => {
@@ -378,7 +382,7 @@ function next() {
     loadFounderTeamEvents()
     loadFounderTeamEventsNearest()
   }
-  if (step.value < totalSteps.value) step.value++
+  if (step.value < lastStep.value) step.value++
 }
 
 function prev() {
@@ -718,6 +722,21 @@ watch(foundersType, (val) => {
   if (step.value === 3 && edition.value !== 'future') next()
 })
 
+watch(futureOnSiteEvent, (val) => {
+  if (!props.open || edition.value !== 'future') return
+  if (step.value !== 5) return
+  if (val === 'later') {
+    futureEventId.value = null
+    next()
+  }
+})
+
+watch(futureEventId, (val) => {
+  if (!props.open || edition.value !== 'future') return
+  if (step.value !== 5) return
+  if (futureOnSiteEvent.value === 'yes' && val) next()
+})
+
 watch(
   () => [formData.value.country, formData.value.zip],
   () => {
@@ -1046,7 +1065,6 @@ watch(
             <div class="wizard-step-voucher-inner wizard-step-onsite-event">
               <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
               <p class="wizard-hint"><I18nText k="wizard.onSiteEventHint" /></p>
-              <p class="wizard-hint wizard-hint-skip"><I18nText k="wizard.onSiteEventSkipHint" /></p>
               <div class="wizard-options wizard-options-stack">
                 <button
                   type="button"
@@ -1083,17 +1101,8 @@ watch(
                 <button
                   type="button"
                   class="wizard-option wizard-option-card"
-                  :class="{ active: futureOnSiteEvent === 'no' }"
-                  @click="futureOnSiteEvent = 'no'; futureEventId = null"
-                >
-                  <div class="wizard-option-main"><I18nText k="wizard.onSiteEventNo" /></div>
-                  <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventNoDesc" /></div>
-                </button>
-                <button
-                  type="button"
-                  class="wizard-option wizard-option-card"
-                  :class="{ active: futureOnSiteEvent === 'skip' }"
-                  @click="futureOnSiteEvent = 'skip'; futureEventId = null"
+                  :class="{ active: futureOnSiteEvent === 'later' }"
+                  @click="futureOnSiteEvent = 'later'; futureEventId = null"
                 >
                   <div class="wizard-option-main"><I18nText k="wizard.onSiteEventSkip" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventSkipDesc" /></div>
@@ -1248,7 +1257,7 @@ watch(
             <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
               <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
             </button>
-            <button v-if="step < totalSteps" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
+            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
               <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
             </button>
             <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
@@ -1988,16 +1997,26 @@ watch(
   .wizard-modal {
     height: 100dvh;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
+  /* Full-screen mobile mode: hide large hero column */
   .wizard-hero {
-    padding: 2rem;
-  }
-  .wizard-hero-content {
-    max-width: none;
+    display: none;
   }
   .wizard-panel {
     min-height: 0;
+    height: 100dvh;
+  }
+  .wizard-header {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    background: var(--color-bg);
+    padding: 0.6rem 1rem 0.45rem;
+  }
+  .wizard-close {
+    width: 2.4rem;
+    height: 2.4rem;
   }
   .wizard-footer .btn {
     min-height: 2.75rem;
@@ -2019,30 +2038,14 @@ watch(
     padding-right: 1.25rem;
   }
   .wizard-panel-main {
-    --wizard-footer-safe: 8.25rem;
+    --wizard-footer-safe: 7.25rem;
   }
   .wizard-message {
     margin-left: 1.25rem;
     margin-right: 1.25rem;
   }
-  .wizard-hero {
-    padding: 1rem 1.25rem;
-  }
-  .wizard-hero-content {
-    gap: 0.75rem;
-  }
-  .wizard-hero h2 {
-    font-size: 1.4rem;
-  }
-  .wizard-hero-text {
-    font-size: 0.92rem;
-    line-height: 1.35;
-  }
-  .wizard-path {
-    display: none;
-  }
   .wizard-body {
-    padding-top: 1rem;
+    padding-top: 0.75rem;
   }
   .wizard-step {
     min-height: 5rem;
@@ -2105,6 +2108,8 @@ watch(
   }
   .wizard-footer {
     gap: 0.5rem;
+    padding-top: 0.65rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   }
   .wizard-footer .btn {
     flex: 1 1 0;

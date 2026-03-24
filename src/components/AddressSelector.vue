@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomSelect from '@/components/CustomSelect.vue'
 
@@ -28,6 +28,18 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+const zipSuggestions = ref([])
+const streetSuggestions = ref([])
+const zipLoading = ref(false)
+const streetLoading = ref(false)
+const zipQuery = ref('')
+const streetQuery = ref('')
+
+let zipDebounceTimer = null
+let streetDebounceTimer = null
+let zipAbortController = null
+let streetAbortController = null
+
 const addressOptions = computed(() =>
   props.addresses.map((addr) => ({
     value: addr.id,
@@ -37,6 +49,17 @@ const addressOptions = computed(() =>
 
 /** Strict boolean — avoids radios stuck when useExisting is undefined/null. */
 const isExistingMode = computed(() => props.modelValue.useExisting !== false)
+
+const countryOptions = computed(() => {
+  const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+    ? new Intl.DisplayNames(['de', 'en'], { type: 'region' })
+    : null
+  const toLabel = (code) => (displayNames ? displayNames.of(code.toUpperCase()) : code.toUpperCase())
+  const top = ['de', 'at', 'ch']
+  const extra = ['fr', 'it', 'nl', 'be', 'pl', 'cz', 'sk', 'hu', 'si', 'hr', 'es', 'pt', 'gb', 'ie']
+  const all = [...top, ...extra]
+  return all.map((c) => ({ value: c, label: toLabel(c) || c.toUpperCase() }))
+})
 
 function formatAddress(addr) {
   if (!addr) return ''
@@ -76,6 +99,146 @@ function setNewField(field, value) {
   })
 }
 
+function clearAutocompleteState() {
+  zipSuggestions.value = []
+  streetSuggestions.value = []
+  zipLoading.value = false
+  streetLoading.value = false
+  zipQuery.value = ''
+  streetQuery.value = ''
+  if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
+  if (streetDebounceTimer) clearTimeout(streetDebounceTimer)
+  if (zipAbortController) zipAbortController.abort()
+  if (streetAbortController) streetAbortController.abort()
+}
+
+function onCountryChange(value) {
+  setNewField('country', value)
+  zipSuggestions.value = []
+  streetSuggestions.value = []
+}
+
+function onZipInput(value) {
+  setNewField('postalCode', value)
+  zipQuery.value = value || ''
+  zipSuggestions.value = []
+  if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
+  const country = (props.modelValue.new?.country || '').toLowerCase()
+  if (!country || !value || String(value).trim().length < 3) return
+  zipDebounceTimer = setTimeout(() => { lookupZip(value, country) }, 260)
+}
+
+async function lookupZip(rawZip, country) {
+  const zip = String(rawZip || '').trim()
+  if (!zip || !country) return
+  if (zipAbortController) zipAbortController.abort()
+  zipAbortController = new AbortController()
+  zipLoading.value = true
+  try {
+    const res = await fetch(`https://api.zippopotam.us/${encodeURIComponent(country)}/${encodeURIComponent(zip)}`, {
+      signal: zipAbortController.signal,
+    })
+    if (!res.ok) {
+      zipSuggestions.value = []
+      return
+    }
+    const data = await res.json()
+    const places = Array.isArray(data?.places) ? data.places : []
+    const normalized = places.map((p) => ({
+      postalCode: data['post code'] || zip,
+      city: p['place name'] || '',
+      state: p.state || '',
+      country,
+    }))
+    const seen = new Set()
+    zipSuggestions.value = normalized.filter((s) => {
+      const key = `${s.postalCode}|${s.city}|${s.state}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }).slice(0, 6)
+  } catch (_) {
+    zipSuggestions.value = []
+  } finally {
+    zipLoading.value = false
+  }
+}
+
+function applyZipSuggestion(item) {
+  setNewField('postalCode', item.postalCode || props.modelValue.new?.postalCode || '')
+  if (item.city) setNewField('city', item.city)
+  zipSuggestions.value = []
+}
+
+function onStreetInput(value) {
+  setNewField('street', value)
+  streetQuery.value = value || ''
+  streetSuggestions.value = []
+  if (streetDebounceTimer) clearTimeout(streetDebounceTimer)
+  const q = String(value || '').trim()
+  if (q.length < 3) return
+  streetDebounceTimer = setTimeout(() => { lookupStreet(q) }, 280)
+}
+
+async function lookupStreet(street) {
+  const country = (props.modelValue.new?.country || '').toLowerCase()
+  const zip = (props.modelValue.new?.postalCode || '').trim()
+  const city = (props.modelValue.new?.city || '').trim()
+  const qParts = [street, zip, city].filter(Boolean)
+  if (qParts.length === 0) return
+  const q = qParts.join(', ')
+  if (streetAbortController) streetAbortController.abort()
+  streetAbortController = new AbortController()
+  streetLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      addressdetails: '1',
+      limit: '6',
+      q,
+    })
+    if (country) params.set('countrycodes', country)
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      signal: streetAbortController.signal,
+    })
+    if (!res.ok) {
+      streetSuggestions.value = []
+      return
+    }
+    const list = await res.json()
+    const items = Array.isArray(list) ? list : []
+    streetSuggestions.value = items.map((it) => {
+      const a = it.address || {}
+      const road = a.road || a.pedestrian || a.footway || a.path || a.cycleway || ''
+      const houseNo = a.house_number || ''
+      const st = [road, houseNo].filter(Boolean).join(' ').trim() || street
+      const zipCode = a.postcode || zip || ''
+      const town = a.city || a.town || a.village || a.hamlet || city || ''
+      const countryCode = (a.country_code || country || '').toLowerCase()
+      return {
+        label: it.display_name || st,
+        street: st,
+        postalCode: zipCode,
+        city: town,
+        country: countryCode,
+      }
+    })
+  } catch (_) {
+    streetSuggestions.value = []
+  } finally {
+    streetLoading.value = false
+  }
+}
+
+function applyStreetSuggestion(item) {
+  if (item.street) setNewField('street', item.street)
+  if (item.postalCode) setNewField('postalCode', item.postalCode)
+  if (item.city) setNewField('city', item.city)
+  if (item.country) setNewField('country', item.country)
+  streetSuggestions.value = []
+  zipSuggestions.value = []
+}
+
 function onExistingKeydown(e) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
@@ -99,6 +262,10 @@ function onNewKeydown(e) {
     document.getElementById(`${props.idPrefix}-mode-existing`)?.focus()
   }
 }
+
+onBeforeUnmount(() => {
+  clearAutocompleteState()
+})
 </script>
 
 <template>
@@ -171,22 +338,56 @@ function onNewKeydown(e) {
       <div class="address-fields">
         <div class="field">
           <label :for="idPrefix + '-street'"><I18nText k="enroll.street" /></label>
-          <input
-            :id="idPrefix + '-street'"
-            type="text"
-            :value="modelValue.new?.street"
-            @input="setNewField('street', $event.target.value)"
-          />
+          <div class="autocomplete-wrap">
+            <input
+              :id="idPrefix + '-street'"
+              type="text"
+              :value="modelValue.new?.street"
+              @input="onStreetInput($event.target.value)"
+            />
+            <div v-if="streetLoading" class="autocomplete-state">
+              <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.voucherChecking') }}
+            </div>
+            <div v-else-if="streetSuggestions.length" class="autocomplete-list" role="listbox">
+              <button
+                v-for="(s, i) in streetSuggestions"
+                :key="idPrefix + '-street-s-' + i"
+                type="button"
+                class="autocomplete-item"
+                @click="applyStreetSuggestion(s)"
+              >
+                <span class="autocomplete-item-main">{{ s.street }}</span>
+                <span class="autocomplete-item-sub">{{ s.postalCode }} {{ s.city }}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="field-row">
           <div class="field">
             <label :for="idPrefix + '-postalCode'"><I18nText k="enroll.postalCode" /></label>
-            <input
-              :id="idPrefix + '-postalCode'"
-              type="text"
-              :value="modelValue.new?.postalCode"
-              @input="setNewField('postalCode', $event.target.value)"
-            />
+            <div class="autocomplete-wrap">
+              <input
+                :id="idPrefix + '-postalCode'"
+                type="text"
+                :value="modelValue.new?.postalCode"
+                @input="onZipInput($event.target.value)"
+              />
+              <div v-if="zipLoading" class="autocomplete-state">
+                <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.voucherChecking') }}
+              </div>
+              <div v-else-if="zipSuggestions.length" class="autocomplete-list" role="listbox">
+                <button
+                  v-for="(s, i) in zipSuggestions"
+                  :key="idPrefix + '-zip-s-' + i"
+                  type="button"
+                  class="autocomplete-item"
+                  @click="applyZipSuggestion(s)"
+                >
+                  <span class="autocomplete-item-main">{{ s.postalCode }} {{ s.city }}</span>
+                  <span v-if="s.state" class="autocomplete-item-sub">{{ s.state }}</span>
+                </button>
+              </div>
+            </div>
           </div>
           <div class="field field-flex">
             <label :for="idPrefix + '-city'"><I18nText k="enroll.city" /></label>
@@ -198,14 +399,16 @@ function onNewKeydown(e) {
             />
           </div>
         </div>
-        <div class="field">
+        <div class="field field-select">
           <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
-          <input
+          <select
             :id="idPrefix + '-country'"
-            type="text"
-            :value="modelValue.new?.country"
-            @input="setNewField('country', $event.target.value)"
-          />
+            :value="(modelValue.new?.country || '').toLowerCase()"
+            @change="onCountryChange($event.target.value)"
+          >
+            <option value=""><I18nText k="enroll.selectCountry" /></option>
+            <option v-for="opt in countryOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
         </div>
       </div>
     </template>
@@ -361,7 +564,22 @@ function onNewKeydown(e) {
   background: var(--color-bg-elevated);
   color: var(--color-text);
 }
+.address-fields select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  min-height: var(--touch);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--text-base);
+  font-family: inherit;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
 .address-fields input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+.address-fields select:focus {
   outline: none;
   border-color: var(--color-accent);
 }
@@ -374,5 +592,65 @@ function onNewKeydown(e) {
 }
 .field-row .field-flex {
   flex: 2;
+}
+.autocomplete-wrap {
+  position: relative;
+}
+.autocomplete-state {
+  margin-top: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.autocomplete-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 13rem;
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.autocomplete-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.autocomplete-item + .autocomplete-item {
+  border-top: 1px solid var(--color-border);
+}
+.autocomplete-item:hover {
+  background: var(--color-bg-hover);
+}
+.autocomplete-item-main {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+.autocomplete-item-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.field-select {
+  margin-bottom: 0.95rem;
+}
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 620px) {
+  .field-row {
+    flex-direction: column;
+    gap: 0.6rem;
+  }
 }
 </style>
