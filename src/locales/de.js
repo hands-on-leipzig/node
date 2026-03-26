@@ -397,7 +397,7 @@ export default {
         "stepOrder": "Bestellübersicht",
         "stepAddresses": "Adressen",
         "voucherCodeQuestion": "Hast du einen Voucher-Code?",
-        "voucherCodeHint": "Mit einem gültigen Code werden Programm, Anzahl Teilnehmende usw. automatisch vorausgewählt.",
+        "voucherCodeHint": "Ein Voucher-Code wird bei Förderprogrammen oder externer Abrechnung vergeben. Er legt Programm, Leistungen und Kostenübernahme fest.",
         "voucherCodeYes": "Ja, ich habe einen Code",
         "voucherCodeYesDesc": "Code eingeben – Programm und Optionen werden automatisch gesetzt.",
         "voucherCodeNo": "Nein, ich wähle selbst",
