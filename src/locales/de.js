@@ -396,7 +396,7 @@ export default {
         "stepOnSiteEvent": "Event vor Ort",
         "stepOrder": "Bestellübersicht",
         "stepAddresses": "Adressen",
-        "voucherCodeQuestion": "Hast du einen Voucher- oder Direkteinstiegs-Code?",
+        "voucherCodeQuestion": "Hast du einen Voucher-Code?",
         "voucherCodeHint": "Mit einem gültigen Code werden Programm, Anzahl Teilnehmende usw. automatisch vorausgewählt.",
         "voucherCodeYes": "Ja, ich habe einen Code",
         "voucherCodeYesDesc": "Code eingeben – Programm und Optionen werden automatisch gesetzt.",
