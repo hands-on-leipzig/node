@@ -11,6 +11,7 @@ import logoFirstFllV from '@/assets/first+fll_v.png'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
+import logoFounders from '@/assets/first_canopy_fll_founders_edition_rgb_fullcolor.png'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -279,7 +280,7 @@ async function lookupZipCityState() {
   }
 }
 
-const foundersLogos = [{ src: logoFirstFllV, alt: 'FIRST LEGO League' }]
+const foundersLogos = [{ src: logoFounders, alt: 'Founders Edition' }]
 
 const futureLogos = [{ src: logoFuture, alt: 'Future Edition' }]
 
@@ -911,12 +912,12 @@ watch(
             <template v-else>
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="foundersVariant = 'explore'">
-                  <img :src="logoFllExploreV" alt="" class="wizard-option-logo" />
+                  <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionExplore" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionExploreDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="foundersVariant = 'challenge'">
-                  <img :src="logoFllChallengeV" alt="" class="wizard-option-logo" />
+                  <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionChallenge" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionChallengeDesc" /></div>
                 </button>
