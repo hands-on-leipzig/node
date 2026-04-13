@@ -34,10 +34,8 @@ const edition = ref(null) // 'founders' | 'future'
 // Step 2: Future = group '5'|'8', Founders = variant 'explore'|'challenge'
 const futureGroup = ref(null)
 const foundersVariant = ref(null)
-// Step 3: Future = pupils 8|16|24, Founders = type 'team'|'class'
+// Step 3: Future = pupils 8|16|24|32, Founders = type 'team'|'class'
 const futurePupils = ref(null)
-const futurePupilsMode = ref(null) // 'preset' | 'custom'
-const futurePupilsCustom = ref(40)
 // Future: optional on-site event registration (+100€)
 const futureOnSiteEvent = ref(null) // null | 'yes' | 'later'
 const futureEventId = ref(null)
@@ -89,6 +87,7 @@ const submitting = ref(false)
 const error = ref(null)
 const success = ref(false)
 const successMessage = ref('')
+const step4ValidationAttempted = ref(false)
 
 const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
@@ -104,10 +103,48 @@ const lastStep = computed(() => {
 })
 
 const totalSteps = computed(() => lastStep.value + 1)
+const addressStep = computed(() => {
+  if (edition.value === 'future') return 6
+  if (foundersTeamHasParticipantsStep.value) return 7
+  if (edition.value === 'founders') return 5
+  return null
+})
+const reviewStep = computed(() => {
+  if (edition.value === 'future') return 6
+  if (foundersTeamHasParticipantsStep.value) return 8
+  if (edition.value === 'founders') return 6
+  return null
+})
 
 const progress = computed(() => {
   if (lastStep.value <= 0) return 0
   return Math.round((step.value / lastStep.value) * 100)
+})
+
+const wizardProgressSteps = computed(() => {
+  const steps = [
+    {
+      key: 'wizard.progressChoose',
+      active: step.value <= 3,
+      done: step.value > 3,
+    },
+    {
+      key: 'wizard.progressDetails',
+      active: step.value === 4,
+      done: step.value > 4,
+    },
+    {
+      key: 'wizard.progressAddresses',
+      active: addressStep.value != null && step.value === addressStep.value,
+      done: addressStep.value != null && step.value > addressStep.value,
+    },
+    {
+      key: 'wizard.progressReview',
+      active: reviewStep.value != null && step.value === reviewStep.value,
+      done: success.value,
+    },
+  ]
+  return steps.map((s, idx) => ({ ...s, index: idx + 1, label: t(s.key) }))
 })
 
 const stepTitle = computed(() => {
@@ -133,20 +170,7 @@ const stepTitle = computed(() => {
 })
 
 function selectFuturePupils(num) {
-  futurePupilsMode.value = 'preset'
   futurePupils.value = num
-}
-
-function selectFuturePupilsMore() {
-  futurePupilsMode.value = 'custom'
-  if (!futurePupilsCustom.value || futurePupilsCustom.value < 40) futurePupilsCustom.value = 40
-  futurePupils.value = futurePupilsCustom.value
-}
-
-function adjustFuturePupils(delta) {
-  const nextVal = Math.max(40, (futurePupilsCustom.value || 40) + delta)
-  futurePupilsCustom.value = nextVal
-  futurePupils.value = nextVal
 }
 
 const summaryItems = computed(() => {
@@ -266,7 +290,6 @@ function chooseNoVoucher() {
 
 function selectEdition(val) {
   edition.value = val
-  if (step.value === 1) next()
 }
 
 function openWizard() {
@@ -275,7 +298,6 @@ function openWizard() {
   futureGroup.value = null
   foundersVariant.value = null
   futurePupils.value = null
-  futurePupilsMode.value = null
   futureOnSiteEvent.value = null
   futureEventId.value = null
   futureEvents.value = []
@@ -295,6 +317,7 @@ function openWizard() {
   step.value = 0
   error.value = null
   success.value = false
+  step4ValidationAttempted.value = false
 }
 
 function close() {
@@ -303,6 +326,28 @@ function close() {
 
 function isFilled(value) {
   return value !== null && value !== undefined && String(value).trim() !== ''
+}
+
+function isStep4RequiredFieldMissing(field) {
+  const requiresSchoolDetails = edition.value === 'future' || foundersType.value === 'class'
+  const requiresLocation = edition.value === 'future' || foundersType.value === 'class' || foundersType.value === 'team'
+
+  if (field === 'name') return edition.value !== 'future' && !formData.value.name?.trim()
+  if (field === 'organization') return requiresSchoolDetails && !formData.value.organization?.trim()
+  if (field === 'schoolType') return requiresSchoolDetails && !formData.value.schoolType
+  if (field === 'country') return requiresLocation && !formData.value.country?.trim()
+  if (field === 'zip') return requiresLocation && !formData.value.zip?.trim()
+  return false
+}
+
+function hasRequiredSchoolFields() {
+  return !(
+    isStep4RequiredFieldMissing('name')
+    || isStep4RequiredFieldMissing('organization')
+    || isStep4RequiredFieldMissing('schoolType')
+    || isStep4RequiredFieldMissing('country')
+    || isStep4RequiredFieldMissing('zip')
+  )
 }
 
 function addFounderParticipant() {
@@ -345,7 +390,7 @@ function canNext() {
   if (step.value === 1) return edition.value != null
   if (step.value === 2) return edition.value === 'future' ? futureGroup.value != null : foundersVariant.value != null
   if (step.value === 3) return edition.value === 'future' ? futurePupils.value != null : foundersType.value != null
-  if (step.value === 4) return edition.value === 'future' ? true : !!formData.value.name?.trim()
+  if (step.value === 4) return hasRequiredSchoolFields()
   if (step.value === 5 && foundersTeamHasParticipantsStep.value) return true // participants optional
   if (step.value === 5 && edition.value === 'future') {
     if (!futureOnSiteEvent.value) return false
@@ -361,6 +406,10 @@ function canNext() {
 }
 
 function next() {
+  if (step.value === 4 && !hasRequiredSchoolFields()) {
+    step4ValidationAttempted.value = true
+    return
+  }
   if (step.value === 0) {
     step.value = 1
     if (edition.value) {
@@ -383,6 +432,7 @@ function next() {
     loadFounderTeamEventsNearest()
   }
   if (step.value < lastStep.value) step.value++
+  step4ValidationAttempted.value = false
 }
 
 function prev() {
@@ -527,10 +577,8 @@ function applyVoucherPreset(data) {
   if (editionVal === 'future') {
     edition.value = 'future'
     if (data.group === '5' || data.group === '8') futureGroup.value = data.group
-    if (typeof data.pupils === 'number' && data.pupils >= 8) {
+    if (typeof data.pupils === 'number' && FUTURE_PUPIL_OPTIONS.includes(data.pupils)) {
       futurePupils.value = data.pupils
-      futurePupilsMode.value = [8, 16, 32].includes(data.pupils) ? 'preset' : 'custom'
-      if (futurePupilsMode.value === 'custom') futurePupilsCustom.value = data.pupils
     }
     return
   }
@@ -627,8 +675,15 @@ async function submit() {
       if (futureOnSiteEvent.value === 'yes' && futureEventId.value) {
         payload.eventId = futureEventId.value
       }
-      await enrollFuture(payload)
+      const res = await enrollFuture(payload)
+      const createdId = getCreatedId(res)
       successMessage.value = t('wizard.success')
+      if (createdId) {
+        setTimeout(() => {
+          close()
+          router.push({ name: 'group-detail', params: { id: createdId } })
+        }, 1200)
+      }
     } else {
       const isTeam = foundersType.value === 'team'
       const program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
@@ -684,6 +739,7 @@ async function submit() {
     success.value = true
     emit('success')
     if (edition.value === 'future') {
+      // Fallback close when backend does not return created id.
       setTimeout(() => { close() }, 1500)
     }
   } catch (e) {
@@ -695,31 +751,6 @@ async function submit() {
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) openWizard()
-})
-
-watch(edition, (val) => {
-  if (!props.open || !val) return
-  if (step.value === 1) next()
-})
-
-watch(futureGroup, (val) => {
-  if (!props.open || !val) return
-  if (step.value === 2 && edition.value === 'future') next()
-})
-
-watch(foundersVariant, (val) => {
-  if (!props.open || !val) return
-  if (step.value === 2 && edition.value !== 'future') next()
-})
-
-watch(futurePupils, (val) => {
-  if (!props.open || val == null) return
-  if (step.value === 3 && edition.value === 'future' && futurePupilsMode.value !== 'custom') next()
-})
-
-watch(foundersType, (val) => {
-  if (!props.open || !val) return
-  if (step.value === 3 && edition.value !== 'future') next()
 })
 
 watch(futureOnSiteEvent, (val) => {
@@ -772,6 +803,20 @@ watch(
               <span :style="{ width: `${progress}%` }"></span>
             </div>
             <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
+          </div>
+          <div class="wizard-hero-stepper">
+            <p class="wizard-hero-stepper-title"><I18nText k="wizard.progressTitle" /></p>
+            <ol class="wizard-hero-stepper-list">
+              <li
+                v-for="item in wizardProgressSteps"
+                :key="item.key"
+                class="wizard-hero-stepper-item"
+                :class="{ done: item.done, active: item.active }"
+              >
+                <span class="wizard-hero-stepper-index">{{ item.index }}</span>
+                <span>{{ item.label }}</span>
+              </li>
+            </ol>
           </div>
           <div class="wizard-hero-hint">
             <i class="bi bi-lightning-charge-fill"></i>
@@ -830,18 +875,18 @@ watch(
           <!-- Step 1: Edition -->
           <div v-show="step === 1" class="wizard-step wizard-step-animate">
             <div class="wizard-options wizard-options-two">
-              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'founders' }" @click="selectEdition('founders')">
-                <div class="wizard-option-main"><I18nText k="dashboard.editionFounders" /></div>
-                <div class="wizard-option-desc"><I18nText k="wizard.editionFoundersDesc" /></div>
-                <div class="wizard-option-logos">
-                  <img v-for="logo in foundersLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
-                </div>
-              </button>
               <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'future' }" @click="selectEdition('future')">
                 <div class="wizard-option-main"><I18nText k="dashboard.editionFuture" /></div>
                 <div class="wizard-option-desc"><I18nText k="wizard.editionFutureDesc" /></div>
                 <div class="wizard-option-logos wizard-option-logos-single">
                   <img v-for="logo in futureLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
+                </div>
+              </button>
+              <button type="button" class="wizard-option wizard-option-card" :class="{ active: edition === 'founders' }" @click="selectEdition('founders')">
+                <div class="wizard-option-main"><I18nText k="dashboard.editionFounders" /></div>
+                <div class="wizard-option-desc"><I18nText k="wizard.editionFoundersDesc" /></div>
+                <div class="wizard-option-logos">
+                  <img v-for="logo in foundersLogos" :key="logo.src" :src="logo.src" :alt="logo.alt" loading="lazy" />
                 </div>
               </button>
             </div>
@@ -880,34 +925,21 @@ watch(
           </div>
 
           <!-- Step 3: Future = pupils, Founders = Team/Class -->
-          <div v-show="step === 3" class="wizard-step wizard-step-animate">
+          <div v-show="step === 3" class="wizard-step wizard-step-animate" :class="{ 'wizard-step-pupils': edition === 'future' }">
             <template v-if="edition === 'future'">
               <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
               <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
               <div class="wizard-options wizard-options-three wizard-options-grid">
                 <button
-                  v-for="num in [8, 16, 32]"
+                  v-for="num in FUTURE_PUPIL_OPTIONS"
                   :key="num"
                   type="button"
                   class="wizard-option"
-                  :class="{ active: futurePupils === num && futurePupilsMode !== 'custom' }"
+                  :class="{ active: futurePupils === num }"
                   @click="selectFuturePupils(num)"
                 >
                   {{ num }}
                 </button>
-                <button
-                  type="button"
-                  class="wizard-option"
-                  :class="{ active: futurePupilsMode === 'custom' }"
-                  @click="selectFuturePupilsMore"
-                >
-                  <I18nText k="wizard.morePupils" />
-                </button>
-              </div>
-              <div v-if="futurePupilsMode === 'custom'" class="wizard-counter">
-                <button type="button" class="wizard-counter-btn" :disabled="futurePupilsCustom <= 40" @click="adjustFuturePupils(-8)">-</button>
-                <span class="wizard-counter-value">{{ futurePupilsCustom }}</span>
-                <button type="button" class="wizard-counter-btn" @click="adjustFuturePupils(8)">+</button>
               </div>
             </template>
             <template v-else>
@@ -928,36 +960,43 @@ watch(
 
           <!-- Step 4: Form data -->
           <div v-show="step === 4" class="wizard-step wizard-step-form wizard-step-animate">
-            <div v-if="edition !== 'future'" class="field" :class="{ filled: isFilled(formData.name) }">
+            <p class="wizard-form-section-title"><I18nText k="wizard.formRequiredSection" /></p>
+            <p class="wizard-hint wizard-hint-compact"><I18nText k="wizard.requiredLegend" /></p>
+            <div v-if="edition !== 'future'" class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
               <input v-model="formData.name" type="text" placeholder=" " />
               <label>
                 <I18nText v-if="foundersType === 'team'" k="enrollTeam.teamName" />
                 <I18nText v-else k="enrollClass.className" />
                 <span class="required">*</span>
               </label>
+              <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('name')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
             </div>
             <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
               <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
               <label><I18nText k="enrollTeam.schoolClub" /></label>
             </div>
             <template v-if="foundersType === 'class' || edition === 'future'">
-              <div class="field" :class="{ filled: isFilled(formData.organization) }">
+              <div class="field" :class="{ filled: isFilled(formData.organization), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('organization') }">
                 <input v-model="formData.organization" type="text" placeholder=" " />
-                <label><I18nText k="enroll.schoolName" /></label>
+                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
-              <div class="field field-select">
-                <label><I18nText k="enroll.schoolType" /></label>
+              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType') }">
+                <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
                 <select v-model="formData.schoolType">
+                  <option value="" disabled><I18nText k="schoolTypes.none" /></option>
                   <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
                     {{ t(opt.labelKey) }}
                   </option>
                 </select>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
             </template>
             <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
-              <div class="field field-select">
-                <label><I18nText k="enroll.schoolCountry" /></label>
+              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('country') }">
+                <label><I18nText k="enroll.schoolCountry" /> <span class="required">*</span></label>
                 <select v-model="formData.country">
+                  <option value="" disabled><I18nText k="enroll.selectCountry" /></option>
                   <optgroup :label="t('enroll.countriesTop')">
                     <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </optgroup>
@@ -965,15 +1004,18 @@ watch(
                     <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </optgroup>
                 </select>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('country')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
-              <div class="field" :class="{ filled: isFilled(formData.zip) }">
+              <div class="field" :class="{ filled: isFilled(formData.zip), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('zip') }">
                 <input v-model="formData.zip" type="text" placeholder=" " />
-                <label><I18nText k="enroll.schoolZip" /></label>
+                <label><I18nText k="enroll.schoolZip" /> <span class="required">*</span></label>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('zip')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
               <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
                 <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
             </template>
+            <p class="wizard-form-section-title wizard-form-section-title-optional"><I18nText k="wizard.formOptionalSection" /></p>
             <template v-if="foundersType === 'class'">
               <div class="field" :class="{ filled: isFilled(formData.grade) }">
                 <input v-model="formData.grade" type="text" placeholder=" " />
@@ -1166,6 +1208,14 @@ watch(
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            <div class="wizard-next-steps">
+              <h4><I18nText k="wizard.nextStepsTitle" /></h4>
+              <ul>
+                <li><I18nText k="wizard.nextStepsItemCreated" /></li>
+                <li><I18nText k="wizard.nextStepsItemManage" /></li>
+                <li><I18nText k="wizard.nextStepsItemStatus" /></li>
+              </ul>
+            </div>
           </div>
 
           <!-- Step 5: Addresses (Founders class) / Step 7: Addresses (Founder team) – voucher available at checkout here -->
@@ -1242,6 +1292,14 @@ watch(
               </div>
             </div>
             <p class="wizard-hint"><I18nText k="wizard.orderReviewHint" /></p>
+            <div class="wizard-next-steps">
+              <h4><I18nText k="wizard.nextStepsTitle" /></h4>
+              <ul>
+                <li><I18nText k="wizard.nextStepsItemCreated" /></li>
+                <li><I18nText k="wizard.nextStepsItemManage" /></li>
+                <li><I18nText k="wizard.nextStepsItemStatus" /></li>
+              </ul>
+            </div>
           </div>
             </div>
 
@@ -1257,10 +1315,10 @@ watch(
             <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
               <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
             </button>
-            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="!canNext()" @click="next">
+            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== 4 && !canNext()" @click="next">
               <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
             </button>
-            <button v-else type="button" class="btn btn-primary" :disabled="submitting || (edition !== 'future' && !formData.name?.trim()) || !areAddressesValid()" @click="submit">
+            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid()" @click="submit">
               <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
               <i v-else class="bi bi-check-lg"></i>
               <I18nText v-if="submitting" k="wizard.submitting" />
@@ -1377,6 +1435,24 @@ watch(
   width: 100%;
   max-width: 36rem;
   margin: 0 auto;
+}
+/* Future pupils step uses vertical flow: heading, subheading, choices */
+.wizard-step-pupils {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.wizard-step-pupils .wizard-question,
+.wizard-step-pupils .wizard-hint {
+  width: 100%;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.wizard-step-pupils .wizard-options {
+  width: 100%;
+  max-width: 36rem;
+  margin: 0.2rem auto 0;
 }
 
 /* Participants step (founder team) */
@@ -1566,6 +1642,21 @@ watch(
   font-size: 0.95rem;
   color: var(--color-text-muted);
 }
+.wizard-hint-compact {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+.wizard-form-section-title {
+  margin: 0.25rem 0 0.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+  font-weight: 700;
+}
+.wizard-form-section-title-optional {
+  margin-top: 0.9rem;
+}
 .wizard-options {
   display: flex;
   flex-wrap: wrap;
@@ -1719,6 +1810,11 @@ watch(
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.6);
 }
+.wizard-step-form .field.invalid input,
+.wizard-step-form .field.invalid textarea,
+.wizard-step-form .field.invalid select {
+  border-color: #dc2626;
+}
 .wizard-step-form label {
   position: absolute;
   left: 1.1rem;
@@ -1771,6 +1867,28 @@ watch(
 .wizard-cart-row strong {
   color: var(--color-text);
   font-weight: 600;
+}
+.wizard-next-steps {
+  margin-top: 0.75rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+.wizard-next-steps h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-subtle);
+}
+.wizard-next-steps ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 .required { color: #dc2626; }
 .field-hint {
@@ -1902,6 +2020,52 @@ watch(
 .wizard-hero-progress {
   display: grid;
   gap: 0.5rem;
+}
+.wizard-hero-stepper {
+  display: grid;
+  gap: 0.45rem;
+}
+.wizard-hero-stepper-title {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.wizard-hero-stepper-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.wizard-hero-stepper-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+  color: rgba(248, 250, 252, 0.82);
+}
+.wizard-hero-stepper-item.active {
+  color: #fff;
+  font-weight: 600;
+}
+.wizard-hero-stepper-item.done {
+  color: rgba(187, 247, 208, 0.95);
+}
+.wizard-hero-stepper-index {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.24);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.wizard-hero-stepper-item.done .wizard-hero-stepper-index {
+  background: rgba(34, 197, 94, 0.35);
 }
 .wizard-progress-bar {
   height: 0.5rem;
@@ -2054,28 +2218,31 @@ watch(
     grid-template-columns: 1fr;
     gap: 0.65rem;
   }
-  /* Future pupils step: compact 2x2 option grid on phones */
+  /* Future pupils step: keep heading at top + large 2x2 choices */
+  .wizard-step-pupils {
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+  .wizard-step-pupils .wizard-question {
+    margin-bottom: 0.45rem;
+  }
+  .wizard-step-pupils .wizard-hint {
+    margin-top: 0;
+    margin-bottom: 0.9rem;
+  }
+  .wizard-step-pupils .wizard-options {
+    margin-top: 0.2rem;
+  }
   .wizard-options-three.wizard-options-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
+    gap: 0.7rem;
   }
   .wizard-options-three .wizard-option {
-    min-height: 4.1rem;
-    padding: 0.75rem 0.6rem;
-    border-radius: 0.7rem;
-    font-size: 0.98rem;
-  }
-  .wizard-options-three .wizard-option:last-child {
-    grid-column: 1 / -1;
-    min-height: 3.8rem;
-  }
-  .wizard-step .wizard-question {
-    margin-bottom: 0.55rem;
-  }
-  .wizard-step .wizard-hint {
-    margin-top: 0.2rem;
-    margin-bottom: 0.8rem;
-    font-size: 0.9rem;
+    min-height: 5.2rem;
+    padding: 1rem 0.8rem;
+    border-radius: 0.85rem;
+    font-size: 1.1rem;
+    font-weight: 600;
   }
   .wizard-option {
     width: 100%;
@@ -2160,9 +2327,6 @@ watch(
   }
   .wizard-options-three.wizard-options-grid {
     grid-template-columns: 1fr;
-  }
-  .wizard-options-three .wizard-option:last-child {
-    grid-column: auto;
   }
 }
 </style>

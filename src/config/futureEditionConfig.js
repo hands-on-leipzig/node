@@ -6,6 +6,7 @@ export const FUTURE_GROUP_PRODUCT_REFS = {
   8: 'FUTURE_GROUP_P8',
   16: 'FUTURE_GROUP_P16',
   24: 'FUTURE_GROUP_P24',
+  32: 'FUTURE_GROUP_P32',
 }
 
 /** Gruppenanmeldung (Hauptposition) – EUR placeholder */
@@ -13,6 +14,7 @@ export const FUTURE_GROUP_PRICE_EUR = {
   8: 250,
   16: 350,
   24: 450,
+  32: 550,
 }
 
 export const FUTURE_SEASON_SET_PRODUCT_REF = 'FUTURE_SEASONSET'
@@ -24,14 +26,15 @@ export const FUTURE_TEAM_EVENT_PRODUCT_REF = 'FUTURE_TEAM_EVENT'
 export const FUTURE_TEAM_EVENT_UNIT_EUR = 100
 
 /** Zulässige Teilnehmerzahlen pro Gruppe (CRM-Logik) */
-export const FUTURE_PUPIL_COUNTS = [8, 16, 24]
+export const FUTURE_PUPIL_COUNTS = [8, 16, 24, 32]
 
 /**
  * Max. Teams für Event-Anmeldung je nach Gruppengröße.
- * 8 → 1, 16 → 2, 24 → 3
+ * 8 → 1, 16 → 2, 24 → 3, 32 → 4
  */
 export function futureMaxEventTeams(pupilCount) {
   if (pupilCount <= 8) return 1
   if (pupilCount <= 16) return 2
-  return 3
+  if (pupilCount <= 24) return 3
+  return 4
 }
