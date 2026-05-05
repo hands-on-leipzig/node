@@ -2,7 +2,7 @@
 /* Locale — updated via DRAHT POST node/translations-pr */
 export default {
     "common": {
-        "appName": "node",
+        "appName": "",
         "tagline": "haNds On Technology – Dashboard und Anmeldung",
         "coach": "Coach",
         "save": "Speichern",
@@ -229,7 +229,7 @@ export default {
         "registerEventFailed": "Anmeldung für das Event fehlgeschlagen."
     },
     "dashboard": {
-        "cockpitTitle": "Coach-Cockpit",
+        "cockpitTitle": "Mein Dashboard",
         "cockpitSubtitle": "Überblick über offene Aufgaben, Anmeldungen und Termine.",
         "tasksToDo": "Offene Aufgaben",
         "checkingTasks": "Aufgaben werden geprüft…",
@@ -283,7 +283,8 @@ export default {
         "optionFoundersClassChallenge": "Klasse Challenge",
         "optionFutureGroup5": "Gruppe 5 - 7 Jahre",
         "optionFutureGroup8": "Gruppe 8 - 16 Jahre",
-        "optionCta": "Anmelden →"
+        "optionCta": "Anmelden →",
+        "addCoCoachButton": "Co-Coach verknüpfen"
     },
     "enrollFuture": {
         "title": "Future Edition",
