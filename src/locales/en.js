@@ -38,7 +38,7 @@ export default {
         "signInWithSso": "Sign in with SSO"
     },
     "nav": {
-        "dashboard": "Dashboard",
+        "dashboard": "My dashboard",
         "login": "Sign in",
         "enrollTeam": "Register team",
         "enrollClass": "Register class",
@@ -400,7 +400,7 @@ export default {
         "voucherCodeQuestion": "Do you have a voucher code?",
         "voucherCodeHint": "A voucher code is issued by HANDS on TECHNOLOGY as part of funding programs or external billing. It defines the program, included services, and cost coverage.",
         "voucherCodeYes": "Yes, I have a voucher.",
-        "voucherCodeYesDesc": "Enter your code – program and options will be set automatically.",
+        "voucherCodeYesDesc": "Enter code – program and options will be set automatically.",
         "voucherCodeNo": "No, I am registering without a voucher.",
         "voucherCodeNoDesc": "Select edition, program, and all options in the next step.",
         "voucherCodeBack": "Back to choice",
