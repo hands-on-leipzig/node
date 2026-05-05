@@ -207,7 +207,7 @@ export default {
         "requestEventChange": "Änderung der Veranstaltung anfragen"
     },
     "dashboard": {
-        "cockpitTitle": "Coach-Cockpit",
+        "cockpitTitle": "LÖSCHEN",
         "cockpitSubtitle": "Überblick über offene Aufgaben, Anmeldungen und Termine.",
         "tasksToDo": "Offene Aufgaben",
         "checkingTasks": "Aufgaben werden geprüft…",
