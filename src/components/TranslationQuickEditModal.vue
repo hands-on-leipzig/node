@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import enSource from '@/locales/en.js'
 import deSource from '@/locales/de.js'
@@ -15,43 +15,91 @@ const { t } = useI18n()
 
 const valEn = ref('')
 const valDe = ref('')
-const initialEn = ref('')
-const initialDe = ref('')
+const lastSavedEn = ref('')
+const lastSavedDe = ref('')
+
+let autosaveTimer = null
+let hydrating = false
+
+function clearAutosaveTimer() {
+  if (autosaveTimer != null) {
+    clearTimeout(autosaveTimer)
+    autosaveTimer = null
+  }
+}
+
+function flushDraftsForKey(key) {
+  if (!key) return
+  if (valEn.value !== lastSavedEn.value) {
+    patchLocaleDraft('en', key, valEn.value)
+    lastSavedEn.value = valEn.value
+  }
+  if (valDe.value !== lastSavedDe.value) {
+    patchLocaleDraft('de', key, valDe.value)
+    lastSavedDe.value = valDe.value
+  }
+}
+
+function scheduleAutosave() {
+  clearAutosaveTimer()
+  autosaveTimer = setTimeout(() => {
+    autosaveTimer = null
+    if (!translationQuickEditOpen.value) return
+    flushDraftsForKey(translationQuickEditKey.value)
+  }, 300)
+}
 
 function loadValues() {
   const key = translationQuickEditKey.value
   if (!key) return
+  hydrating = true
+  clearAutosaveTimer()
   const d = loadAllLocaleDrafts()
   const flatEn = { ...flattenLocaleStrings(deepCloneLocale(enSource)), ...d.en }
   const flatDe = { ...flattenLocaleStrings(deepCloneLocale(deSource)), ...d.de }
   valEn.value = flatEn[key] ?? ''
   valDe.value = flatDe[key] ?? ''
-  initialEn.value = valEn.value
-  initialDe.value = valDe.value
+  lastSavedEn.value = valEn.value
+  lastSavedDe.value = valDe.value
+  hydrating = false
 }
 
 watch(
   () => [translationQuickEditOpen.value, translationQuickEditKey.value],
-  ([open]) => {
+  ([open, key], [prevOpen, prevKey]) => {
+    if (prevOpen && prevKey && (!open || key !== prevKey)) {
+      flushDraftsForKey(prevKey)
+      clearAutosaveTimer()
+    }
     if (open) loadValues()
   }
 )
 
-function save() {
-  const key = translationQuickEditKey.value
-  if (!key) return
-  if (valEn.value !== initialEn.value) {
-    patchLocaleDraft('en', key, valEn.value)
-  }
-  if (valDe.value !== initialDe.value) {
-    patchLocaleDraft('de', key, valDe.value)
-  }
+watch([valEn, valDe], () => {
+  if (!translationQuickEditOpen.value || hydrating) return
+  scheduleAutosave()
+})
+
+function closeModal() {
+  clearAutosaveTimer()
+  flushDraftsForKey(translationQuickEditKey.value)
   closeTranslationQuickEdit()
 }
 
-function onBackdrop(e) {
-  if (e.target === e.currentTarget) closeTranslationQuickEdit()
+function save() {
+  closeModal()
 }
+
+function onBackdrop(e) {
+  if (e.target === e.currentTarget) closeModal()
+}
+
+onBeforeUnmount(() => {
+  clearAutosaveTimer()
+  if (translationQuickEditOpen.value) {
+    flushDraftsForKey(translationQuickEditKey.value)
+  }
+})
 </script>
 
 <template>
@@ -67,7 +115,7 @@ function onBackdrop(e) {
       <div class="tqem-dialog" @click.stop>
         <header class="tqem-head">
           <h2 id="tqem-title" class="tqem-title">{{ t('common.translationQuickEditTitle') }}</h2>
-          <button type="button" class="tqem-close" :aria-label="t('common.closeDialog')" @click="closeTranslationQuickEdit">
+          <button type="button" class="tqem-close" :aria-label="t('common.closeDialog')" @click="closeModal">
             <i class="bi bi-x-lg" aria-hidden="true" />
           </button>
         </header>
@@ -85,7 +133,7 @@ function onBackdrop(e) {
           </label>
         </div>
         <footer class="tqem-foot">
-          <button type="button" class="tqem-btn tqem-btn-ghost" @click="closeTranslationQuickEdit">
+          <button type="button" class="tqem-btn tqem-btn-ghost" @click="closeModal">
             {{ t('common.cancel') }}
           </button>
           <button type="button" class="tqem-btn tqem-btn-primary" @click="save">

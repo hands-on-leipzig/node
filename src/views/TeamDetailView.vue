@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getTeam, getEvents, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
@@ -8,6 +8,7 @@ import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { t, locale } = useI18n()
 const team = ref(null)
 const loading = ref(true)
@@ -200,6 +201,17 @@ async function persistPlayers() {
   }
 }
 
+function scrollToCoCoachesSection() {
+  if (route.query.focus !== 'coCoaches' || loading.value || !team.value) return
+  nextTick(() => {
+    document.getElementById('team-co-coaches-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function dismissCoCoachBanner() {
+  router.replace({ name: 'team-detail', params: { id: id.value }, query: {} })
+}
+
 async function fetchTeam() {
   if (!id.value) return
   loading.value = true
@@ -213,6 +225,7 @@ async function fetchTeam() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
+    if (team.value) scrollToCoCoachesSection()
   }
 }
 
@@ -276,6 +289,13 @@ watch(id, async () => {
   await fetchTeam()
   loadEvents()
 })
+
+watch(
+  () => route.query.focus,
+  () => {
+    if (team.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
 </script>
 
 <template>
@@ -463,7 +483,15 @@ watch(id, async () => {
           <div v-if="savingPlayers" class="detail-saving-hint"><I18nText k="dashboard.loading" /></div>
         </div>
 
-        <h4 class="detail-subsection-title"><I18nText k="detail.coCoaches" /></h4>
+        <div id="team-co-coaches-anchor" class="detail-co-coaches-wrap">
+          <div v-if="route.query.focus === 'coCoaches'" class="detail-co-coach-banner" role="note">
+            <p class="detail-co-coach-banner-text"><I18nText k="teamDetail.coCoachFocusBanner" /></p>
+            <button type="button" class="detail-btn detail-btn-ghost detail-co-coach-banner-dismiss" @click="dismissCoCoachBanner">
+              <I18nText k="teamDetail.coCoachFocusDismiss" />
+            </button>
+          </div>
+          <h4 class="detail-subsection-title"><I18nText k="detail.coCoaches" /></h4>
+        </div>
         <p v-if="!(team.co_coaches && team.co_coaches.length) && !(team.manual_co_coaches && team.manual_co_coaches.length)" class="detail-empty-hint"><I18nText k="detail.noData" /></p>
         <template v-else>
           <p v-if="team.co_coaches && team.co_coaches.length" class="detail-coaches">
@@ -603,6 +631,35 @@ watch(id, async () => {
   font-size: var(--text-base);
   color: var(--color-text-muted);
   margin: 0;
+}
+.detail-co-coaches-wrap {
+  scroll-margin-top: 5rem;
+}
+.detail-co-coach-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-accent-soft);
+}
+.detail-co-coach-banner-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.45;
+  flex: 1;
+  min-width: 12rem;
+}
+.detail-co-coach-banner-dismiss {
+  flex-shrink: 0;
+}
+.detail-co-coaches-wrap .detail-subsection-title {
+  margin-top: 0;
 }
 .detail-subsection-title {
   font-size: var(--text-sm);

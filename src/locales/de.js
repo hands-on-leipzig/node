@@ -212,7 +212,9 @@ export default {
         "registering": "Wird angemeldet…",
         "registerEventSuccess": "Team wurde für das Event angemeldet.",
         "registerEventFailed": "Anmeldung für das Event fehlgeschlagen.",
-        "requestEventChange": "Änderung der Veranstaltung anfragen"
+        "requestEventChange": "Änderung der Veranstaltung anfragen",
+        "coCoachFocusBanner": "Hier findest du die Co-Trainer zu diesem Team. Änderungen und neue Einträge werden über die Geschäftsstelle in DRAHT gepflegt.",
+        "coCoachFocusDismiss": "Hinweis ausblenden"
     },
     "groupDetail": {
         "event": "Veranstaltung",
@@ -227,7 +229,7 @@ export default {
         "registerEventFailed": "Anmeldung für das Event fehlgeschlagen."
     },
     "dashboard": {
-        "cockpitTitle": "LÖSCHEN",
+        "cockpitTitle": "Coach-Cockpit",
         "cockpitSubtitle": "Überblick über offene Aufgaben, Anmeldungen und Termine.",
         "tasksToDo": "Offene Aufgaben",
         "checkingTasks": "Aufgaben werden geprüft…",
@@ -449,6 +451,10 @@ export default {
         "progressChoose": "Auswahl treffen",
         "progressDetails": "Daten eingeben",
         "progressAddresses": "Adressen bestätigen",
+        "progressOnSite": "Event vor Ort",
+        "progressCheckout": "Bestellung & Adressen",
+        "progressParticipants": "Teilnehmende",
+        "progressEvent": "Event",
         "progressReview": "Prüfen & absenden",
         "formRequiredSection": "Pflichtangaben",
         "formOptionalSection": "Optionale Angaben",

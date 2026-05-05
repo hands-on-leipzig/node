@@ -14,8 +14,34 @@ const { t } = useI18n()
 const router = useRouter()
 
 const wizardOpen = ref(false)
+const coCoachModalOpen = ref(false)
+const selectedTeamId = ref('')
+
 function openWizard() {
   wizardOpen.value = true
+}
+function openCoCoachModal() {
+  coCoachModalOpen.value = true
+  const list = teams.value
+  if (list.length === 1) {
+    selectedTeamId.value = String(list[0].id)
+  } else if (list.length > 1) {
+    selectedTeamId.value = String(list[0].id)
+  } else {
+    selectedTeamId.value = ''
+  }
+}
+function closeCoCoachModal() {
+  coCoachModalOpen.value = false
+}
+function goToCoCoachTeamPage() {
+  const id = selectedTeamId.value
+  if (!id) return
+  closeCoCoachModal()
+  router.push({ name: 'team-detail', params: { id }, query: { focus: 'coCoaches' } })
+}
+function teamSelectLabel(team) {
+  return team.name || team.label || team.ref || '#' + team.id
 }
 function onWizardClose() {
   wizardOpen.value = false
@@ -161,10 +187,16 @@ const hasDocumentTreeContent = computed(() => {
             <I18nText k="dashboard.registerNew" />
           </h2>
           <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
-          <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
-            <i class="bi bi-magic"></i>
-            <span><I18nText k="wizard.ctaButton" /></span>
-          </button>
+          <div class="dashboard-register-actions">
+            <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
+              <i class="bi bi-magic"></i>
+              <span><I18nText k="wizard.ctaButton" /></span>
+            </button>
+            <button type="button" class="dashboard-cta-coach" @click="openCoCoachModal">
+              <i class="bi bi-person-plus" aria-hidden="true" />
+              <span><I18nText k="dashboard.addCoCoachButton" /></span>
+            </button>
+          </div>
         </section>
 
         <!-- Section: Tasks to do (only teams/classes with action required) -->
@@ -264,6 +296,57 @@ const hasDocumentTreeContent = computed(() => {
         </section>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="coCoachModalOpen"
+        class="co-coach-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('dashboard.addCoCoachModalTitle')"
+        @click.self="closeCoCoachModal"
+      >
+        <div class="co-coach-modal-dialog" @click.stop>
+          <header class="co-coach-modal-head">
+            <h2 class="co-coach-modal-title"><I18nText k="dashboard.addCoCoachModalTitle" /></h2>
+            <button type="button" class="co-coach-modal-close" :aria-label="t('dashboard.addCoCoachClose')" @click="closeCoCoachModal">
+              <i class="bi bi-x-lg" aria-hidden="true" />
+            </button>
+          </header>
+          <div class="co-coach-modal-body">
+            <template v-if="teams.length === 0">
+              <p class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachNoTeams" /></p>
+            </template>
+            <template v-else>
+              <p class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachModalLead" /></p>
+              <label v-if="teams.length > 1" class="co-coach-modal-label">
+                <span><I18nText k="dashboard.addCoCoachChooseTeam" /></span>
+                <select v-model="selectedTeamId" class="co-coach-modal-select">
+                  <option v-for="tm in teams" :key="tm.id" :value="String(tm.id)">
+                    {{ teamSelectLabel(tm) }}
+                  </option>
+                </select>
+              </label>
+              <p class="co-coach-modal-note"><I18nText k="dashboard.addCoCoachModalNote" /></p>
+            </template>
+          </div>
+          <footer class="co-coach-modal-foot">
+            <button type="button" class="co-coach-modal-btn co-coach-modal-btn-ghost" @click="closeCoCoachModal">
+              <I18nText k="dashboard.addCoCoachClose" />
+            </button>
+            <button
+              v-if="teams.length > 0"
+              type="button"
+              class="co-coach-modal-btn co-coach-modal-btn-primary"
+              :disabled="!selectedTeamId"
+              @click="goToCoCoachTeamPage"
+            >
+              <I18nText k="dashboard.addCoCoachGo" />
+            </button>
+          </footer>
+        </div>
+      </div>
+    </Teleport>
 
     <EnrollWizard :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
   </div>
@@ -513,6 +596,179 @@ const hasDocumentTreeContent = computed(() => {
 
 .dashboard-cta .bi {
   font-size: 1.1rem;
+}
+
+.dashboard-register-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.dashboard-cta-coach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.15rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dashboard-cta-coach:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.dashboard-cta-coach .bi {
+  font-size: 1.05rem;
+}
+
+.co-coach-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10040;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.co-coach-modal-dialog {
+  width: 100%;
+  max-width: 26rem;
+  max-height: min(90vh, 520px);
+  overflow: auto;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.co-coach-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.co-coach-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.co-coach-modal-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  line-height: 1;
+}
+
+.co-coach-modal-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.co-coach-modal-body {
+  padding: 1rem;
+}
+
+.co-coach-modal-text,
+.co-coach-modal-note {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.co-coach-modal-note {
+  margin-bottom: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-subtle);
+}
+
+.co-coach-modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.co-coach-modal-select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  font-size: var(--text-sm);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.co-coach-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.co-coach-modal-btn {
+  padding: 0.45rem 0.9rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+}
+
+.co-coach-modal-btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.co-coach-modal-btn-ghost:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+
+.co-coach-modal-btn-primary {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.co-coach-modal-btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.co-coach-modal-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* Upcoming events */

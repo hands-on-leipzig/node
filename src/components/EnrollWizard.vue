@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEvents, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
@@ -111,48 +111,53 @@ const lastStep = computed(() => {
 })
 
 const totalSteps = computed(() => lastStep.value + 1)
-const addressStep = computed(() => {
-  if (edition.value === 'future') return 6
-  if (foundersTeamHasParticipantsStep.value) return 7
-  if (edition.value === 'founders') return 5
-  return null
-})
-const reviewStep = computed(() => {
-  if (edition.value === 'future') return 6
-  if (foundersTeamHasParticipantsStep.value) return 8
-  if (edition.value === 'founders') return 6
-  return null
-})
 
+/** Matches the step label (step+1)/(last+1): first screen > 0% and final screen = 100%. */
 const progress = computed(() => {
-  if (lastStep.value <= 0) return 0
-  return Math.round((step.value / lastStep.value) * 100)
+  const last = lastStep.value
+  if (last < 0) return 0
+  return Math.min(100, Math.round(((step.value + 1) / (last + 1)) * 100))
 })
 
 const wizardProgressSteps = computed(() => {
-  const steps = [
-    {
-      key: 'wizard.progressChoose',
-      active: step.value <= 3,
-      done: step.value > 3,
-    },
-    {
-      key: 'wizard.progressDetails',
-      active: step.value === 4,
-      done: step.value > 4,
-    },
-    {
-      key: 'wizard.progressAddresses',
-      active: addressStep.value != null && step.value === addressStep.value,
-      done: addressStep.value != null && step.value > addressStep.value,
-    },
-    {
-      key: 'wizard.progressReview',
-      active: reviewStep.value != null && step.value === reviewStep.value,
-      done: success.value,
-    },
-  ]
-  return steps.map((s, idx) => ({ ...s, index: idx + 1, label: t(s.key) }))
+  const s = step.value
+  const withIndex = (items) => items.map((it, idx) => ({ ...it, index: idx + 1, label: t(it.key) }))
+
+  if (!edition.value) {
+    return withIndex([
+      { key: 'wizard.progressChoose', active: s <= 1, done: false },
+      { key: 'wizard.progressDetails', active: false, done: false },
+      { key: 'wizard.progressAddresses', active: false, done: false },
+      { key: 'wizard.progressReview', active: false, done: false },
+    ])
+  }
+
+  if (edition.value === 'future') {
+    return withIndex([
+      { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
+      { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
+      { key: 'wizard.progressOnSite', active: s === 5, done: s > 5 },
+      { key: 'wizard.progressCheckout', active: s === 6, done: success.value },
+    ])
+  }
+
+  if (foundersTeamHasParticipantsStep.value) {
+    return withIndex([
+      { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
+      { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
+      { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
+      { key: 'wizard.progressEvent', active: s === 6, done: s > 6 },
+      { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
+      { key: 'wizard.progressReview', active: s === 8, done: success.value },
+    ])
+  }
+
+  return withIndex([
+    { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
+    { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
+    { key: 'wizard.progressAddresses', active: s === 5, done: s > 5 },
+    { key: 'wizard.progressReview', active: s === 6, done: success.value },
+  ])
 })
 
 const stepTitle = computed(() => {
@@ -177,8 +182,18 @@ const stepTitle = computed(() => {
   return ''
 })
 
+function scheduleAdvanceIfReady(expectedStep) {
+  nextTick(() => {
+    if (!props.open) return
+    if (step.value !== expectedStep) return
+    if (!canNext()) return
+    next()
+  })
+}
+
 function selectFuturePupils(num) {
   futurePupils.value = num
+  scheduleAdvanceIfReady(3)
 }
 
 const summaryItems = computed(() => {
@@ -298,6 +313,22 @@ function chooseNoVoucher() {
 
 function selectEdition(val) {
   edition.value = val
+  scheduleAdvanceIfReady(1)
+}
+
+function selectFutureGroup(val) {
+  futureGroup.value = val
+  scheduleAdvanceIfReady(2)
+}
+
+function selectFoundersVariant(val) {
+  foundersVariant.value = val
+  scheduleAdvanceIfReady(2)
+}
+
+function selectFoundersType(val) {
+  foundersType.value = val
+  scheduleAdvanceIfReady(3)
 }
 
 function openWizard() {
@@ -773,6 +804,12 @@ async function onVoucherBlur() {
         voucherPresetInvoiceId: voucherPresetInvoiceId.value,
       },
     })
+
+    if (result.valid && voucherValid.value === true && props.open && step.value === 0 && hasVoucherCode.value === 'yes') {
+      nextTick(() => {
+        if (canNext()) next()
+      })
+    }
   } catch (err) {
     voucherValid.value = false
     voucherMessage.value = t('enroll.voucherInvalid')
@@ -926,6 +963,12 @@ watch(futureEventId, (val) => {
   if (futureOnSiteEvent.value === 'yes' && val) next()
 })
 
+watch(founderTeamEventId, (val) => {
+  if (!props.open || !foundersTeamHasParticipantsStep.value) return
+  if (step.value !== 6) return
+  if (val) nextTick(() => next())
+})
+
 watch(
   () => [formData.value.country, formData.value.zip],
   () => {
@@ -956,26 +999,29 @@ watch(
               <span class="wizard-path-label">{{ item.label }}</span>
             </div>
           </div>
-          <div class="wizard-hero-progress">
-            <div class="wizard-progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
-              <span :style="{ width: `${progress}%` }"></span>
+          <!-- Progress only after voucher step: totalSteps/edition are unknown until then. -->
+          <template v-if="step > 0">
+            <div class="wizard-hero-progress">
+              <div class="wizard-progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
+                <span :style="{ width: `${progress}%` }"></span>
+              </div>
+              <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
             </div>
-            <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
-          </div>
-          <div class="wizard-hero-stepper">
-            <p class="wizard-hero-stepper-title"><I18nText k="wizard.progressTitle" /></p>
-            <ol class="wizard-hero-stepper-list">
-              <li
-                v-for="item in wizardProgressSteps"
-                :key="item.key"
-                class="wizard-hero-stepper-item"
-                :class="{ done: item.done, active: item.active }"
-              >
-                <span class="wizard-hero-stepper-index">{{ item.index }}</span>
-                <span>{{ item.label }}</span>
-              </li>
-            </ol>
-          </div>
+            <div class="wizard-hero-stepper">
+              <p class="wizard-hero-stepper-title"><I18nText k="wizard.progressTitle" /></p>
+              <ol class="wizard-hero-stepper-list">
+                <li
+                  v-for="item in wizardProgressSteps"
+                  :key="item.key"
+                  class="wizard-hero-stepper-item"
+                  :class="{ done: item.done, active: item.active }"
+                >
+                  <span class="wizard-hero-stepper-index">{{ item.index }}</span>
+                  <span>{{ item.label }}</span>
+                </li>
+              </ol>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -1050,12 +1096,12 @@ watch(
           <div v-show="step === 2" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
               <div class="wizard-options wizard-options-two">
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '5' }" @click="futureGroup = '5'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '5' }" @click="selectFutureGroup('5')">
                   <img :src="logoFuture" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup5" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.futureGroup5Desc" /></div>
                 </button>
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '8' }" @click="futureGroup = '8'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '8' }" @click="selectFutureGroup('8')">
                   <img :src="logoFuture" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup8" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.futureGroup8Desc" /></div>
@@ -1064,12 +1110,12 @@ watch(
             </template>
             <template v-else>
               <div class="wizard-options wizard-options-two">
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="foundersVariant = 'explore'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="selectFoundersVariant('explore')">
                   <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionExplore" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionExploreDesc" /></div>
                 </button>
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="foundersVariant = 'challenge'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="selectFoundersVariant('challenge')">
                   <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionChallenge" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionChallengeDesc" /></div>
@@ -1098,12 +1144,12 @@ watch(
             </template>
             <template v-else>
               <div class="wizard-options wizard-options-two">
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="foundersType = 'team'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="selectFoundersType('team')">
                   <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
                 </button>
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="foundersType = 'class'">
+                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="selectFoundersType('class')">
                   <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>

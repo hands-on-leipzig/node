@@ -397,7 +397,9 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
     <main class="main">
       <header class="header">
         <RouterLink to="/dashboard" class="header-brand" @click="closeSidebar">
-          <img src="@/assets/hot.png" alt="" class="header-logo" />
+          <span class="header-logo-wrap">
+            <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="header-logo" />
+          </span>
           <span class="header-app-name"><I18nText k="common.appName" /></span>
         </RouterLink>
       </header>
@@ -814,12 +816,31 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
   background: var(--color-bg-hover);
   color: var(--color-text);
 }
+.header-brand:hover .header-logo-wrap {
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
+}
+.header-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--color-bg-muted) 0%, var(--color-bg-elevated) 100%);
+  border: 1px solid var(--color-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
 .header-logo {
-  height: 2rem;
+  height: 2.35rem;
   width: auto;
+  max-height: 2.75rem;
   display: block;
   object-fit: contain;
-  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.06));
 }
 .header-app-name {
   font-size: var(--text-lg);
