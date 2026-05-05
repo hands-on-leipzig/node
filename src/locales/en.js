@@ -48,15 +48,23 @@ export default {
         "groupDetail": "Group",
         "adminDocuments": "Documents (admin)",
         "adminTranslations": "Translations (admin)",
+        "sidebarOpenTeam": "Open team: {name}",
+        "sidebarOpenClass": "Open class: {name}",
+        "sidebarOpenGroup": "Open group: {name}",
+        "sidebarSectionFounders": "Founders enrollments",
+        "sidebarSectionFuture": "Future enrollments",
         "logOut": "Log out"
     },
     "admin": {
         "documentsTitle": "Documents for download",
         "documentsLead": "Add files coaches can open directly (name + link from SharePoint “Copy link”), and optionally a folder link. Listing a SharePoint folder automatically in the app would need Microsoft Graph on the server—this list is maintained here. Saved in DRAHT.",
         "documentsFilesSection": "Files (list for coaches)",
-        "documentsFilesHint": "For each file: paste the download/share URL (https…). Display name is shown in the list; leave blank to use the file name from the URL.",
+        "documentsFilesHint": "For each row: under “Folder” you may enter a path with slashes (e.g. Handbooks/2024) for nested folder accordions on the coach dashboard. Paste the download/share URL (https…). Display name is shown in the list; leave blank to use the file name from the URL.",
         "documentsFileName": "Display name",
         "documentsFileNamePlaceholder": "e.g. Handbuch.pdf",
+        "documentsFileFolder": "Folder",
+        "documentsFileFolderPlaceholder": "e.g. Handbooks",
+        "documentsFileFolderHint": "Use slashes for nested folders (e.g. Handbooks/2024). Leave empty for the root. If Microsoft Graph returns a relative path per file (path field), levels appear automatically in the coach dashboard.",
         "documentsFileUrl": "File URL",
         "documentsFileUrlPlaceholder": "https://…",
         "documentsAddFile": "Add file",
@@ -205,6 +213,18 @@ export default {
         "registerEventSuccess": "Team has been registered for the event.",
         "registerEventFailed": "Registration for the event failed.",
         "requestEventChange": "Request change of event"
+    },
+    "groupDetail": {
+        "event": "Event",
+        "registerForEventHint": "You can register this Future group for an on-site event at any time.",
+        "teamCountHint": "Registered pupils: {pupils}. You can register up to {maxTeams} event team(s) of 8 pupils each.",
+        "selectEvent": "Select event…",
+        "eventTeamsLabel": "Number of event teams (8 pupils each)",
+        "eventCostHint": "Estimated event fee: {cost} EUR (100 EUR per event team).",
+        "registerForEventButton": "Register group for event",
+        "registering": "Registering…",
+        "registerEventSuccess": "Group has been registered for the event.",
+        "registerEventFailed": "Registration for the event failed."
     },
     "dashboard": {
         "cockpitTitle": "LÖSCHEN",

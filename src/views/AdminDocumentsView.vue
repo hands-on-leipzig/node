@@ -13,7 +13,7 @@ const { t } = useI18n()
 const folderUrl = ref('')
 const title = ref('')
 const skipGraphFileListing = ref(false)
-/** @type {import('vue').Ref<Array<{ name: string, url: string }>>} */
+/** @type {import('vue').Ref<Array<{ name: string, url: string, folder: string }>>} */
 const files = ref([])
 const loading = ref(true)
 const saving = ref(false)
@@ -73,6 +73,7 @@ async function load() {
         ? list.map((r) => ({
             name: String(r?.name ?? '').trim(),
             url: String(r?.url ?? '').trim(),
+            folder: String(r?.folder ?? r?.group ?? '').trim(),
           }))
         : [emptyRow()]
   } catch (e) {
@@ -103,6 +104,7 @@ function payloadFiles() {
     .map((r) => ({
       name: r.name.trim(),
       url: r.url.trim(),
+      folder: r.folder.trim(),
     }))
     .filter((r) => r.url && /^https?:\/\//i.test(r.url))
 }
@@ -203,6 +205,7 @@ async function save() {
         ? list.map((r) => ({
             name: String(r?.name ?? '').trim(),
             url: String(r?.url ?? '').trim(),
+            folder: String(r?.folder ?? r?.group ?? '').trim(),
           }))
         : [emptyRow()]
     success.value = true
@@ -244,6 +247,7 @@ onMounted(load)
         <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsFilesHint" /></p>
         <div class="admin-files-head">
           <span class="admin-files-col-name"><I18nText k="admin.documentsFileName" /></span>
+          <span class="admin-files-col-folder"><I18nText k="admin.documentsFileFolder" /></span>
           <span class="admin-files-col-url"><I18nText k="admin.documentsFileUrl" /></span>
           <span class="admin-files-col-act" aria-hidden="true" />
         </div>
@@ -254,6 +258,14 @@ onMounted(load)
             class="admin-input admin-input-name"
             :placeholder="t('admin.documentsFileNamePlaceholder')"
             autocomplete="off"
+          />
+          <input
+            v-model="row.folder"
+            type="text"
+            class="admin-input admin-input-folder"
+            :placeholder="t('admin.documentsFileFolderPlaceholder')"
+            autocomplete="off"
+            :title="t('admin.documentsFileFolderHint')"
           />
           <input
             v-model="row.url"
@@ -564,7 +576,7 @@ onMounted(load)
 }
 .admin-files-head {
   display: grid;
-  grid-template-columns: 1fr 2fr 2.25rem;
+  grid-template-columns: 1fr minmax(5.5rem, 0.55fr) 2fr 2.25rem;
   gap: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
@@ -578,18 +590,21 @@ onMounted(load)
   .admin-file-row {
     grid-template-columns: 1fr 2.25rem;
   }
-  .admin-input-name {
+  .admin-input-name,
+  .admin-input-folder,
+  .admin-input-url {
     grid-column: 1 / -1;
   }
 }
 .admin-file-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 2.25rem;
+  grid-template-columns: 1fr minmax(5.5rem, 0.55fr) 2fr 2.25rem;
   gap: 0.5rem;
   align-items: start;
   margin-bottom: 0.5rem;
 }
 .admin-input-name,
+.admin-input-folder,
 .admin-input-url {
   width: 100%;
   min-width: 0;

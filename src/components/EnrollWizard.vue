@@ -70,6 +70,13 @@ const voucherMessage = ref('')
 const voucherType = ref(null)
 const voucherInvoiceId = ref(null)
 const voucherInvoiceName = ref(null)
+/** Optional invoice address from voucher JSON preset (llx_societe / address book id). */
+const voucherPresetInvoiceId = ref(null)
+const voucherPresetInvoiceName = ref(null)
+/** 0|1|2 — maps to seasonSetCount / num_boards in DRAHT payloads. */
+const presetSeasonSetCount = ref(null)
+const presetRegisterEventTeams = ref(null)
+const presetEventTeamCount = ref(null)
 // Founder team: participants (first name, last name, date of birth, gender)
 const founderTeamPlayers = ref([])
 // Founder team: event to register for
@@ -311,6 +318,11 @@ function openWizard() {
   voucherType.value = null
   voucherInvoiceId.value = null
   voucherInvoiceName.value = null
+  voucherPresetInvoiceId.value = null
+  voucherPresetInvoiceName.value = null
+  presetSeasonSetCount.value = null
+  presetRegisterEventTeams.value = null
+  presetEventTeamCount.value = null
   deliveryAddress.value = emptyAddressState()
   invoiceAddress.value = emptyAddressState()
   founderTeamPlayers.value = []
@@ -412,10 +424,15 @@ function next() {
     return
   }
   if (step.value === 0) {
-    step.value = 1
-    if (edition.value) {
-      if (edition.value === 'future' && futureGroup.value) loadAddresses()
-      else if (edition.value !== 'future') loadAddresses()
+    step.value = firstIncompleteEnrollmentStep()
+    if (edition.value === 'future' && futureGroup.value && step.value >= 2) loadAddresses()
+    else if (edition.value === 'founders' && step.value >= 3) loadAddresses()
+    if (step.value >= 4 && edition.value === 'future') {
+      loadFutureEvents()
+      loadFutureEventsNearest()
+    }
+    if (step.value >= 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
+      addFounderParticipant()
     }
     return
   }
@@ -536,6 +553,7 @@ function buildAddressPayload(addr) {
 
 function buildInvoicePayload() {
   if (voucherType.value === '1' && voucherInvoiceId.value != null) return { addressId: voucherInvoiceId.value }
+  if (voucherPresetInvoiceId.value != null) return { addressId: voucherPresetInvoiceId.value }
   return buildAddressPayload(invoiceAddress.value)
 }
 
@@ -547,6 +565,7 @@ function isDeliveryAddressValid() {
 /** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
 function isInvoiceAddressValid() {
   if (voucherType.value === '1') return voucherInvoiceId.value != null
+  if (voucherPresetInvoiceId.value != null) return true
   return !!buildAddressPayload(invoiceAddress.value)
 }
 
@@ -567,37 +586,123 @@ function formatSubmitError(e) {
 }
 
 /**
- * Apply preset from voucher/direct-entry API response.
- * Expected data (when API supports it): edition ('founders'|'future'), program (1|2|4|5|6|7),
- * or for future: group ('5'|'8'), pupils (number).
+ * Apply preset from voucher API `preset` object (or legacy flat body).
+ * edition ('founders'|'future'), program (1|2|4|5|6|7), future: group ('5'|'8'), pupils (number).
  * Program: 1=Explore team, 2=Challenge team, 4=Explore class, 5=Challenge class, 6=Future 5-8, 7=Future 8-16.
  */
-function applyVoucherPreset(data) {
-  if (!data || typeof data !== 'object') return
+function logVoucherDebug(label, payload) {
+  console.info(`[EnrollWizard][voucher] ${label}`, payload)
+}
+
+function applyVoucherPreset(raw) {
+  const data = raw && typeof raw === 'object' && raw.preset && typeof raw.preset === 'object' ? raw.preset : raw
+  if (!data || typeof data !== 'object') {
+    logVoucherDebug('applyVoucherPreset: skipped (no object)', { raw })
+    return
+  }
   const editionVal = data.edition
+  const programNum = data.program != null && data.program !== '' ? Number(data.program) : NaN
+  const program = Number.isFinite(programNum) ? programNum : undefined
+  let presetBranch = 'none'
+
   if (editionVal === 'future') {
     edition.value = 'future'
-    if (data.group === '5' || data.group === '8') futureGroup.value = data.group
-    if (typeof data.pupils === 'number' && FUTURE_PUPIL_OPTIONS.includes(data.pupils)) {
-      futurePupils.value = data.pupils
+    const g = data.group != null ? String(data.group) : ''
+    if (g === '5' || g === '8') futureGroup.value = g
+    const pupilsNum = Number(data.pupils)
+    if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
+      futurePupils.value = pupilsNum
     }
-    return
-  }
-  const program = data.program
-  if (program === 6 || program === 7) {
+    presetBranch = 'edition_future'
+  } else if (program === 6 || program === 7) {
     edition.value = 'future'
     futureGroup.value = program === 7 ? '8' : '5'
-    return
-  }
-  if (program === 1 || program === 2 || program === 4 || program === 5) {
+    const pupilsNum = Number(data.pupils)
+    if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
+      futurePupils.value = pupilsNum
+    }
+    presetBranch = 'program_6_or_7_future'
+  } else if (program === 1 || program === 2 || program === 4 || program === 5) {
     edition.value = 'founders'
     foundersVariant.value = program === 1 || program === 4 ? 'explore' : 'challenge'
     foundersType.value = program === 1 || program === 2 ? 'team' : 'class'
+    presetBranch = 'program_founders_standard'
   } else if (editionVal === 'founders') {
     edition.value = 'founders'
     if (data.variant === 'explore' || data.variant === 'challenge') foundersVariant.value = data.variant
     if (data.type === 'team' || data.type === 'class') foundersType.value = data.type
+    presetBranch = 'edition_founders_fields'
+  } else {
+    presetBranch = 'no_matching_rule'
   }
+
+  const setsNum = data.seasonSetCount != null ? Number(data.seasonSetCount) : (data.num_boards != null ? Number(data.num_boards) : NaN)
+  if ([0, 1, 2].includes(setsNum)) {
+    presetSeasonSetCount.value = setsNum
+  }
+  if (typeof data.registerEventTeams === 'boolean') {
+    presetRegisterEventTeams.value = data.registerEventTeams
+  } else if (data.registerEventTeams == null) {
+    presetRegisterEventTeams.value = null
+  }
+  const etc = Number(data.eventTeamCount)
+  if (Number.isFinite(etc) && etc >= 0) {
+    presetEventTeamCount.value = etc
+  } else if (data.eventTeamCount == null) {
+    presetEventTeamCount.value = null
+  }
+  if (data.futureOnSiteEvent === 'yes' || data.futureOnSiteEvent === 'later') {
+    futureOnSiteEvent.value = data.futureOnSiteEvent
+  }
+  const evId = Number(data.eventId)
+  if (Number.isFinite(evId) && evId > 0) {
+    futureEventId.value = evId
+  }
+  const invId = Number(data.invoiceAddressId)
+  if (Number.isFinite(invId) && invId > 0) {
+    voucherPresetInvoiceId.value = invId
+    voucherPresetInvoiceName.value = data.invoiceAddressName != null ? String(data.invoiceAddressName) : ''
+    invoiceAddress.value = {
+      ...invoiceAddress.value,
+      useExisting: true,
+      addressId: String(invId),
+    }
+  }
+
+  logVoucherDebug('applyVoucherPreset: applied', {
+    presetBranch,
+    inputRaw: raw,
+    parsed: { edition: data.edition, program: data.program, group: data.group, pupils: data.pupils, variant: data.variant, type: data.type },
+    wizardNow: {
+      edition: edition.value,
+      futureGroup: futureGroup.value,
+      futurePupils: futurePupils.value,
+      foundersVariant: foundersVariant.value,
+      foundersType: foundersType.value,
+      presetSeasonSetCount: presetSeasonSetCount.value,
+      presetRegisterEventTeams: presetRegisterEventTeams.value,
+      presetEventTeamCount: presetEventTeamCount.value,
+      futureOnSiteEvent: futureOnSiteEvent.value,
+      futureEventId: futureEventId.value,
+      voucherPresetInvoiceId: voucherPresetInvoiceId.value,
+    },
+  })
+}
+
+/** First wizard step that still needs input after optional voucher preset (1=edition … 4=data). */
+function firstIncompleteEnrollmentStep() {
+  if (!edition.value) return 1
+  if (edition.value === 'future') {
+    if (!futureGroup.value) return 2
+    if (futurePupils.value == null) return 3
+    return 4
+  }
+  if (edition.value === 'founders') {
+    if (!foundersVariant.value) return 2
+    if (!foundersType.value) return 3
+    return 4
+  }
+  return 1
 }
 
 async function onVoucherBlur() {
@@ -608,6 +713,11 @@ async function onVoucherBlur() {
     voucherType.value = null
     voucherInvoiceId.value = null
     voucherInvoiceName.value = null
+    voucherPresetInvoiceId.value = null
+    voucherPresetInvoiceName.value = null
+    presetSeasonSetCount.value = null
+    presetRegisterEventTeams.value = null
+    presetEventTeamCount.value = null
     return
   }
   voucherChecking.value = true
@@ -616,10 +726,19 @@ async function onVoucherBlur() {
   voucherType.value = null
   voucherInvoiceId.value = null
   voucherInvoiceName.value = null
+  voucherPresetInvoiceId.value = null
+  voucherPresetInvoiceName.value = null
+  presetSeasonSetCount.value = null
+  presetRegisterEventTeams.value = null
+  presetEventTeamCount.value = null
   try {
     const result = await validateVoucher(code)
     voucherValid.value = result.valid
     voucherMessage.value = result.message || (result.valid ? t('enroll.voucherValid') : t('enroll.voucherInvalid'))
+    const body = result.data && typeof result.data === 'object' ? result.data : null
+    const presetFromApi = body && typeof body.preset === 'object' ? body.preset : null
+    const apiKeys = body ? Object.keys(body) : []
+
     if (result.valid) {
       voucherType.value = result.voucherType ?? null
       if (result.voucherType === '1') {
@@ -630,12 +749,34 @@ async function onVoucherBlur() {
           voucherMessage.value = t('enroll.voucherInvalid')
         }
       }
-      const preset = result.data?.data ?? result.data
-      if (preset) applyVoucherPreset(preset)
+      if (presetFromApi) applyVoucherPreset(presetFromApi)
+      else logVoucherDebug('validate: no preset object on API body', { code, apiType: body?.type, apiKeys })
     }
-  } catch (_) {
+
+    logVoucherDebug('validate: summary', {
+      code,
+      apiSaysValid: result.valid,
+      wizardShowsValid: voucherValid.value,
+      message: result.message,
+      voucherType: voucherType.value,
+      apiType: body?.type,
+      apiKeys,
+      presetRecognized: presetFromApi != null,
+      presetFromApi: presetFromApi,
+      wizardAfter: {
+        edition: edition.value,
+        futureGroup: futureGroup.value,
+        futurePupils: futurePupils.value,
+        foundersVariant: foundersVariant.value,
+        foundersType: foundersType.value,
+        presetSeasonSetCount: presetSeasonSetCount.value,
+        voucherPresetInvoiceId: voucherPresetInvoiceId.value,
+      },
+    })
+  } catch (err) {
     voucherValid.value = false
     voucherMessage.value = t('enroll.voucherInvalid')
+    console.warn('[EnrollWizard][voucher] validate: request failed', { code, err })
   } finally {
     voucherChecking.value = false
   }
@@ -673,6 +814,18 @@ async function submit() {
         deliveryAddress: buildAddressPayload(deliveryAddress.value),
         invoiceAddress: buildInvoicePayload(),
       }
+      if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
+        payload.seasonSetCount = presetSeasonSetCount.value
+        payload.num_boards = presetSeasonSetCount.value
+      }
+      if (presetRegisterEventTeams.value === true) {
+        payload.registerEventTeams = true
+        const n = presetEventTeamCount.value
+        if (n != null && Number.isFinite(n) && n >= 0) payload.eventTeamCount = n
+      } else if (presetRegisterEventTeams.value === false) {
+        payload.registerEventTeams = false
+        payload.eventTeamCount = 0
+      }
       if (futureOnSiteEvent.value === 'yes' && futureEventId.value) {
         payload.eventId = futureEventId.value
       }
@@ -704,6 +857,10 @@ async function submit() {
         notes: formData.value.notes?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
         invoiceAddress: invoicePayload ?? undefined,
+      }
+      if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
+        payload.num_boards = presetSeasonSetCount.value
+        payload.seasonSetCount = presetSeasonSetCount.value
       }
       if (!isTeam) {
         payload.grade = formData.value.grade?.trim() || undefined
@@ -819,10 +976,6 @@ watch(
               </li>
             </ol>
           </div>
-          <div class="wizard-hero-hint">
-            <i class="bi bi-lightning-charge-fill"></i>
-            {{ stepTitle }}
-          </div>
         </div>
       </div>
 
@@ -859,14 +1012,14 @@ watch(
                     type="text"
                     :placeholder="t('enroll.placeholderVoucherCode')"
                     autofocus
-                    @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                    @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
                     @blur="onVoucherBlur"
                   />
                   <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
                   <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
                   <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
                 </div>
-                <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null">
+                <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null">
                   <i class="bi bi-arrow-left"></i> <I18nText k="wizard.voucherCodeBack" />
                 </button>
               </div>
@@ -1189,7 +1342,7 @@ watch(
                 v-model="voucher"
                 type="text"
                 placeholder=" "
-                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
                 @blur="onVoucherBlur"
               />
               <label><I18nText k="enroll.voucher" /></label>
@@ -1197,15 +1350,15 @@ watch(
               <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
               <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
             </div>
-            <template v-if="voucherType === '1'">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
             </template>
 
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
-            <template v-if="voucherType === '1'">
+            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
               <div class="field voucher-invoice-forced">
                 <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
@@ -1230,7 +1383,7 @@ watch(
                 v-model="voucher"
                 type="text"
                 placeholder=" "
-                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null"
+                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
                 @blur="onVoucherBlur"
               />
               <label><I18nText k="enroll.voucher" /></label>
@@ -1238,14 +1391,14 @@ watch(
               <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
               <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
             </div>
-            <template v-if="voucherType === '1'">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
             </template>
             <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
-            <template v-if="voucherType === '1'">
+            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
               <div class="field voucher-invoice-forced">
                 <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName">({{ voucherInvoiceName }})</span></p>
+                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />

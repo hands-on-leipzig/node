@@ -10,6 +10,8 @@ function normalizeFiles(raw) {
     .map((x) => ({
       name: String(x.name ?? '').trim() || 'Download',
       url: String(x.url ?? '').trim(),
+      folder: String(x.folder ?? x.group ?? '').trim(),
+      path: String(x.path ?? x.folderPath ?? x.relativePath ?? '').trim().replace(/\\/g, '/'),
     }))
     .filter((x) => /^https?:\/\//i.test(x.url))
     .slice(0, 150)
@@ -56,12 +58,22 @@ function mergeFileLists(graphFiles, manualFiles) {
   for (const f of graphFiles) {
     if (!f.url || seen.has(f.url)) continue
     seen.add(f.url)
-    out.push({ name: f.name, url: f.url })
+    out.push({
+      name: f.name,
+      url: f.url,
+      folder: f.folder || '',
+      path: f.path || '',
+    })
   }
   for (const f of manualFiles) {
     if (!f.url || seen.has(f.url)) continue
     seen.add(f.url)
-    out.push({ name: f.name, url: f.url })
+    out.push({
+      name: f.name,
+      url: f.url,
+      folder: f.folder || '',
+      path: f.path || '',
+    })
   }
   return out
 }

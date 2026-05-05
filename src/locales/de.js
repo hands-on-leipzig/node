@@ -48,15 +48,23 @@ export default {
         "groupDetail": "Gruppe",
         "adminDocuments": "Dokumente (Admin)",
         "adminTranslations": "Übersetzungen (Admin)",
+        "sidebarOpenTeam": "Team öffnen: {name}",
+        "sidebarOpenClass": "Klasse öffnen: {name}",
+        "sidebarOpenGroup": "Gruppe öffnen: {name}",
+        "sidebarSectionFounders": "Founders Anmeldungen",
+        "sidebarSectionFuture": "Future Anmeldungen",
         "logOut": "Abmelden"
     },
     "admin": {
         "documentsTitle": "Dokumente zum Download",
         "documentsLead": "Trage Dateien ein, die Coaches direkt öffnen können (Anzeigename + Link aus SharePoint „Link kopieren“), optional einen Ordner-Link. Ein automatisches Verzeichnis aus SharePoint bräuchte Microsoft Graph auf dem Server—hier pflegst du die Liste manuell. Wird in DRAHT gespeichert.",
         "documentsFilesSection": "Dateien (Liste für Coaches)",
-        "documentsFilesHint": "Pro Datei: Link einfügen (https…). Anzeigename erscheint in der Liste; leer lassen, um den Dateinamen aus der URL zu nutzen.",
+        "documentsFilesHint": "Pro Datei: unter „Ordner“ optional einen Pfad mit Schrägstrichen (z. B. Handbücher/2024) — im Dashboard erscheinen verschachtelte Ordner-Akkordeons. Link (https…); Anzeigename; leer lassen, um den Dateinamen aus der URL zu nutzen.",
         "documentsFileName": "Anzeigename",
         "documentsFileNamePlaceholder": "z. B. Handbuch.pdf",
+        "documentsFileFolder": "Ordner",
+        "documentsFileFolderPlaceholder": "z. B. Handbücher",
+        "documentsFileFolderHint": "Ordner mit Schrägstrich (z. B. Handbücher/2024) = verschachtelte Akkordeons. Leer = Datei im Stamm. Wenn Microsoft Graph relative Pfade liefert (Feld path), werden Ebenen automatisch so angezeigt.",
         "documentsFileUrl": "Datei-URL",
         "documentsFileUrlPlaceholder": "https://…",
         "documentsAddFile": "Datei hinzufügen",
@@ -205,6 +213,18 @@ export default {
         "registerEventSuccess": "Team wurde für das Event angemeldet.",
         "registerEventFailed": "Anmeldung für das Event fehlgeschlagen.",
         "requestEventChange": "Änderung der Veranstaltung anfragen"
+    },
+    "groupDetail": {
+        "event": "Veranstaltung",
+        "registerForEventHint": "Du kannst diese Future-Gruppe jederzeit zusätzlich für ein Event vor Ort anmelden.",
+        "teamCountHint": "Angemeldete Teilnehmende: {pupils}. Du kannst bis zu {maxTeams} Event-Team(s) mit je 8 Teilnehmenden anmelden.",
+        "selectEvent": "Event auswählen…",
+        "eventTeamsLabel": "Anzahl Event-Teams (je 8 Teilnehmende)",
+        "eventCostHint": "Geschätzte Eventgebühr: {cost} EUR (100 EUR pro Event-Team).",
+        "registerForEventButton": "Gruppe zum Event anmelden",
+        "registering": "Wird angemeldet…",
+        "registerEventSuccess": "Gruppe wurde für das Event angemeldet.",
+        "registerEventFailed": "Anmeldung für das Event fehlgeschlagen."
     },
     "dashboard": {
         "cockpitTitle": "LÖSCHEN",

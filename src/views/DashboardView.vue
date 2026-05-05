@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
@@ -7,6 +7,8 @@ import { listTeams, listClasses, getOpenTasks } from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
+import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
+import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -120,6 +122,19 @@ onMounted(async () => {
     documentsLoading.value = false
   }
 })
+
+/** SharePoint / manual files grouped by relative path (`path` from API or `folder` with slashes). */
+const documentsFolderRoot = computed(() => {
+  const cfg = documentsConfig.value
+  if (!cfg || typeof cfg !== 'object') return { files: [], folders: [] }
+  const files = Array.isArray(cfg.files) ? cfg.files : []
+  return buildDocumentsFolderTree(files)
+})
+
+const hasDocumentTreeContent = computed(() => {
+  const r = documentsFolderRoot.value
+  return (r.files?.length || 0) + (r.folders?.length || 0) > 0
+})
 </script>
 
 <template>
@@ -139,6 +154,19 @@ onMounted(async () => {
       </header>
 
       <div class="dashboard-grid">
+        <!-- Section: Register new team / class -->
+        <section class="dashboard-card dashboard-card-register">
+          <h2 class="dashboard-card-title">
+            <i class="bi bi-plus-circle"></i>
+            <I18nText k="dashboard.registerNew" />
+          </h2>
+          <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
+          <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
+            <i class="bi bi-magic"></i>
+            <span><I18nText k="wizard.ctaButton" /></span>
+          </button>
+        </section>
+
         <!-- Section: Tasks to do (only teams/classes with action required) -->
         <section class="dashboard-card dashboard-card-tasks">
           <h2 class="dashboard-card-title">
@@ -152,11 +180,11 @@ onMounted(async () => {
           </div>
           <div v-else-if="taskItems.length" class="dashboard-tasks-list">
             <button
-              v-for="item in taskItems"
-              :key="item.type + '-' + item.id"
-              type="button"
-              class="dashboard-task-item"
-              @click="goToTask(item)"
+                v-for="item in taskItems"
+                :key="item.type + '-' + item.id"
+                type="button"
+                class="dashboard-task-item"
+                @click="goToTask(item)"
             >
               <span class="dashboard-task-name">{{ item.name }}</span>
               <span v-if="item.ref" class="dashboard-task-ref">{{ item.ref }}</span>
@@ -170,19 +198,6 @@ onMounted(async () => {
             <i class="bi bi-check-circle"></i>
             <I18nText k="dashboard.noPendingTasks" />
           </p>
-        </section>
-
-        <!-- Section: Register new team / class -->
-        <section class="dashboard-card dashboard-card-register">
-          <h2 class="dashboard-card-title">
-            <i class="bi bi-plus-circle"></i>
-            <I18nText k="dashboard.registerNew" />
-          </h2>
-          <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
-          <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
-            <i class="bi bi-magic"></i>
-            <span><I18nText k="wizard.ctaButton" /></span>
-          </button>
         </section>
 
         <!-- Documents for download (SharePoint / shared folder) — always visible -->
@@ -210,33 +225,11 @@ onMounted(async () => {
             >
               <I18nText k="dashboard.documentsGraphNoFiles" />
             </p>
-            <ul
-              v-if="documentsConfig.files?.length"
-              class="dashboard-documents-file-list"
-            >
-              <li v-for="(f, i) in documentsConfig.files" :key="i">
-                <a
-                  :href="f.url"
-                  class="dashboard-documents-file-link"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <i class="bi bi-file-earmark-arrow-down"></i>
-                  <span>{{ f.name }}</span>
-                </a>
-              </li>
-            </ul>
-            <a
-              v-if="documentsConfig.folderUrl"
-              :href="documentsConfig.folderUrl"
-              class="dashboard-documents-link"
-              :class="{ 'dashboard-documents-link-after-list': documentsConfig.files?.length }"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <i class="bi bi-folder2-open"></i>
-              <I18nText k="dashboard.openDocumentsFolder" />
-            </a>
+            <DocumentsFolderTree
+              v-if="hasDocumentTreeContent"
+              :node="documentsFolderRoot"
+              :depth="0"
+            />
           </template>
           <template v-else-if="!documentsLoading">
             <p class="dashboard-card-desc dashboard-documents-empty">
@@ -414,46 +407,6 @@ onMounted(async () => {
   color: var(--color-text-subtle);
   margin: 0 0 0.75rem;
   line-height: 1.45;
-}
-.dashboard-documents-file-list {
-  list-style: none;
-  margin: 0 0 1rem;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-.dashboard-documents-file-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 0.65rem;
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  background: var(--color-bg-muted);
-  border-radius: var(--radius);
-  text-decoration: none;
-  border: 1px solid var(--color-border);
-  transition: border-color 0.15s, background 0.15s;
-}
-.dashboard-documents-file-link:hover {
-  border-color: var(--color-accent);
-  background: var(--color-bg);
-  color: var(--color-accent);
-}
-.dashboard-documents-file-link .bi {
-  flex-shrink: 0;
-  color: var(--color-accent);
-}
-.dashboard-documents-link-after-list {
-  margin-top: 0.25rem;
-  background: var(--color-bg-muted);
-  color: var(--color-accent);
-  border: 1px solid var(--color-border);
-}
-.dashboard-documents-link-after-list:hover {
-  opacity: 1;
-  background: var(--color-bg);
 }
 .dashboard-documents-link-secondary {
   background: var(--color-bg-muted);

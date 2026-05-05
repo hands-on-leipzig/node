@@ -12,7 +12,7 @@ So that reload and direct URLs (e.g. `/dashboard`) work:
 Handled entirely by **DRAHT** — no separate Node API.
 
 - **GET** `node/documents-config` — static config (`folderUrl`, `title`, manual `files`, flags). Optional **`?mergeGraph=1`** still merges Graph server-side (legacy).
-- **GET** `node/documents-folder-files` — JSON `{ files, folderUrl, graphOk, graphCode }` (coach dashboard).
+- **GET** `node/documents-folder-files` — JSON `{ files, folderUrl, graphOk, graphCode }` (coach dashboard). Each item in `files` may include `path` or `folderPath` (relative path under the linked folder, use `/` segments) so the UI can show nested folder accordions; `folder` from admin config is merged the same way.
 - **GET** `node/documents-graph-status` — admin: token + `GET /sites/root` (MS_CLIENT_* sanity check). Response includes **Graph identity**: client-credentials / Entra app id (`appid`, `tid`, roles)—SharePoint is **not** accessed as the Keycloak user in the browser.
 - **POST** `node/documents-probe-folder` — admin, body `{ "url": "…" }` — same folder probe as after save.
 - After **PUT** `node/documents-config`, response includes **`folderGraphProbe`** (readable, HTTP codes, `summaryKey`) when Graph is enabled.

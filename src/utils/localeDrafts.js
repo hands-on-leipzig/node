@@ -1,5 +1,6 @@
 /** Persist translation overrides until a PR is created (localStorage). */
 import { ref } from 'vue'
+import { applyDraftsToI18nFromData } from '@/i18n/mergeLocaleDrafts.js'
 import {
   notifyTranslationDraftSaved,
   showGithubExportBanner,
@@ -45,6 +46,7 @@ export function patchLocaleDraft(locale, path, value) {
   const all = loadAllLocaleDrafts()
   all[locale] = { ...all[locale], [path]: value }
   writeAll(all)
+  applyDraftsToI18nFromData(all)
   localeDraftRevision.value++
   notifyTranslationDraftSaved()
 }
@@ -55,6 +57,7 @@ export function clearLocaleDraft(locale) {
   const all = loadAllLocaleDrafts()
   all[locale] = {}
   writeAll(all)
+  applyDraftsToI18nFromData(all)
   localeDraftRevision.value++
   if (countLocaleDraftKeys('en') + countLocaleDraftKeys('de') === 0) {
     showGithubExportBanner.value = false

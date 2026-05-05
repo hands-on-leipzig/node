@@ -68,20 +68,26 @@ async function loadSidebarLists() {
   }
 }
 
-function teamFlyoutLabel(team) {
-  const name = team.name || t('dashboard.team')
-  const ref = team.ref || '#' + team.id
-  return name + ' ' + ref
+function teamPrimaryLabel(team) {
+  return team.name || t('dashboard.team')
 }
-function classFlyoutLabel(cls) {
-  const name = cls.name || t('dashboard.class')
-  const ref = cls.ref || '#' + cls.id
-  return name + ' ' + ref
+function teamSecondaryLabel(team) {
+  if (team.ref) return String(team.ref)
+  return team.id != null ? '#' + team.id : ''
 }
-function groupFlyoutLabel(group) {
-  const name = group.name || t('dashboard.editionFuture')
-  const ref = group.ref || '#' + group.id
-  return name + ' ' + ref
+function classPrimaryLabel(cls) {
+  return cls.name || t('dashboard.class')
+}
+function classSecondaryLabel(cls) {
+  if (cls.ref) return String(cls.ref)
+  return cls.id != null ? '#' + cls.id : ''
+}
+function groupPrimaryLabel(group) {
+  return group.name || t('dashboard.editionFuture')
+}
+function groupSecondaryLabel(group) {
+  if (group.ref) return String(group.ref)
+  return group.id != null ? '#' + group.id : ''
 }
 function goTeam(id) {
   closeSidebar()
@@ -164,6 +170,9 @@ const userInitials = computed(() => {
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return name.slice(0, 2).toUpperCase()
 })
+
+const hasFoundersEnrollments = computed(() => teams.value.length > 0 || classes.value.length > 0)
+const hasFutureEnrollments = computed(() => groups.value.length > 0)
 </script>
 
 <template>
@@ -183,14 +192,6 @@ const userInitials = computed(() => {
       @click="closeSidebar"
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
-      <div class="sidebar-head">
-        <RouterLink to="/dashboard" class="sidebar-item sidebar-logo-link" @click="closeSidebar">
-          <span class="sidebar-item-icon">
-            <img src="@/assets/hot.png" alt="" class="sidebar-logo" />
-          </span>
-          <span class="flyout"><I18nText k="common.appName" /></span>
-        </RouterLink>
-      </div>
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
@@ -201,55 +202,103 @@ const userInitials = computed(() => {
           @click="closeSidebar"
         >
           <span class="sidebar-item-icon">
-            <i class="bi" :class="item.icon"></i>
+            <i class="bi" :class="item.icon" aria-hidden="true"></i>
           </span>
-          <span class="flyout"><I18nText :k="item.nameKey" /></span>
+          <span class="sidebar-item-label"><I18nText :k="item.nameKey" /></span>
         </RouterLink>
         <div v-if="sidebarLoading" class="sidebar-list-loading">
           <i class="bi bi-arrow-repeat spin"></i>
         </div>
         <template v-else>
-          <div v-for="team in teams" :key="'team-' + team.id" class="sidebar-item sidebar-entry" :class="{ active: isTeamActive(team.id) }" :title="teamFlyoutLabel(team)" @click="goTeam(team.id)">
+          <p v-if="hasFoundersEnrollments" class="sidebar-section-title">
+            <I18nText k="nav.sidebarSectionFounders" />
+          </p>
+          <button
+            v-for="team in teams"
+            :key="'team-' + team.id"
+            type="button"
+            class="sidebar-item sidebar-entry"
+            :class="{ active: isTeamActive(team.id) }"
+            :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+            :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+            @click="goTeam(team.id)"
+          >
             <span class="sidebar-item-icon">
               <i class="bi bi-person-fill" aria-hidden="true"></i>
             </span>
-            <span class="flyout">{{ teamFlyoutLabel(team) }}</span>
-          </div>
-          <div v-for="cls in classes" :key="'class-' + cls.id" class="sidebar-item sidebar-entry" :class="{ active: isClassActive(cls.id) }" :title="classFlyoutLabel(cls)" @click="goClass(cls.id)">
+            <span class="sidebar-item-text">
+              <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
+              <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
+            </span>
+          </button>
+          <button
+            v-for="cls in classes"
+            :key="'class-' + cls.id"
+            type="button"
+            class="sidebar-item sidebar-entry"
+            :class="{ active: isClassActive(cls.id) }"
+            :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+            :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+            @click="goClass(cls.id)"
+          >
             <span class="sidebar-item-icon">
               <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
             </span>
-            <span class="flyout">{{ classFlyoutLabel(cls) }}</span>
-          </div>
-          <div v-for="group in groups" :key="'group-' + group.id" class="sidebar-item sidebar-entry" :class="{ active: isGroupActive(group.id) }" :title="groupFlyoutLabel(group)" @click="goGroup(group.id)">
+            <span class="sidebar-item-text">
+              <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
+              <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
+            </span>
+          </button>
+          <p
+            v-if="hasFutureEnrollments"
+            class="sidebar-section-title"
+            :class="{ 'sidebar-section-title--after-founders': hasFoundersEnrollments }"
+          >
+            <I18nText k="nav.sidebarSectionFuture" />
+          </p>
+          <button
+            v-for="group in groups"
+            :key="'group-' + group.id"
+            type="button"
+            class="sidebar-item sidebar-entry"
+            :class="{ active: isGroupActive(group.id) }"
+            :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+            :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+            @click="goGroup(group.id)"
+          >
             <span class="sidebar-item-icon">
               <i class="bi bi-stars" aria-hidden="true"></i>
             </span>
-            <span class="flyout">{{ groupFlyoutLabel(group) }}</span>
-          </div>
+            <span class="sidebar-item-text">
+              <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
+              <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
+            </span>
+          </button>
         </template>
       </nav>
       <div class="sidebar-bottom">
-        <div class="profile-trigger sidebar-item">
+        <div class="sidebar-profile-wrap">
           <button
             type="button"
-            class="profile-btn"
+            class="profile-trigger sidebar-item"
             aria-haspopup="true"
             :aria-expanded="profileMenuOpen"
             @click="openProfileMenu"
           >
-            <img
-              v-if="user?.picture"
-              :src="user.picture"
-              alt=""
-              class="profile-avatar-img"
-            />
-            <span v-else class="profile-avatar-initials">{{ userInitials }}</span>
+            <span class="profile-avatar">
+              <img
+                v-if="user?.picture"
+                :src="user.picture"
+                alt=""
+                class="profile-avatar-img"
+              />
+              <span v-else class="profile-avatar-initials">{{ userInitials }}</span>
+            </span>
+            <span class="sidebar-item-label profile-sidebar-name">
+              <template v-if="user?.name">{{ user.name }}</template>
+              <I18nText v-else k="common.coach" />
+            </span>
           </button>
-          <span class="flyout profile-flyout">
-            <template v-if="user?.name">{{ user.name }}</template>
-            <I18nText v-else k="common.coach" />
-          </span>
           <Transition name="profile-menu">
             <div v-if="profileMenuOpen" class="profile-menu" role="menu">
               <div class="profile-menu-header">
@@ -347,10 +396,10 @@ const userInitials = computed(() => {
     </aside>
     <main class="main">
       <header class="header">
-        <h1 class="page-title">
-          <I18nText v-if="route.meta?.titleKey" :k="String(route.meta.titleKey)" tag="span" />
-          <I18nText v-else k="nav.dashboard" tag="span" />
-        </h1>
+        <RouterLink to="/dashboard" class="header-brand" @click="closeSidebar">
+          <img src="@/assets/hot.png" alt="" class="header-logo" />
+          <span class="header-app-name"><I18nText k="common.appName" /></span>
+        </RouterLink>
       </header>
       <div class="content" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
         <RouterView />
@@ -396,7 +445,8 @@ const userInitials = computed(() => {
 }
 
 .sidebar {
-  width: 4.5rem;
+  --sidebar-width: 16.75rem;
+  width: var(--sidebar-width);
   height: 100vh;
   flex-shrink: 0;
   background: var(--color-sidebar);
@@ -404,73 +454,97 @@ const userInitials = computed(() => {
   padding: 1rem 0;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-/* Dock-style: item expands (scale) on hover, label in flyout to the right */
+/* Icon + label row; full-width click target */
 .sidebar-item {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  width: calc(100% - 1rem);
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 2.75rem;
   margin: 0 0.5rem;
+  padding: 0.35rem 0.5rem;
   border-radius: var(--radius);
-  transition: background 0.15s;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
 }
 .sidebar-item-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  width: 2.25rem;
+  min-width: 2.25rem;
 }
-.sidebar-item:hover .sidebar-item-icon {
-  transform: scale(1.18);
-}
-.sidebar-item .flyout {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-left: 0.75rem;
-  padding: 0.4rem 0.75rem;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text);
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 50;
-}
-.sidebar-item:hover .flyout {
+.sidebar-item:hover .sidebar-item-icon .bi {
   opacity: 1;
 }
-
-.sidebar-head {
-  padding: 0 0 1rem;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
-}
-.sidebar-logo-link {
-  text-decoration: none;
+.sidebar-item-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.25;
   color: inherit;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
-.sidebar-logo {
-  height: 2rem;
-  width: auto;
-  display: block;
-  object-fit: contain;
+.nav-link .sidebar-item-label {
+  font-weight: 600;
 }
+.sidebar-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+  text-align: left;
+}
+.sidebar-item-sublabel {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1;
+}
+.sidebar-nav-top-spacer {
+  flex-shrink: 0;
+  min-height: 1.35rem;
+  width: 100%;
+}
+.sidebar-section-title {
+  margin: 0.65rem 0.5rem 0.15rem;
+  padding: 0 0.5rem;
+  border: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+  line-height: 1.3;
+}
+.sidebar-section-title--after-founders {
+  margin-top: 0.95rem;
 }
 .nav-link {
   padding: 0;
@@ -478,6 +552,7 @@ const userInitials = computed(() => {
   font-size: var(--text-base);
   color: var(--color-text-muted);
   text-decoration: none;
+  align-self: stretch;
 }
 .nav-link .bi {
   font-size: 1.35rem;
@@ -508,7 +583,12 @@ const userInitials = computed(() => {
 .sidebar-entry {
   cursor: pointer;
   font-size: var(--text-base);
+  font-family: inherit;
   color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  align-self: stretch;
 }
 .sidebar-entry .bi {
   font-size: 1.25rem;
@@ -517,21 +597,26 @@ const userInitials = computed(() => {
 .sidebar-entry:hover {
   background: var(--color-bg-hover);
   color: var(--color-text);
+  border-color: var(--color-border);
+}
+.sidebar-entry:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 .sidebar-entry.active {
   background: var(--color-accent-soft);
   color: var(--color-accent);
+  border-color: var(--color-border);
 }
 .sidebar-entry.active .bi {
   opacity: 1;
 }
+.sidebar-entry.active .sidebar-item-sublabel {
+  color: inherit;
+  opacity: 0.85;
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-.profile-trigger .flyout.profile-flyout {
-  max-width: 10rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sidebar-bottom {
@@ -539,19 +624,29 @@ const userInitials = computed(() => {
   border-top: 1px solid var(--color-border);
   margin-top: auto;
 }
-.profile-trigger {
+.sidebar-profile-wrap {
   position: relative;
 }
-.profile-btn {
+.profile-trigger {
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+.profile-trigger:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.profile-avatar {
   width: 2.5rem;
   height: 2.5rem;
   min-width: 2.5rem;
   min-height: 2.5rem;
   flex-shrink: 0;
   border-radius: 50%;
-  border: none;
-  padding: 0;
-  cursor: pointer;
   overflow: hidden;
   background: var(--color-bg-muted);
   color: var(--color-text-muted);
@@ -561,9 +656,14 @@ const userInitials = computed(() => {
   transition: background 0.15s;
   aspect-ratio: 1;
 }
-.profile-btn:hover {
+.profile-trigger:hover .profile-avatar {
   background: var(--color-bg-hover);
   color: var(--color-text);
+}
+.profile-sidebar-name {
+  font-weight: 600;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .profile-avatar-img {
   width: 100%;
@@ -698,14 +798,33 @@ const userInitials = computed(() => {
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-elevated);
 }
-.page-title {
-  font-size: var(--text-xl);
-  font-weight: 600;
+.header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
   color: var(--color-text);
-  flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-radius: var(--radius);
+  padding: 0.15rem 0.35rem 0.15rem 0.15rem;
+  margin: -0.15rem 0 -0.15rem -0.15rem;
+  transition: background 0.15s;
+}
+.header-brand:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.header-logo {
+  height: 2rem;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.header-app-name {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 .content {
@@ -732,7 +851,7 @@ const userInitials = computed(() => {
     left: 0;
     bottom: 0;
     z-index: 101;
-    width: 4.5rem;
+    width: min(var(--sidebar-width), 92vw);
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: var(--shadow-lg);

@@ -47,7 +47,7 @@ handsonApi.interceptors.response.use((response) => response, responseErrorHandle
  * Validate a voucher code. Uses GET handson/voucher/{code} or GET handson/voucher/{program}/{code}.
  * Voucher is valid when the API returns message "VoucherValid" (i.e. type !== 'error').
  * - type '1': forces invoice address; response includes data.id (societe id) and data.name; use data.id as invoice_adr when submitting.
- * - type '2': no form change; effect is handled later in DRAHT.
+ * - type '2' / '3': no invoice override; optional `preset` from voucher program (edition, program, group, …) for enrollment wizard.
  *
  * @param {string} code - Voucher code (e.g. user-entered ref)
  * @param {number} [program] - Optional program id (team: 1/2, class: 4/5, future groups: 6/7). If omitted, validates without program.
@@ -264,6 +264,14 @@ export function getClass(id) {
  */
 export function getGroup(id) {
   return api.get('/groups/' + encodeURIComponent(id))
+}
+
+/**
+ * Register future group for an event (or update/clear).
+ * Payload: { eventId, eventTeamCount } where eventTeamCount is number of 8-pupil teams.
+ */
+export function registerGroupForEvent(groupId, eventId, eventTeamCount) {
+  return api.put('/groups/' + encodeURIComponent(groupId) + '/event', { eventId, eventTeamCount })
 }
 
 /**
