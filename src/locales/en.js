@@ -231,7 +231,7 @@ export default {
         "mockEventLandesfinale": "State final Saxony",
         "mockEventLandesfinaleDate": "May 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Here you can register your FIRST LEGO League groups for the Future Edition (ages 8–16) as well as the Founders Edition (Explore, Challenge).",
+        "intro": "Here you can register your FIRST LEGO League groups for the Future Edition 8+ (ages 8–16) as well as the Founders Edition (Explore and Challenge).",
         "enrollTeam": "Register a team",
         "enrollTeamDesc": "Register a team for the competition.",
         "enrollClass": "Register a class",
