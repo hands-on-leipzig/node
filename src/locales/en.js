@@ -207,7 +207,7 @@ export default {
         "requestEventChange": "Request change of event"
     },
     "dashboard": {
-        "cockpitTitle": "Coach cockpit",
+        "cockpitTitle": "LÖSCHEN",
         "cockpitSubtitle": "Overview of pending tasks, registrations and dates.",
         "tasksToDo": "Tasks to do",
         "checkingTasks": "Checking tasks…",
