@@ -382,7 +382,7 @@ export default {
     },
     "wizard": {
         "title": "Anmelde-Assistent",
-        "ctaTitle": "Starte deine Anmeldung",
+        "ctaTitle": "Deine Anmeldung",
         "ctaButton": "Anmeldung starten",
         "stepVoucherCode": "Voucher-Code",
         "stepEdition": "Voucher-Code",

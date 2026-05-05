@@ -382,7 +382,7 @@ export default {
     },
     "wizard": {
         "title": "Registration wizard",
-        "ctaTitle": "Start your registration",
+        "ctaTitle": "Your registration",
         "ctaButton": "Start enrollment",
         "stepVoucherCode": "Voucher code",
         "stepEdition": "Voucher code",
