@@ -38,7 +38,7 @@ export default {
         "signInWithSso": "Mit SSO anmelden"
     },
     "nav": {
-        "dashboard": "Dashboard",
+        "dashboard": "Mein Dashboard",
         "login": "Anmelden",
         "enrollTeam": "Team anmelden",
         "enrollClass": "Klasse anmelden",
