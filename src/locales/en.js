@@ -2,7 +2,7 @@
 /* Locale — updated via DRAHT POST node/translations-pr */
 export default {
     "common": {
-        "appName": "node",
+        "appName": "",
         "tagline": "haNds On technology Dashboard and Enrollment",
         "coach": "Coach",
         "save": "Save",
@@ -229,7 +229,7 @@ export default {
         "registerEventFailed": "Registration for the event failed."
     },
     "dashboard": {
-        "cockpitTitle": "LÖSCHEN",
+        "cockpitTitle": "My Dashboard",
         "cockpitSubtitle": "Overview of pending tasks, registrations and dates.",
         "tasksToDo": "Tasks to do",
         "checkingTasks": "Checking tasks…",
