@@ -231,7 +231,7 @@ export default {
         "mockEventLandesfinale": "Landesfinale Sachsen",
         "mockEventLandesfinaleDate": "Mai 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Hier kannst du deine FIRST LEGO League Gruppen für die Future Edition 8+ (8–16 Jahre) sowie die Founders Edition (Explore, Challenge) anmelden.",
+        "intro": "Hier kannst du deine FIRST LEGO League Gruppen für die Future Edition (8–16 Jahre) sowie die Founders Edition (Explore, Challenge) anmelden.",
         "enrollTeam": "Team anmelden",
         "enrollTeamDesc": "Team für den Wettbewerb registrieren.",
         "enrollClass": "Klasse anmelden",
