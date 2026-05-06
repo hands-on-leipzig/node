@@ -12,6 +12,7 @@ import {
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups } from '@/services/draht'
+import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const route = useRoute()
 const router = useRouter()
@@ -173,6 +174,7 @@ const userInitials = computed(() => {
 
 const hasFoundersEnrollments = computed(() => teams.value.length > 0 || classes.value.length > 0)
 const hasFutureEnrollments = computed(() => groups.value.length > 0)
+const { canInstall, promptInstall } = usePwaInstall()
 </script>
 
 <template>
@@ -192,6 +194,9 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
       @click="closeSidebar"
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
+      <RouterLink to="/dashboard" class="sidebar-brand" @click="closeSidebar">
+        <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-brand-logo" />
+      </RouterLink>
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
@@ -395,15 +400,20 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
       </div>
     </aside>
     <main class="main">
-      <header class="header">
-        <RouterLink to="/dashboard" class="header-brand" @click="closeSidebar">
-          <span class="header-logo-wrap">
-            <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="header-logo" />
-          </span>
-          <span class="header-app-name"><I18nText k="common.appName" /></span>
-        </RouterLink>
-      </header>
       <div class="content" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
+        <div class="content-actions">
+          <button
+            v-if="canInstall"
+            type="button"
+            class="header-install-btn"
+            @click="promptInstall"
+            title="Install app"
+            aria-label="Install app"
+          >
+            <i class="bi bi-phone"></i>
+            <span>Install App</span>
+          </button>
+        </div>
         <RouterView />
       </div>
     </main>
@@ -413,7 +423,7 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
 <style scoped>
 .dashboard-layout {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-bg);
   position: relative;
@@ -458,6 +468,22 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0.5rem;
+  padding: 0.25rem 0.2rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+}
+.sidebar-brand-logo {
+  height: 4.5rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 /* Icon + label row; full-width click target */
@@ -528,6 +554,7 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  margin-top: 0.85rem;
 }
 .sidebar-nav-top-spacer {
   flex-shrink: 0;
@@ -791,68 +818,37 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
   flex-direction: column;
   overflow: hidden;
 }
-.header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  padding: 0.875rem 1.25rem;
-  min-height: 3.5rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-}
-.header-brand {
+.content-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  text-decoration: none;
-  color: var(--color-text);
-  min-width: 0;
-  border-radius: var(--radius);
-  padding: 0.15rem 0.35rem 0.15rem 0.15rem;
-  margin: -0.15rem 0 -0.15rem -0.15rem;
-  transition: background 0.15s;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: 0.75rem;
 }
-.header-brand:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-.header-brand:hover .header-logo-wrap {
-  border-color: var(--color-accent);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
-}
-.header-logo-wrap {
-  display: flex;
+.header-install-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.2rem 0.45rem;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--color-bg-muted) 0%, var(--color-bg-elevated) 100%);
+  gap: 0.4rem;
+  min-height: var(--touch);
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.06);
-  flex-shrink: 0;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.header-logo {
-  height: 2.35rem;
-  width: auto;
-  max-height: 2.75rem;
-  display: block;
-  object-fit: contain;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.06));
-}
-.header-app-name {
-  font-size: var(--text-lg);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.header-install-btn:hover {
+  background: var(--color-bg-hover);
 }
 .content {
   flex: 1;
   min-height: 0;
   padding: 1.25rem;
   overflow: auto;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
 /* Mobile: drawer overlay */
@@ -860,8 +856,11 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
   .menu-toggle {
     display: flex;
   }
-  .header {
-    padding-left: 4.5rem;
+  .header-install-btn {
+    padding: 0.45rem 0.65rem;
+  }
+  .header-install-btn span {
+    display: none;
   }
   .sidebar-backdrop {
     display: block;
@@ -872,13 +871,30 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0)
     left: 0;
     bottom: 0;
     z-index: 101;
-    width: min(var(--sidebar-width), 92vw);
+    width: min(var(--sidebar-width), 86vw);
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: var(--shadow-lg);
   }
   .sidebar.open {
     transform: translateX(0);
+  }
+  .sidebar-brand {
+    padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
+  }
+  .sidebar-brand-logo {
+    height: 2.85rem;
+  }
+  .content {
+    padding: 1rem;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+}
+
+@media (max-width: 420px) {
+  .sidebar-brand-logo {
+    height: 2.45rem;
   }
 }
 </style>

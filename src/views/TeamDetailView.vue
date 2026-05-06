@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, getEvents, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { getTeam, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
@@ -88,6 +88,40 @@ function playerMeta(p) {
     parts.push(d.toLocaleDateString(locale.value === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }))
   }
   return parts.length ? parts.join(' · ') : ''
+}
+
+function extractEventList(data) {
+  if (Array.isArray(data)) return data
+  if (!data || typeof data !== 'object') return []
+  const isMapObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length > 0
+  if (isMapObject(data) && !('data' in data) && !('events' in data) && !('items' in data) && !('results' in data) && !('list' in data)) {
+    return Object.values(data)
+  }
+  const direct = data.data ?? data.events ?? data.items ?? data.results ?? data.list
+  if (Array.isArray(direct)) return direct
+  if (isMapObject(direct)) return Object.values(direct)
+  if (direct && typeof direct === 'object') {
+    const nested = direct.data ?? direct.events ?? direct.items ?? direct.results ?? direct.list
+    if (Array.isArray(nested)) return nested
+    if (isMapObject(nested)) return Object.values(nested)
+  }
+  return []
+}
+
+function normalizeEvents(rawList) {
+  return rawList
+    .map((entry) => {
+      const base = entry?.event && typeof entry.event === 'object' ? { ...entry.event, ...entry } : entry
+      const id = base?.id ?? base?.eventId ?? base?.event_id ?? base?.rowid ?? base?.fk_event ?? base?.value
+      if (id == null || id === '') return null
+      const label = base?.label ?? base?.name ?? base?.title ?? base?.ref ?? base?.eventLabel ?? base?.event_name
+      return {
+        ...base,
+        id: String(id),
+        label: label != null ? String(label) : `Event ${id}`,
+      }
+    })
+    .filter(Boolean)
 }
 
 function toBirthdayStr(ts) {
@@ -234,10 +268,30 @@ async function loadEvents() {
   events.value = []
   registerEventError.value = null
   try {
-    const res = await getEvents()
+    const country = String(
+      team.value?.country
+      || team.value?.land
+      || team.value?.schoolCountry
+      || team.value?.school_country
+      || team.value?.overview?.delivery_address?.country
+      || team.value?.overview?.billing_address?.country
+      || ''
+    ).trim().toLowerCase() || undefined
+    const zip = String(
+      team.value?.zip
+      || team.value?.plz
+      || team.value?.postalCode
+      || team.value?.postal_code
+      || team.value?.overview?.delivery_address?.zip
+      || team.value?.overview?.billing_address?.zip
+      || ''
+    ).trim() || undefined
+    const rawProgram = team.value?.program?.id ?? team.value?.program_id ?? team.value?.programId ?? team.value?.program ?? undefined
+    const program = (typeof rawProgram === 'object' ? rawProgram?.id : rawProgram) ?? undefined
+    const res = await getEventsNearest(country, zip, program)
     const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    events.value = Array.isArray(list) ? list : []
+    const list = extractEventList(data)
+    events.value = normalizeEvents(list)
   } catch (_) {
     events.value = []
   } finally {
@@ -382,7 +436,7 @@ watch(
           <p class="detail-hint detail-hint-sm"><I18nText k="teamDetail.registerForEventHint" /></p>
           <div class="detail-register-event">
             <EventSelectDropdown
-              :title="t('wizard.eventSelectAllEvents')"
+              :title="t('wizard.eventSelectSimple')"
               :events="events"
               :loading="eventsLoading"
               :model-value="registerEventId"

@@ -117,10 +117,23 @@ function clearAutocompleteState() {
   if (streetAbortController) streetAbortController.abort()
 }
 
+function normalizeCountryForZipLookup(rawCountry, rawZip) {
+  const country = String(rawCountry || '').trim().toLowerCase()
+  const zip = String(rawZip || '').trim()
+  if (country) return country
+  // Fallback for common DACH-style numeric postcodes when no country selected.
+  if (/^\d{4,5}$/.test(zip)) return 'de'
+  return ''
+}
+
 function onCountryChange(value) {
   setNewField('country', value)
   zipSuggestions.value = []
   streetSuggestions.value = []
+  const currentZip = props.modelValue.new?.postalCode || ''
+  if (String(currentZip).trim().length >= 3) {
+    onZipInput(currentZip)
+  }
 }
 
 function onZipInput(value) {
@@ -129,7 +142,7 @@ function onZipInput(value) {
   zipSuggestions.value = []
   streetSuggestions.value = []
   if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
-  const country = (props.modelValue.new?.country || '').toLowerCase()
+  const country = normalizeCountryForZipLookup(props.modelValue.new?.country, value)
   if (!country || !value || String(value).trim().length < 3) return
   zipDebounceTimer = setTimeout(() => { lookupZip(value, country) }, 260)
 }
@@ -176,6 +189,7 @@ async function lookupZip(rawZip, country) {
 function applyZipSuggestion(item) {
   setNewField('postalCode', item.postalCode || props.modelValue.new?.postalCode || '')
   if (item.city) setNewField('city', item.city)
+  if (item.country) setNewField('country', item.country)
   zipSuggestions.value = []
 }
 
@@ -190,7 +204,7 @@ function onStreetInput(value) {
 }
 
 async function lookupStreet(street) {
-  const country = (props.modelValue.new?.country || '').toLowerCase()
+  const country = normalizeCountryForZipLookup(props.modelValue.new?.country, props.modelValue.new?.postalCode)
   const zip = (props.modelValue.new?.postalCode || '').trim()
   const city = (props.modelValue.new?.city || '').trim()
   if (!country || zip.length < 3) return

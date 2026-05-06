@@ -80,7 +80,7 @@ function mergeFileLists(graphFiles, manualFiles) {
 
 /**
  * Loads documents-config, then documents-folder-files when Graph is enabled.
- * @returns {Promise<{ folderUrl: string, title: string, files: Array<{name: string, url: string}>, skipGraphFileListing: boolean, graphMeta?: { ok: boolean, code: string } }>}
+ * @returns {Promise<{ folderUrl: string, title: string, files: Array<{name: string, url: string}>, graphFolders?: string[], skipGraphFileListing: boolean, graphMeta?: { ok: boolean, code: string } }>}
  */
 export async function fetchDocumentsConfig() {
   const empty = {
@@ -116,6 +116,7 @@ export async function fetchDocumentsConfig() {
 
   const graphMeta = { ok: false, code: 'not_requested' }
   let mergedFiles = [...base.files]
+  let graphFolders = []
 
   const wantGraph = base.folderUrl && !base.skipGraphFileListing
 
@@ -124,6 +125,9 @@ export async function fetchDocumentsConfig() {
       const gRes = await getDocumentsFolderFiles()
       const g = unwrapPayload(gRes?.data)
       const graphFiles = normalizeFiles(g?.files)
+      graphFolders = Array.isArray(g?.folders)
+        ? g.folders.map((x) => String(x || '').trim().replace(/\\/g, '/')).filter(Boolean)
+        : []
       graphMeta.ok = !!g?.graphOk
       graphMeta.code = String(g?.graphCode ?? 'unknown')
       mergedFiles = mergeFileLists(graphFiles, base.files)
@@ -140,6 +144,7 @@ export async function fetchDocumentsConfig() {
     folderUrl: base.folderUrl,
     title: base.title,
     files: mergedFiles,
+    graphFolders,
     skipGraphFileListing: base.skipGraphFileListing,
     graphMeta,
   }

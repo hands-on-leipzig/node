@@ -22,17 +22,12 @@ const emptyAddressState = () => ({
 })
 
 const form = ref({
-  name: '',
   schoolType: '',
-  grade: '',
-  teacherName: '',
   location: '',
   zip: '',
-  description: '',
   playersTotal: '',
   organization: '',
   voucher: '',
-  notes: '',
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
@@ -126,10 +121,6 @@ function buildInvoiceAddressPayload() {
 }
 
 async function submit() {
-  if (!form.value.name?.trim()) {
-    error.value = t('enrollClass.classNameRequired')
-    return
-  }
   if (form.value.voucher?.trim() && voucherValid.value === false) {
     error.value = t('enroll.voucherInvalid')
     return
@@ -138,14 +129,12 @@ async function submit() {
   success.value = false
   submitting.value = true
   try {
+    const className = form.value.organization.trim() || form.value.location.trim() || 'Klasse'
     const payload = {
-      name: form.value.name.trim(),
+      name: className,
       schoolType: form.value.schoolType || undefined,
-      grade: form.value.grade.trim() || undefined,
-      teacherName: form.value.teacherName.trim() || undefined,
       location: form.value.location.trim() || undefined,
       zip: form.value.zip.trim() || undefined,
-      description: form.value.description.trim() || undefined,
       playersTotal: (() => {
         const v = form.value.playersTotal
         if (v === '' || v == null) return undefined
@@ -154,7 +143,6 @@ async function submit() {
       })(),
       organization: form.value.organization.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
-      notes: form.value.notes.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
       invoiceAddress: buildInvoiceAddressPayload(),
     }
@@ -167,17 +155,12 @@ async function submit() {
     voucherInvoiceId.value = null
     voucherInvoiceName.value = null
     form.value = {
-      name: '',
       schoolType: '',
-      grade: '',
-      teacherName: '',
       location: '',
       zip: '',
-      description: '',
       playersTotal: '',
       organization: '',
       voucher: '',
-      notes: '',
       deliveryAddress: emptyAddressState(),
       invoiceAddress: emptyAddressState(),
     }
@@ -213,16 +196,6 @@ function onFormFieldFocus(e) {
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
       <div class="field">
-        <label for="class-name"><I18nText k="enrollClass.className" /> <span class="required">*</span></label>
-        <input
-          id="class-name"
-          v-model="form.name"
-          type="text"
-          required
-          :placeholder="t('enrollClass.placeholderName')"
-        />
-      </div>
-      <div class="field">
         <label for="class-location"><I18nText k="enroll.location" /></label>
         <input
           id="class-location"
@@ -252,37 +225,10 @@ function onFormFieldFocus(e) {
         <label for="class-school-type"><I18nText k="enroll.schoolType" /></label>
         <select id="class-school-type" v-model="form.schoolType">
           <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
-            {{ t(opt.labelKey) }}
+          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
+            {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
           </option>
         </select>
-      </div>
-      <div class="field">
-        <label for="class-grade"><I18nText k="enrollClass.grade" /></label>
-        <input
-          id="class-grade"
-          v-model="form.grade"
-          type="text"
-          :placeholder="t('enrollClass.placeholderGrade')"
-        />
-      </div>
-      <div class="field">
-        <label for="class-teacher"><I18nText k="enrollClass.teacherName" /></label>
-        <input
-          id="class-teacher"
-          v-model="form.teacherName"
-          type="text"
-          :placeholder="t('enrollClass.placeholderTeacher')"
-        />
-      </div>
-      <div class="field">
-        <label for="class-description"><I18nText k="enrollClass.description" /></label>
-        <input
-          id="class-description"
-          v-model="form.description"
-          type="text"
-          :placeholder="t('enrollClass.placeholderDescription')"
-        />
       </div>
       <div class="field">
         <label for="class-players-total"><I18nText k="enrollClass.playersTotal" /></label>
@@ -340,15 +286,6 @@ function onFormFieldFocus(e) {
         id-prefix="class-invoice"
       />
 
-      <div class="field">
-        <label for="class-notes"><I18nText k="enrollClass.notes" /></label>
-        <textarea
-          id="class-notes"
-          v-model="form.notes"
-          rows="3"
-          :placeholder="t('enrollClass.optionalNotes')"
-        />
-      </div>
       <div v-if="error" class="message error">
         <i class="bi bi-exclamation-circle"></i>
         {{ error }}

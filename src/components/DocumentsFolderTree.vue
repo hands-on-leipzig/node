@@ -14,6 +14,19 @@ const props = defineProps({
     default: 0,
   },
 })
+const emit = defineEmits(['open-pdf'])
+
+function isPdfFile(file) {
+  const name = String(file?.name || '')
+  const url = String(file?.url || '')
+  return /\.pdf$/i.test(name) || /\.pdf([?#].*)?$/i.test(url)
+}
+
+function onFileClick(event, file) {
+  if (!isPdfFile(file)) return
+  event.preventDefault()
+  emit('open-pdf', { url: file.url, name: file.name || 'PDF' })
+}
 
 function subtreeCount(sub) {
   return countFilesInDocumentTree(sub)
@@ -38,6 +51,7 @@ const hasFolders = computed(() => (props.node.folders?.length || 0) > 0)
           class="doc-folder-tree-file-link"
           target="_blank"
           rel="noopener noreferrer"
+          @click="onFileClick($event, f)"
         >
           <i class="bi bi-file-earmark-arrow-down" aria-hidden="true" />
           <span>{{ f.name }}</span>
@@ -59,7 +73,7 @@ const hasFolders = computed(() => (props.node.folders?.length || 0) > 0)
           <span class="doc-folder-tree-count">{{ subtreeCount(fd.node) }}</span>
         </summary>
         <div class="doc-folder-tree-panel">
-          <DocumentsFolderTree :node="fd.node" :depth="depth + 1" />
+          <DocumentsFolderTree :node="fd.node" :depth="depth + 1" @open-pdf="emit('open-pdf', $event)" />
         </div>
       </details>
     </div>

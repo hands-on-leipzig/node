@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
@@ -8,6 +8,7 @@ import { fetchDocumentsConfig } from '@/services/documentsConfig'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
+import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 
 const { t } = useI18n()
@@ -65,7 +66,16 @@ const documentsConfig = ref({
   files: [],
   graphMeta: null,
 })
-const documentsLoading = ref(true)
+const documentsLoading = ref(false)
+const documentsLoadedOnce = ref(false)
+const documentsModalOpen = ref(false)
+const pdfModalOpen = ref(false)
+const pdfModalUrl = ref('')
+const pdfModalTitle = ref('')
+const pdfModalBlobUrl = ref('')
+const isMobileDashboard = ref(false)
+let mobileMediaQuery = null
+let detachMobileListener = null
 
 /** Mock upcoming events – replace with API feed later. */
 const upcomingEvents = ref([
@@ -141,26 +151,125 @@ function goToTask(item) {
 
 onMounted(async () => {
   loadLists()
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    mobileMediaQuery = window.matchMedia('(max-width: 768px)')
+    isMobileDashboard.value = !!mobileMediaQuery.matches
+    const onMqChange = (e) => {
+      isMobileDashboard.value = !!e.matches
+    }
+    if (typeof mobileMediaQuery.addEventListener === 'function') {
+      mobileMediaQuery.addEventListener('change', onMqChange)
+      detachMobileListener = () => mobileMediaQuery?.removeEventListener('change', onMqChange)
+    } else if (typeof mobileMediaQuery.addListener === 'function') {
+      mobileMediaQuery.addListener(onMqChange)
+      detachMobileListener = () => mobileMediaQuery?.removeListener(onMqChange)
+    }
+  }
+  if (!isMobileDashboard.value) {
+    await ensureDocumentsLoaded()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (detachMobileListener) detachMobileListener()
+  if (pdfModalBlobUrl.value) {
+    URL.revokeObjectURL(pdfModalBlobUrl.value)
+    pdfModalBlobUrl.value = ''
+  }
+})
+
+watch(isMobileDashboard, async (mobile) => {
+  if (!mobile) {
+    await ensureDocumentsLoaded()
+  }
+})
+
+async function ensureDocumentsLoaded() {
+  if (documentsLoadedOnce.value || documentsLoading.value) return
   documentsLoading.value = true
   try {
     documentsConfig.value = await fetchDocumentsConfig()
+    documentsLoadedOnce.value = true
   } finally {
     documentsLoading.value = false
   }
-})
+}
+
+async function openDocumentsModal() {
+  documentsModalOpen.value = true
+  await ensureDocumentsLoaded()
+}
+
+function closeDocumentsModal() {
+  documentsModalOpen.value = false
+}
+
+async function tryOpenPdfAsBlob(rawUrl, title) {
+  try {
+    const res = await fetch(rawUrl, { credentials: 'include' })
+    if (!res.ok) return false
+    const blob = await res.blob()
+    if (!blob || blob.size <= 0) return false
+    if (pdfModalBlobUrl.value) {
+      URL.revokeObjectURL(pdfModalBlobUrl.value)
+    }
+    pdfModalBlobUrl.value = URL.createObjectURL(blob)
+    pdfModalUrl.value = pdfModalBlobUrl.value
+    pdfModalTitle.value = title
+    pdfModalOpen.value = true
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function openDocumentsPdf(payload) {
+  const rawUrl = String(payload?.url || '')
+  const title = String(payload?.name || 'PDF')
+  const host = (() => {
+    try {
+      return new URL(rawUrl).hostname.toLowerCase()
+    } catch {
+      return ''
+    }
+  })()
+  // SharePoint/OneDrive often forbids direct iframe embedding (X-Frame-Options/CSP).
+  // Workaround: try fetching bytes and display a local blob URL in the modal.
+  // If that fails (CORS/auth), fall back to a new tab.
+  if (host.endsWith('sharepoint.com') || host.endsWith('onedrive.live.com')) {
+    if (await tryOpenPdfAsBlob(rawUrl, title)) return
+    window.open(rawUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+  pdfModalUrl.value = rawUrl
+  pdfModalTitle.value = title
+  pdfModalOpen.value = true
+}
+
+function closeDocumentsPdf() {
+  pdfModalOpen.value = false
+  pdfModalUrl.value = ''
+  pdfModalTitle.value = ''
+  if (pdfModalBlobUrl.value) {
+    URL.revokeObjectURL(pdfModalBlobUrl.value)
+    pdfModalBlobUrl.value = ''
+  }
+}
 
 /** SharePoint / manual files grouped by relative path (`path` from API or `folder` with slashes). */
 const documentsFolderRoot = computed(() => {
   const cfg = documentsConfig.value
   if (!cfg || typeof cfg !== 'object') return { files: [], folders: [] }
   const files = Array.isArray(cfg.files) ? cfg.files : []
-  return buildDocumentsFolderTree(files)
+  const folderPaths = Array.isArray(cfg.graphFolders) ? cfg.graphFolders : []
+  return buildDocumentsFolderTree(files, folderPaths)
 })
 
 const hasDocumentTreeContent = computed(() => {
   const r = documentsFolderRoot.value
   return (r.files?.length || 0) + (r.folders?.length || 0) > 0
 })
+
 </script>
 
 <template>
@@ -239,6 +348,14 @@ const hasDocumentTreeContent = computed(() => {
             <template v-if="documentsConfig.title">{{ documentsConfig.title }}</template>
             <I18nText v-else k="dashboard.documentsForDownload" />
           </h2>
+          <template v-if="isMobileDashboard">
+            <p class="dashboard-card-desc"><I18nText k="dashboard.documentsDescription" /></p>
+            <button type="button" class="dashboard-documents-open-mobile" @click="openDocumentsModal">
+              <i class="bi bi-folder2-open" aria-hidden="true" />
+              <I18nText k="dashboard.documentsOpenMobile" />
+            </button>
+          </template>
+          <template v-else>
           <div v-if="documentsLoading" class="dashboard-documents-loading">
             <i class="bi bi-arrow-repeat spin"></i>
             <I18nText k="dashboard.documentsLoadingList" />
@@ -261,6 +378,7 @@ const hasDocumentTreeContent = computed(() => {
               v-if="hasDocumentTreeContent"
               :node="documentsFolderRoot"
               :depth="0"
+              @open-pdf="openDocumentsPdf"
             />
           </template>
           <template v-else-if="!documentsLoading">
@@ -276,6 +394,7 @@ const hasDocumentTreeContent = computed(() => {
               <i class="bi bi-gear"></i>
               <I18nText k="dashboard.documentsConfigureAdmin" />
             </RouterLink>
+          </template>
           </template>
         </section>
 
@@ -296,6 +415,69 @@ const hasDocumentTreeContent = computed(() => {
         </section>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="documentsModalOpen"
+        class="dashboard-documents-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('dashboard.documentsForDownload')"
+        @click.self="closeDocumentsModal"
+      >
+        <div class="dashboard-documents-modal" @click.stop>
+          <header class="dashboard-documents-modal-head">
+            <h2 class="dashboard-documents-modal-title">
+              <template v-if="documentsConfig.title">{{ documentsConfig.title }}</template>
+              <I18nText v-else k="dashboard.documentsForDownload" />
+            </h2>
+            <button type="button" class="dashboard-documents-modal-close" :aria-label="t('common.closeDialog')" @click="closeDocumentsModal">
+              <i class="bi bi-x-lg" aria-hidden="true" />
+            </button>
+          </header>
+          <div class="dashboard-documents-modal-body">
+            <div v-if="documentsLoading" class="dashboard-documents-loading">
+              <i class="bi bi-arrow-repeat spin"></i>
+              <I18nText k="dashboard.documentsLoadingList" />
+            </div>
+            <template v-else-if="documentsConfig.files?.length || documentsConfig.folderUrl">
+              <p class="dashboard-card-desc"><I18nText k="dashboard.documentsDescription" /></p>
+              <p
+                v-if="
+                  documentsConfig.graphMeta?.code === 'empty_or_unavailable' &&
+                  documentsConfig.folderUrl &&
+                  !documentsConfig.files?.length
+                "
+                class="dashboard-documents-graph-hint"
+              >
+                <I18nText k="dashboard.documentsGraphNoFiles" />
+              </p>
+              <DocumentsFolderTree
+                v-if="hasDocumentTreeContent"
+                :node="documentsFolderRoot"
+                :depth="0"
+                @open-pdf="openDocumentsPdf"
+              />
+            </template>
+            <template v-else>
+              <p class="dashboard-card-desc dashboard-documents-empty">
+                <I18nText k="dashboard.documentsNotConfigured" />
+              </p>
+              <p class="dashboard-documents-hint"><I18nText k="dashboard.documentsNotConfiguredHint" /></p>
+              <RouterLink
+                v-if="hasAdminRole()"
+                to="/dashboard/admin/documents"
+                class="dashboard-documents-link dashboard-documents-link-secondary"
+                @click="closeDocumentsModal"
+              >
+                <i class="bi bi-gear"></i>
+                <I18nText k="dashboard.documentsConfigureAdmin" />
+              </RouterLink>
+            </template>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div
@@ -349,13 +531,19 @@ const hasDocumentTreeContent = computed(() => {
     </Teleport>
 
     <EnrollWizard :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
+    <PdfViewerModal
+      :show="pdfModalOpen"
+      :pdf-url="pdfModalUrl"
+      :title="pdfModalTitle"
+      @close="closeDocumentsPdf"
+    />
   </div>
 </template>
 
 <style scoped>
 .dashboard-view {
   width: 100%;
-  max-width: 56rem;
+  max-width: 64rem;
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 2rem;
@@ -499,6 +687,75 @@ const hasDocumentTreeContent = computed(() => {
 .dashboard-documents-link-secondary:hover {
   background: var(--color-bg-hover);
   color: var(--color-text);
+}
+.dashboard-documents-open-mobile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch);
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.dashboard-documents-open-mobile:hover {
+  background: var(--color-bg-hover);
+}
+.dashboard-documents-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10030;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.dashboard-documents-modal {
+  width: min(100%, 44rem);
+  max-height: min(88vh, 780px);
+  overflow: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.dashboard-documents-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+.dashboard-documents-modal-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.dashboard-documents-modal-close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+  width: 2.2rem;
+  height: 2.2rem;
+}
+.dashboard-documents-modal-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.dashboard-documents-modal-body {
+  padding: 0.85rem 1rem 1rem;
+  min-width: 0;
 }
 
 .dashboard-tasks-list {
@@ -815,8 +1072,47 @@ const hasDocumentTreeContent = computed(() => {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .dashboard-card {
+    padding: 1rem 1rem;
+  }
   .dashboard-title {
     font-size: 1.5rem;
+  }
+  .dashboard-documents-modal {
+    width: 100%;
+    max-height: 92vh;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header {
+    margin-bottom: 1.1rem;
+  }
+  .dashboard-title {
+    font-size: 1.3rem;
+  }
+  .dashboard-subtitle {
+    font-size: 0.92rem;
+  }
+  .dashboard-card-title {
+    font-size: 0.85rem;
+  }
+  .dashboard-task-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.35rem 0.5rem;
+  }
+  .dashboard-task-action {
+    width: 100%;
+  }
+  .dashboard-events-list {
+    grid-template-columns: 1fr;
   }
 }
 </style>

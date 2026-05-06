@@ -52,7 +52,6 @@ const form = ref({
   zip: '',
   organization: '',
   voucher: '',
-  notes: '',
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
@@ -307,7 +306,6 @@ async function submit() {
       zip: form.value.zip.trim() || undefined,
       organization: form.value.organization.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
-      notes: form.value.notes.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
       invoiceAddress: buildInvoiceAddressPayload(),
     }
@@ -331,7 +329,6 @@ async function submit() {
       zip: '',
       organization: '',
       voucher: '',
-      notes: '',
       deliveryAddress: emptyAddressState(),
       invoiceAddress: emptyAddressState(),
     }
@@ -593,8 +590,8 @@ const stepIndex = computed(() => {
           <label for="future-school-type"><I18nText k="enroll.schoolType" /></label>
           <select id="future-school-type" v-model="form.schoolType">
             <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-            <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
-              {{ t(opt.labelKey) }}
+            <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
+              {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
             </option>
           </select>
         </div>
@@ -634,11 +631,6 @@ const stepIndex = computed(() => {
           :label="t('enroll.invoiceAddress')"
           id-prefix="future-invoice"
         />
-
-        <div class="field">
-          <label for="future-notes"><I18nText k="enrollClass.notes" /></label>
-          <textarea id="future-notes" v-model="form.notes" rows="3" />
-        </div>
 
         <div v-if="error" class="message error">
           <i class="bi bi-exclamation-circle"></i> {{ error }}

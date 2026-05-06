@@ -2,12 +2,11 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEvents, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
+import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
-import logoFirstFllV from '@/assets/first+fll_v.png'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -21,6 +20,7 @@ const emit = defineEmits(['close', 'success'])
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const FUTURE_GROUP_5_ENABLED = false
 
 const emptyAddressState = () => ({
   useExisting: true,
@@ -35,13 +35,11 @@ const edition = ref(null) // 'founders' | 'future'
 // Step 2: Future = group '5'|'8', Founders = variant 'explore'|'challenge'
 const futureGroup = ref(null)
 const foundersVariant = ref(null)
-// Step 3: Future = pupils 8|16|24|32, Founders = type 'team'|'class'
+// Step 3: Future = pupils 8|16|24, Founders = type 'team'|'class'
 const futurePupils = ref(null)
 // Future: optional on-site event registration (+100€)
 const futureOnSiteEvent = ref(null) // null | 'yes' | 'later'
 const futureEventId = ref(null)
-const futureEvents = ref([])
-const futureEventsLoading = ref(false)
 const futureEventsNearest = ref([])
 const futureEventsNearestLoading = ref(false)
 const foundersType = ref(null)
@@ -56,10 +54,6 @@ const formData = ref({
   city: '',
   state: '',
   location: '',
-  notes: '',
-  grade: '',
-  teacherName: '',
-  description: '',
   playersTotal: '',
 })
 // Step 5
@@ -81,8 +75,6 @@ const presetEventTeamCount = ref(null)
 const founderTeamPlayers = ref([])
 // Founder team: event to register for
 const founderTeamEventId = ref(null)
-const founderEvents = ref([])
-const founderEventsLoading = ref(false)
 const founderEventsNearest = ref([])
 const founderEventsNearestLoading = ref(false)
 // Step 6
@@ -228,15 +220,20 @@ const summaryItems = computed(() => {
 })
 
 const selectedFutureEventLabel = computed(() => {
-  if (!futureEventId.value || !futureEvents.value.length) return null
-  const ev = futureEvents.value.find((e) => String(e.id) === String(futureEventId.value))
+  if (!futureEventId.value || !futureEventsNearest.value.length) return null
+  const ev = futureEventsNearest.value.find((e) => String(e.id) === String(futureEventId.value))
   return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
 })
 
 const selectedFounderEventLabel = computed(() => {
-  if (!founderTeamEventId.value || !founderEvents.value.length) return null
-  const ev = founderEvents.value.find((e) => String(e.id) === String(founderTeamEventId.value))
+  if (!founderTeamEventId.value || !founderEventsNearest.value.length) return null
+  const ev = founderEventsNearest.value.find((e) => String(e.id) === String(founderTeamEventId.value))
   return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
+})
+
+const centeredOptionStep = computed(() => {
+  if (step.value === 0) return hasVoucherCode.value === null
+  return step.value === 1 || step.value === 2 || step.value === 3
 })
 
 /** Event display label with optional capacity (from flow API). */
@@ -248,6 +245,40 @@ function futureEventOptionLabel(ev) {
     return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
   }
   return name
+}
+
+function extractEventList(data) {
+  if (Array.isArray(data)) return data
+  if (!data || typeof data !== 'object') return []
+  const isMapObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length > 0
+  if (isMapObject(data) && !('data' in data) && !('events' in data) && !('items' in data) && !('results' in data) && !('list' in data)) {
+    return Object.values(data)
+  }
+  const direct = data.data ?? data.events ?? data.items ?? data.results ?? data.list
+  if (Array.isArray(direct)) return direct
+  if (isMapObject(direct)) return Object.values(direct)
+  if (direct && typeof direct === 'object') {
+    const nested = direct.data ?? direct.events ?? direct.items ?? direct.results ?? direct.list
+    if (Array.isArray(nested)) return nested
+    if (isMapObject(nested)) return Object.values(nested)
+  }
+  return []
+}
+
+function normalizeEvents(rawList) {
+  return rawList
+    .map((entry) => {
+      const base = entry?.event && typeof entry.event === 'object' ? { ...entry.event, ...entry } : entry
+      const id = base?.id ?? base?.eventId ?? base?.event_id ?? base?.rowid ?? base?.fk_event ?? base?.value
+      if (id == null || id === '') return null
+      const label = base?.label ?? base?.name ?? base?.title ?? base?.ref ?? base?.eventLabel ?? base?.event_name
+      return {
+        ...base,
+        id: String(id),
+        label: label != null ? String(label) : `Event ${id}`,
+      }
+    })
+    .filter(Boolean)
 }
 
 const countryOptions = computed(() => {
@@ -317,6 +348,7 @@ function selectEdition(val) {
 }
 
 function selectFutureGroup(val) {
+  if (val === '5' && !FUTURE_GROUP_5_ENABLED) return
   futureGroup.value = val
   scheduleAdvanceIfReady(2)
 }
@@ -339,10 +371,9 @@ function openWizard() {
   futurePupils.value = null
   futureOnSiteEvent.value = null
   futureEventId.value = null
-  futureEvents.value = []
   futureEventsNearest.value = []
   foundersType.value = null
-  formData.value = { name: '', schoolOrClub: '', schoolType: '', organization: '', country: '', zip: '', city: '', state: '', location: '', notes: '', grade: '', teacherName: '', description: '', playersTotal: '' }
+  formData.value = { name: '', schoolOrClub: '', schoolType: '', organization: '', country: '', zip: '', city: '', state: '', location: '', playersTotal: '' }
   voucher.value = ''
   voucherValid.value = null
   voucherMessage.value = ''
@@ -458,10 +489,7 @@ function next() {
     step.value = firstIncompleteEnrollmentStep()
     if (edition.value === 'future' && futureGroup.value && step.value >= 2) loadAddresses()
     else if (edition.value === 'founders' && step.value >= 3) loadAddresses()
-    if (step.value >= 4 && edition.value === 'future') {
-      loadFutureEvents()
-      loadFutureEventsNearest()
-    }
+      if (step.value >= 4 && edition.value === 'future') loadFutureEventsNearest()
     if (step.value >= 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
       addFounderParticipant()
     }
@@ -469,17 +497,11 @@ function next() {
   }
   if (step.value === 2 && edition.value === 'future') loadAddresses()
   if (step.value === 3) loadAddresses()
-  if (step.value === 4 && edition.value === 'future') {
-    loadFutureEvents()
-    loadFutureEventsNearest()
-  }
+  if (step.value === 4 && edition.value === 'future') loadFutureEventsNearest()
   if (step.value === 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
     addFounderParticipant()
   }
-  if (step.value === 5 && foundersTeamHasParticipantsStep.value) {
-    loadFounderTeamEvents()
-    loadFounderTeamEventsNearest()
-  }
+  if (step.value === 5 && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
   if (step.value < lastStep.value) step.value++
   step4ValidationAttempted.value = false
 }
@@ -493,21 +515,6 @@ function prev() {
   if (step.value > 1) step.value--
 }
 
-async function loadFutureEvents() {
-  futureEventsLoading.value = true
-  futureEvents.value = []
-  try {
-    const res = await getEvents()
-    const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    futureEvents.value = Array.isArray(list) ? list : []
-  } catch (_) {
-    futureEvents.value = []
-  } finally {
-    futureEventsLoading.value = false
-  }
-}
-
 async function loadFutureEventsNearest() {
   futureEventsNearestLoading.value = true
   futureEventsNearest.value = []
@@ -517,27 +524,12 @@ async function loadFutureEventsNearest() {
     const program = futureGroup.value === '8' ? 7 : (futureGroup.value === '5' ? 6 : undefined)
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    futureEventsNearest.value = Array.isArray(list) ? list : []
+    const list = extractEventList(data)
+    futureEventsNearest.value = normalizeEvents(list)
   } catch (_) {
     futureEventsNearest.value = []
   } finally {
     futureEventsNearestLoading.value = false
-  }
-}
-
-async function loadFounderTeamEvents() {
-  founderEventsLoading.value = true
-  founderEvents.value = []
-  try {
-    const res = await getEvents()
-    const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    founderEvents.value = Array.isArray(list) ? list : []
-  } catch (_) {
-    founderEvents.value = []
-  } finally {
-    founderEventsLoading.value = false
   }
 }
 
@@ -550,8 +542,8 @@ async function loadFounderTeamEventsNearest() {
     const program = foundersVariant.value === 'explore' ? 1 : 2
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    founderEventsNearest.value = Array.isArray(list) ? list : []
+    const list = extractEventList(data)
+    founderEventsNearest.value = normalizeEvents(list)
   } catch (_) {
     founderEventsNearest.value = []
   } finally {
@@ -639,7 +631,8 @@ function applyVoucherPreset(raw) {
   if (editionVal === 'future') {
     edition.value = 'future'
     const g = data.group != null ? String(data.group) : ''
-    if (g === '5' || g === '8') futureGroup.value = g
+    if (g === '8') futureGroup.value = '8'
+    if (g === '5' && FUTURE_GROUP_5_ENABLED) futureGroup.value = '5'
     const pupilsNum = Number(data.pupils)
     if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
       futurePupils.value = pupilsNum
@@ -647,7 +640,7 @@ function applyVoucherPreset(raw) {
     presetBranch = 'edition_future'
   } else if (program === 6 || program === 7) {
     edition.value = 'future'
-    futureGroup.value = program === 7 ? '8' : '5'
+    futureGroup.value = program === 7 ? '8' : (FUTURE_GROUP_5_ENABLED ? '5' : null)
     const pupilsNum = Number(data.pupils)
     if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
       futurePupils.value = pupilsNum
@@ -820,7 +813,7 @@ async function onVoucherBlur() {
 }
 
 async function submit() {
-  if (edition.value !== 'future' && !formData.value.name?.trim()) {
+  if (edition.value === 'founders' && foundersType.value === 'team' && !formData.value.name?.trim()) {
     error.value = t('wizard.nameRequired')
     return
   }
@@ -847,7 +840,6 @@ async function submit() {
         location: formData.value.city?.trim() || undefined,
         state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
-        notes: formData.value.notes?.trim() || undefined,
         deliveryAddress: buildAddressPayload(deliveryAddress.value),
         invoiceAddress: buildInvoicePayload(),
       }
@@ -880,9 +872,12 @@ async function submit() {
       const program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
       const deliveryPayload = buildAddressPayload(deliveryAddress.value)
       const invoicePayload = buildInvoicePayload()
+      const resolvedName = isTeam
+        ? formData.value.name.trim()
+        : (formData.value.organization?.trim() || formData.value.city?.trim() || 'Klasse')
       const payload = {
         program,
-        name: formData.value.name.trim(),
+        name: resolvedName,
         schoolOrClub: isTeam ? (formData.value.schoolOrClub?.trim() || undefined) : undefined,
         schoolType: !isTeam ? (formData.value.schoolType || undefined) : undefined,
         organization: formData.value.organization?.trim() || undefined,
@@ -891,7 +886,6 @@ async function submit() {
         location: (formData.value.city || '').trim() || undefined,
         state: (formData.value.state || '').trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
-        notes: formData.value.notes?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
         invoiceAddress: invoicePayload ?? undefined,
       }
@@ -900,9 +894,6 @@ async function submit() {
         payload.seasonSetCount = presetSeasonSetCount.value
       }
       if (!isTeam) {
-        payload.grade = formData.value.grade?.trim() || undefined
-        payload.teacherName = formData.value.teacherName?.trim() || undefined
-        payload.description = formData.value.description?.trim() || undefined
         const v = formData.value.playersTotal
         if (v !== '' && v != null) {
           const n = parseInt(String(v).trim(), 10)
@@ -1034,9 +1025,13 @@ watch(
 
         <div class="wizard-panel-main">
           <div class="wizard-scroll">
-            <div class="wizard-body">
+            <div class="wizard-body" :class="{ 'wizard-body--center-options': centeredOptionStep }">
           <!-- Step 0: Voucher-Code / Direkteinstieg -->
-          <div v-show="step === 0" class="wizard-step wizard-step-voucher wizard-step-animate">
+          <div
+            v-show="step === 0"
+            class="wizard-step wizard-step-voucher wizard-step-animate"
+            :class="{ 'wizard-step-voucher--choice': hasVoucherCode === null }"
+          >
             <div class="wizard-step-voucher-inner">
               <p class="wizard-question"><I18nText k="wizard.voucherCodeQuestion" /></p>
               <p class="wizard-hint"><I18nText k="wizard.voucherCodeHint" /></p>
@@ -1092,17 +1087,21 @@ watch(
             </div>
           </div>
 
-          <!-- Step 2: Future = group 5+/8+, Founders = Explore/Challenge -->
+          <!-- Step 2: Future = group 5+/8+ (5+ currently disabled), Founders = Explore/Challenge -->
           <div v-show="step === 2" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
               <div class="wizard-options wizard-options-two">
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '5' }" @click="selectFutureGroup('5')">
-                  <img :src="logoFuture" alt="" class="wizard-option-logo" />
+                <button
+                  type="button"
+                  class="wizard-option wizard-option-card"
+                  :class="{ active: futureGroup === '5', 'is-disabled': !FUTURE_GROUP_5_ENABLED }"
+                  :disabled="!FUTURE_GROUP_5_ENABLED"
+                  @click="selectFutureGroup('5')"
+                >
                   <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup5" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.futureGroup5Desc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: futureGroup === '8' }" @click="selectFutureGroup('8')">
-                  <img :src="logoFuture" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup8" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.futureGroup8Desc" /></div>
                 </button>
@@ -1111,12 +1110,10 @@ watch(
             <template v-else>
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'explore' }" @click="selectFoundersVariant('explore')">
-                  <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionExplore" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionExploreDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersVariant === 'challenge' }" @click="selectFoundersVariant('challenge')">
-                  <img :src="logoFounders" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="wizard.optionChallenge" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.optionChallengeDesc" /></div>
                 </button>
@@ -1129,7 +1126,7 @@ watch(
             <template v-if="edition === 'future'">
               <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
               <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
-              <div class="wizard-options wizard-options-three wizard-options-grid">
+              <div class="wizard-options wizard-options-three wizard-options-vertical">
                 <button
                   v-for="num in FUTURE_PUPIL_OPTIONS"
                   :key="num"
@@ -1145,12 +1142,10 @@ watch(
             <template v-else>
               <div class="wizard-options wizard-options-two">
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="selectFoundersType('team')">
-                  <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
                 </button>
                 <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="selectFoundersType('class')">
-                  <img :src="logoFirstFllV" alt="" class="wizard-option-logo" />
                   <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
                   <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>
                 </button>
@@ -1162,11 +1157,10 @@ watch(
           <div v-show="step === 4" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-form-section-title"><I18nText k="wizard.formRequiredSection" /></p>
             <p class="wizard-hint wizard-hint-compact"><I18nText k="wizard.requiredLegend" /></p>
-            <div v-if="edition !== 'future'" class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
+            <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
               <input v-model="formData.name" type="text" placeholder=" " />
               <label>
-                <I18nText v-if="foundersType === 'team'" k="enrollTeam.teamName" />
-                <I18nText v-else k="enrollClass.className" />
+                <I18nText k="enrollTeam.teamName" />
                 <span class="required">*</span>
               </label>
               <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('name')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
@@ -1185,8 +1179,8 @@ watch(
                 <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
                 <select v-model="formData.schoolType">
                   <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
-                    {{ t(opt.labelKey) }}
+                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
+                    {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
                   </option>
                 </select>
                 <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
@@ -1215,29 +1209,12 @@ watch(
                 <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
             </template>
-            <p class="wizard-form-section-title wizard-form-section-title-optional"><I18nText k="wizard.formOptionalSection" /></p>
             <template v-if="foundersType === 'class'">
-              <div class="field" :class="{ filled: isFilled(formData.grade) }">
-                <input v-model="formData.grade" type="text" placeholder=" " />
-                <label><I18nText k="enrollClass.grade" /></label>
-              </div>
-              <div class="field" :class="{ filled: isFilled(formData.teacherName) }">
-                <input v-model="formData.teacherName" type="text" placeholder=" " />
-                <label><I18nText k="enrollClass.teacherName" /></label>
-              </div>
-              <div class="field" :class="{ filled: isFilled(formData.description) }">
-                <input v-model="formData.description" type="text" placeholder=" " />
-                <label><I18nText k="enrollClass.description" /></label>
-              </div>
               <div class="field" :class="{ filled: isFilled(formData.playersTotal) }">
                 <input v-model="formData.playersTotal" type="number" min="0" step="1" placeholder=" " />
                 <label><I18nText k="enrollClass.playersTotal" /></label>
               </div>
             </template>
-            <div class="field" :class="{ filled: isFilled(formData.notes) }">
-              <textarea v-model="formData.notes" rows="2" placeholder=" " />
-              <label><I18nText k="enrollTeam.notes" /></label>
-            </div>
           </div>
 
           <!-- Step 5: Participants (Founder team only) -->
@@ -1279,26 +1256,15 @@ watch(
           <div v-show="step === 6 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
             <div class="wizard-event-select-wrap">
-              <div class="wizard-event-dropdowns">
-                <EventSelectDropdown
-                  :title="t('wizard.eventSelectAllEvents')"
-                  :events="founderEvents"
-                  :loading="founderEventsLoading"
-                  :model-value="founderTeamEventId"
-                  :placeholder="t('wizard.founderTeamEventPlaceholder')"
-                  :event-label-fn="futureEventOptionLabel"
-                  @update:model-value="founderTeamEventId = $event"
-                />
-                <EventSelectDropdown
-                  :title="t('wizard.eventSelectNearest')"
-                  :events="founderEventsNearest"
-                  :loading="founderEventsNearestLoading"
-                  :model-value="founderTeamEventId"
-                  :placeholder="t('wizard.founderTeamEventPlaceholder')"
-                  :event-label-fn="futureEventOptionLabel"
-                  @update:model-value="founderTeamEventId = $event"
-                />
-              </div>
+              <EventSelectDropdown
+                :title="t('wizard.eventSelectSimple')"
+                :events="founderEventsNearest"
+                :loading="founderEventsNearestLoading"
+                :model-value="founderTeamEventId"
+                :placeholder="t('wizard.founderTeamEventPlaceholder')"
+                :event-label-fn="futureEventOptionLabel"
+                @update:model-value="founderTeamEventId = $event"
+              />
             </div>
           </div>
 
@@ -1319,26 +1285,15 @@ watch(
                 </button>
                 <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
                   <p class="wizard-event-label"><I18nText k="wizard.onSiteEventSelect" /></p>
-                  <div class="wizard-event-dropdowns">
-                    <EventSelectDropdown
-                      :title="t('wizard.eventSelectAllEvents')"
-                      :events="futureEvents"
-                      :loading="futureEventsLoading"
-                      :model-value="futureEventId"
-                      :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
-                      :event-label-fn="futureEventOptionLabel"
-                      @update:model-value="futureEventId = $event"
-                    />
-                    <EventSelectDropdown
-                      :title="t('wizard.eventSelectNearest')"
-                      :events="futureEventsNearest"
-                      :loading="futureEventsNearestLoading"
-                      :model-value="futureEventId"
-                      :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
-                      :event-label-fn="futureEventOptionLabel"
-                      @update:model-value="futureEventId = $event"
-                    />
-                  </div>
+                  <EventSelectDropdown
+                    :title="t('wizard.eventSelectSimple')"
+                    :events="futureEventsNearest"
+                    :loading="futureEventsNearestLoading"
+                    :model-value="futureEventId"
+                    :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                    :event-label-fn="futureEventOptionLabel"
+                    @update:model-value="futureEventId = $event"
+                  />
                 </div>
                 <button
                   type="button"
@@ -1471,12 +1426,13 @@ watch(
                   <I18nText v-else k="wizard.optionChallenge" tag="span" />
                 </strong>
               </div>
-              <div class="wizard-cart-row">
-                <span>
-                  <I18nText v-if="foundersType === 'team'" k="enrollTeam.teamName" />
-                  <I18nText v-else k="enrollClass.className" />
-                </span>
+              <div v-if="foundersType === 'team'" class="wizard-cart-row">
+                <span><I18nText k="enrollTeam.teamName" /></span>
                 <strong>{{ formData.name?.trim() || '—' }}</strong>
+              </div>
+              <div v-else-if="formData.organization?.trim()" class="wizard-cart-row">
+                <span><I18nText k="enroll.schoolName" /></span>
+                <strong>{{ formData.organization.trim() }}</strong>
               </div>
               <div v-if="foundersType === 'team' && founderTeamEventId" class="wizard-cart-row">
                 <span><I18nText k="wizard.stepEvent" /></span>
@@ -1599,11 +1555,15 @@ watch(
 }
 /* Scroll lives on .wizard-scroll; body is content only */
 .wizard-body {
-  flex: none;
+  flex: 1 0 auto;
+  min-height: 100%;
   overflow: visible;
   padding: 1.5rem 2rem 1rem;
   display: flex;
   flex-direction: column;
+}
+.wizard-body--center-options {
+  justify-content: center;
 }
 .wizard-panel-main {
   --wizard-footer-safe: 6.5rem;
@@ -1616,6 +1576,8 @@ watch(
 .wizard-scroll {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -1733,6 +1695,9 @@ watch(
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+}
+.wizard-step-voucher.wizard-step-voucher--choice {
+  justify-content: center;
 }
 .wizard-step-voucher .wizard-step-voucher-inner {
   width: 100%;
@@ -1907,6 +1872,19 @@ watch(
   flex: 1;
   min-width: 5rem;
 }
+.wizard-options-vertical {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+  gap: 0.75rem;
+}
+.wizard-options-vertical .wizard-option {
+  width: 100%;
+  min-height: 4.6rem;
+  padding: 0.95rem 1rem;
+}
 .wizard-option {
   padding: 2.25rem 2rem;
   font-size: 1.15rem;
@@ -1970,6 +1948,13 @@ watch(
   background: var(--color-accent-soft);
   color: var(--color-accent);
   box-shadow: 0 8px 18px rgba(59, 130, 246, 0.18);
+}
+.wizard-option:disabled,
+.wizard-option.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 .wizard-step-form .field {
   margin-bottom: 1.25rem;
@@ -2411,6 +2396,9 @@ watch(
   .wizard-body {
     padding-top: 0.75rem;
   }
+  .wizard-body--center-options {
+    justify-content: flex-start;
+  }
   .wizard-step {
     min-height: 5rem;
   }
@@ -2432,10 +2420,6 @@ watch(
   }
   .wizard-step-pupils .wizard-options {
     margin-top: 0.2rem;
-  }
-  .wizard-options-three.wizard-options-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.7rem;
   }
   .wizard-options-three .wizard-option {
     min-height: 5.2rem;
@@ -2525,8 +2509,8 @@ watch(
   .wizard-footer .btn {
     width: 100%;
   }
-  .wizard-options-three.wizard-options-grid {
-    grid-template-columns: 1fr;
+  .wizard-options-vertical {
+    max-width: 100%;
   }
 }
 </style>

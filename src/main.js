@@ -9,6 +9,7 @@ import { applyDraftsToI18nFromData } from './i18n/mergeLocaleDrafts.js'
 import { loadAllLocaleDrafts } from './utils/localeDrafts'
 import { initTheme } from './theme'
 import I18nText from './components/I18nText.vue'
+import { registerSW } from 'virtual:pwa-register'
 
 initTheme()
 
@@ -18,3 +19,5 @@ app.use(i18n)
 applyDraftsToI18nFromData(loadAllLocaleDrafts())
 app.use(router)
 app.mount('#app')
+
+registerSW({ immediate: true })

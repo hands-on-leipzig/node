@@ -42,8 +42,20 @@ function relativePathFor(file) {
  * @param {DocFile[]} files
  * @returns {{ files: DocFile[], folders: Array<{ name: string, node: ReturnType<typeof finalizeNode> }> }}
  */
-export function buildDocumentsFolderTree(files) {
+export function buildDocumentsFolderTree(files, folderPaths = []) {
   const root = emptyNode()
+  const normalizedFolderPaths = Array.isArray(folderPaths) ? folderPaths : []
+  for (const fp of normalizedFolderPaths) {
+    const segments = String(fp || '').split('/').map((s) => s.trim()).filter(Boolean)
+    if (segments.length === 0) continue
+    let node = root
+    for (const seg of segments) {
+      if (!node.children.has(seg)) {
+        node.children.set(seg, emptyNode())
+      }
+      node = node.children.get(seg)
+    }
+  }
   if (!Array.isArray(files)) return finalizeNode(root)
   for (const file of files) {
     const rel = relativePathFor(file)

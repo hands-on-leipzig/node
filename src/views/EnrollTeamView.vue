@@ -29,7 +29,6 @@ const form = ref({
   state: '',
   organization: '',
   voucher: '',
-  notes: '',
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
@@ -198,7 +197,6 @@ async function submit() {
       state: form.value.state?.trim() || undefined,
       organization: form.value.organization?.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
-      notes: form.value.notes.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
       invoiceAddress: buildInvoiceAddressPayload(),
     }
@@ -219,7 +217,6 @@ async function submit() {
       state: '',
       organization: '',
       voucher: '',
-      notes: '',
       deliveryAddress: emptyAddressState(),
       invoiceAddress: emptyAddressState(),
     }
@@ -364,15 +361,6 @@ function onFormFieldFocus(e) {
         id-prefix="team-invoice"
       />
 
-      <div class="field">
-        <label for="team-notes"><I18nText k="enrollTeam.notes" /></label>
-        <textarea
-          id="team-notes"
-          v-model="form.notes"
-          rows="3"
-          :placeholder="t('enrollTeam.optionalNotes')"
-        />
-      </div>
       <div v-if="error" class="message error">
         <i class="bi bi-exclamation-circle"></i>
         {{ error }}
