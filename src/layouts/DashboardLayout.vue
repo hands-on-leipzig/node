@@ -138,17 +138,48 @@ function handleClickOutside(e) {
   }
 }
 
+function pushBackTrapState() {
+  if (typeof window === 'undefined') return
+  if (!route.path.startsWith('/dashboard')) return
+  window.history.pushState({ hotBackTrap: true }, '', window.location.href)
+}
+
+function handleBrowserBack() {
+  if (typeof window === 'undefined') return
+  if (!route.path.startsWith('/dashboard')) return
+
+  const backEvent = new CustomEvent('hot-browser-back', { detail: { handled: false } })
+  window.dispatchEvent(backEvent)
+  if (backEvent.detail?.handled) {
+    pushBackTrapState()
+    return
+  }
+
+  if (route.name !== 'dashboard') {
+    router.replace({ name: 'dashboard' }).finally(() => {
+      pushBackTrapState()
+    })
+    return
+  }
+
+  pushBackTrapState()
+}
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('popstate', handleBrowserBack)
+  pushBackTrapState()
   loadSidebarLists()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('popstate', handleBrowserBack)
 })
 watch(
   () => route.path,
   (path) => {
     if (path === '/dashboard' || path === '/dashboard/') loadSidebarLists()
+    pushBackTrapState()
   }
 )
 

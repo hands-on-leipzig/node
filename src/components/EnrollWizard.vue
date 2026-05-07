@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
@@ -17,6 +17,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'success'])
+const previousBodyOverflow = ref('')
+const previousHtmlOverflow = ref('')
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -42,6 +44,9 @@ const futureOnSiteEvent = ref(null) // null | 'yes' | 'later'
 const futureEventId = ref(null)
 const futureEventsNearest = ref([])
 const futureEventsNearestLoading = ref(false)
+const futureEventTeamCount = ref(1)
+const requestedFutureTeamCount = ref(null)
+const futureTeamEvents = ref([])
 const foundersType = ref(null)
 // Step 4
 const formData = ref({
@@ -81,6 +86,7 @@ const founderEventsNearestLoading = ref(false)
 const deliveryAddress = ref(emptyAddressState())
 const invoiceAddress = ref(emptyAddressState())
 const addresses = ref([])
+const deliveryAddressDifferent = ref(false)
 
 const step = ref(1)
 const submitting = ref(false)
@@ -103,6 +109,27 @@ const lastStep = computed(() => {
 })
 
 const totalSteps = computed(() => lastStep.value + 1)
+const FUTURE_EVENT_TEAM_SIZE = 8
+const futureTeamOptionCounts = computed(() =>
+  Array.from(new Set(
+    FUTURE_PUPIL_OPTIONS
+      .map((n) => Math.floor(Number(n) / FUTURE_EVENT_TEAM_SIZE))
+      .filter((n) => Number.isFinite(n) && n > 0),
+  )).sort((a, b) => a - b),
+)
+const maxFutureEventTeamsByPupils = computed(() => {
+  const pupils = Number(futurePupils.value)
+  if (!Number.isFinite(pupils) || pupils <= 0) return 0
+  return Math.max(1, Math.floor(pupils / FUTURE_EVENT_TEAM_SIZE))
+})
+const futureTeamEventsAllSelected = computed(() => {
+  if (futureOnSiteEvent.value !== 'yes') return true
+  if (futureTeamEvents.value.length === 0) return false
+  return futureTeamEvents.value.every((entry) => {
+    const evId = Number(entry?.eventId)
+    return Number.isFinite(evId) && evId > 0
+  })
+})
 
 /** Matches the step label (step+1)/(last+1): first screen > 0% and final screen = 100%. */
 const progress = computed(() => {
@@ -185,7 +212,82 @@ function scheduleAdvanceIfReady(expectedStep) {
 
 function selectFuturePupils(num) {
   futurePupils.value = num
+  const maxTeams = maxFutureEventTeamsByPupils.value
+  if (futureEventTeamCount.value > maxTeams) {
+    futureEventTeamCount.value = maxTeams
+  }
+  if (requestedFutureTeamCount.value != null && requestedFutureTeamCount.value <= maxTeams) {
+    futureEventTeamCount.value = requestedFutureTeamCount.value
+    requestedFutureTeamCount.value = null
+  }
   scheduleAdvanceIfReady(3)
+}
+
+function selectFutureEventTeamCount(count) {
+  const n = Number(count)
+  const maxTeams = maxFutureEventTeamsByPupils.value
+  if (!Number.isFinite(n) || n <= 0) return
+  if (n <= maxTeams) {
+    futureEventTeamCount.value = n
+    requestedFutureTeamCount.value = null
+    return
+  }
+  requestedFutureTeamCount.value = n
+}
+
+function upgradeFuturePupilsForRequestedTeams() {
+  const requested = Number(requestedFutureTeamCount.value)
+  if (!Number.isFinite(requested) || requested <= 0) return
+  const neededPupils = requested * FUTURE_EVENT_TEAM_SIZE
+  if (!FUTURE_PUPIL_OPTIONS.includes(neededPupils)) return
+  futurePupils.value = neededPupils
+  futureEventTeamCount.value = requested
+  requestedFutureTeamCount.value = null
+}
+
+function normalizeFutureEventTeamCount() {
+  const maxTeams = maxFutureEventTeamsByPupils.value
+  if (maxTeams <= 0) return 0
+  const current = Number(futureEventTeamCount.value)
+  if (!Number.isFinite(current) || current < 1) return 1
+  return Math.min(current, maxTeams)
+}
+
+function syncFutureTeamEventsArray() {
+  if (futureOnSiteEvent.value !== 'yes') {
+    futureTeamEvents.value = []
+    futureEventId.value = null
+    return
+  }
+  const count = normalizeFutureEventTeamCount()
+  while (futureTeamEvents.value.length < count) {
+    futureTeamEvents.value.push({ eventId: null })
+  }
+  futureTeamEvents.value = futureTeamEvents.value.slice(0, count)
+}
+
+function updateDerivedFutureEventId() {
+  if (futureOnSiteEvent.value !== 'yes' || futureTeamEvents.value.length === 0) {
+    futureEventId.value = null
+    return
+  }
+  const ids = futureTeamEvents.value
+    .map((entry) => Number(entry?.eventId))
+    .filter((id) => Number.isFinite(id) && id > 0)
+  if (!ids.length || ids.length !== futureTeamEvents.value.length) {
+    futureEventId.value = null
+    return
+  }
+  const allSame = ids.every((id) => id === ids[0])
+  futureEventId.value = allSame ? ids[0] : null
+}
+
+function selectFutureTeamEvent(teamIndex, eventId) {
+  const idx = Number(teamIndex)
+  if (!Number.isFinite(idx) || idx < 0) return
+  if (!futureTeamEvents.value[idx]) return
+  futureTeamEvents.value[idx] = { eventId: eventId ? Number(eventId) : null }
+  updateDerivedFutureEventId()
 }
 
 const summaryItems = computed(() => {
@@ -207,8 +309,12 @@ const summaryItems = computed(() => {
   if (edition.value === 'future' && futurePupils.value != null) {
     items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
   }
-  if (edition.value === 'future' && futureOnSiteEvent.value === 'yes' && futureEventId.value) {
-    items.push({ label: selectedFutureEventLabel.value || t('wizard.onSiteEventSelected') })
+  if (edition.value === 'future' && futureOnSiteEvent.value === 'yes') {
+    if (futureTeamEventSummaries.value.length > 0) {
+      futureTeamEventSummaries.value.forEach((line) => items.push({ label: line }))
+    } else if (futureEventId.value) {
+      items.push({ label: selectedFutureEventLabel.value || t('wizard.onSiteEventSelected') })
+    }
   }
   if (edition.value === 'founders' && foundersType.value) {
     items.push({ label: t(foundersType.value === 'team' ? 'dashboard.team' : 'dashboard.class') })
@@ -224,6 +330,18 @@ const selectedFutureEventLabel = computed(() => {
   const ev = futureEventsNearest.value.find((e) => String(e.id) === String(futureEventId.value))
   return ev ? (ev.label || ev.name || ev.title || ev.ref) : null
 })
+
+const futureTeamEventSummaries = computed(() =>
+  futureTeamEvents.value
+    .map((entry, idx) => {
+      const evId = Number(entry?.eventId)
+      if (!Number.isFinite(evId) || evId <= 0) return null
+      const ev = futureEventsNearest.value.find((item) => String(item.id) === String(evId))
+      const evLabel = ev ? (ev.label || ev.name || ev.title || ev.ref) : `#${evId}`
+      return `${t('wizard.teamSingular')} ${idx + 1}: ${evLabel}`
+    })
+    .filter(Boolean),
+)
 
 const selectedFounderEventLabel = computed(() => {
   if (!founderTeamEventId.value || !founderEventsNearest.value.length) return null
@@ -372,6 +490,9 @@ function openWizard() {
   futureOnSiteEvent.value = null
   futureEventId.value = null
   futureEventsNearest.value = []
+  futureEventTeamCount.value = 1
+  requestedFutureTeamCount.value = null
+  futureTeamEvents.value = []
   foundersType.value = null
   formData.value = { name: '', schoolOrClub: '', schoolType: '', organization: '', country: '', zip: '', city: '', state: '', location: '', playersTotal: '' }
   voucher.value = ''
@@ -387,6 +508,7 @@ function openWizard() {
   presetEventTeamCount.value = null
   deliveryAddress.value = emptyAddressState()
   invoiceAddress.value = emptyAddressState()
+  deliveryAddressDifferent.value = false
   founderTeamPlayers.value = []
   founderTeamEventId.value = null
   step.value = 0
@@ -469,7 +591,13 @@ function canNext() {
   if (step.value === 5 && foundersTeamHasParticipantsStep.value) return true // participants optional
   if (step.value === 5 && edition.value === 'future') {
     if (!futureOnSiteEvent.value) return false
-    if (futureOnSiteEvent.value === 'yes') return !!futureEventId.value
+    if (futureOnSiteEvent.value === 'yes') {
+      const n = Number(futureEventTeamCount.value)
+      return Number.isFinite(n)
+        && n >= 1
+        && n <= maxFutureEventTeamsByPupils.value
+        && futureTeamEventsAllSelected.value
+    }
     return true
   }
   if (step.value === 5 && edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
@@ -514,6 +642,20 @@ function prev() {
   }
   if (step.value > 1) step.value--
 }
+
+function handleBrowserBack() {
+  if (!props.open) return false
+  if (step.value > 0) {
+    prev()
+    return true
+  }
+  close()
+  return true
+}
+
+defineExpose({
+  handleBrowserBack,
+})
 
 async function loadFutureEventsNearest() {
   futureEventsNearestLoading.value = true
@@ -580,9 +722,14 @@ function buildInvoicePayload() {
   return buildAddressPayload(invoiceAddress.value)
 }
 
+function buildDeliveryPayload() {
+  if (!deliveryAddressDifferent.value) return buildInvoicePayload()
+  return buildAddressPayload(deliveryAddress.value)
+}
+
 /** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
 function isDeliveryAddressValid() {
-  return !!buildAddressPayload(deliveryAddress.value)
+  return !!buildDeliveryPayload()
 }
 
 /** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
@@ -672,6 +819,7 @@ function applyVoucherPreset(raw) {
   const etc = Number(data.eventTeamCount)
   if (Number.isFinite(etc) && etc >= 0) {
     presetEventTeamCount.value = etc
+    if (etc > 0) futureEventTeamCount.value = etc
   } else if (data.eventTeamCount == null) {
     presetEventTeamCount.value = null
   }
@@ -681,6 +829,10 @@ function applyVoucherPreset(raw) {
   const evId = Number(data.eventId)
   if (Number.isFinite(evId) && evId > 0) {
     futureEventId.value = evId
+    const teamCount = Number.isFinite(Number(futureEventTeamCount.value)) && Number(futureEventTeamCount.value) > 0
+      ? Number(futureEventTeamCount.value)
+      : 1
+    futureTeamEvents.value = Array.from({ length: teamCount }, () => ({ eventId: evId }))
   }
   const invId = Number(data.invoiceAddressId)
   if (Number.isFinite(invId) && invId > 0) {
@@ -849,23 +1001,34 @@ async function submit() {
         location: formData.value.city?.trim() || undefined,
         state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
-        deliveryAddress: buildAddressPayload(deliveryAddress.value),
+        deliveryAddress: buildDeliveryPayload(),
         invoiceAddress: buildInvoicePayload(),
       }
       if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
         payload.seasonSetCount = presetSeasonSetCount.value
         payload.num_boards = presetSeasonSetCount.value
       }
-      if (presetRegisterEventTeams.value === true) {
+      if (futureOnSiteEvent.value === 'yes') {
         payload.registerEventTeams = true
-        const n = presetEventTeamCount.value
-        if (n != null && Number.isFinite(n) && n >= 0) payload.eventTeamCount = n
-      } else if (presetRegisterEventTeams.value === false) {
+        const n = Number(futureEventTeamCount.value)
+        payload.eventTeamCount = Number.isFinite(n) && n >= 1 ? n : 1
+        const teamEventsPayload = futureTeamEvents.value
+          .map((entry, index) => {
+            const evId = Number(entry?.eventId)
+            if (!Number.isFinite(evId) || evId <= 0) return null
+            return { index: index + 1, eventId: evId }
+          })
+          .filter(Boolean)
+        if (teamEventsPayload.length) {
+          payload.eventTeams = teamEventsPayload
+        }
+        const uniqueEventIds = Array.from(new Set(teamEventsPayload.map((entry) => entry.eventId)))
+        if (uniqueEventIds.length === 1) {
+          payload.eventId = uniqueEventIds[0]
+        }
+      } else if (presetRegisterEventTeams.value === false || futureOnSiteEvent.value === 'later') {
         payload.registerEventTeams = false
         payload.eventTeamCount = 0
-      }
-      if (futureOnSiteEvent.value === 'yes' && futureEventId.value) {
-        payload.eventId = futureEventId.value
       }
       const res = await enrollFuture(payload)
       const createdId = getCreatedId(res)
@@ -879,7 +1042,7 @@ async function submit() {
     } else {
       const isTeam = foundersType.value === 'team'
       const program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
-      const deliveryPayload = buildAddressPayload(deliveryAddress.value)
+      const deliveryPayload = buildDeliveryPayload()
       const invoicePayload = buildInvoicePayload()
       const resolvedName = isTeam
         ? formData.value.name.trim()
@@ -946,21 +1109,56 @@ async function submit() {
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) openWizard()
+  if (typeof document !== 'undefined') {
+    if (isOpen) {
+      previousBodyOverflow.value = document.body.style.overflow || ''
+      previousHtmlOverflow.value = document.documentElement.style.overflow || ''
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = previousBodyOverflow.value
+      document.documentElement.style.overflow = previousHtmlOverflow.value
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = previousBodyOverflow.value
+    document.documentElement.style.overflow = previousHtmlOverflow.value
+  }
 })
 
 watch(futureOnSiteEvent, (val) => {
   if (!props.open || edition.value !== 'future') return
   if (step.value !== 5) return
+  if (val === 'yes') {
+    if (!Number.isFinite(Number(futureEventTeamCount.value)) || Number(futureEventTeamCount.value) < 1) {
+      futureEventTeamCount.value = 1
+    }
+    syncFutureTeamEventsArray()
+    return
+  }
   if (val === 'later') {
     futureEventId.value = null
+    futureTeamEvents.value = []
+    requestedFutureTeamCount.value = null
     next()
   }
 })
 
-watch(futureEventId, (val) => {
-  if (!props.open || edition.value !== 'future') return
-  if (step.value !== 5) return
-  if (futureOnSiteEvent.value === 'yes' && val) next()
+watch([futureEventTeamCount, maxFutureEventTeamsByPupils], () => {
+  syncFutureTeamEventsArray()
+  updateDerivedFutureEventId()
+})
+
+watch(futurePupils, () => {
+  const maxTeams = maxFutureEventTeamsByPupils.value
+  if (maxTeams > 0 && futureEventTeamCount.value > maxTeams) {
+    futureEventTeamCount.value = maxTeams
+  }
+  syncFutureTeamEventsArray()
+  updateDerivedFutureEventId()
 })
 
 watch(founderTeamEventId, (val) => {
@@ -1294,15 +1492,70 @@ watch(
                 </button>
                 <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
                   <p class="wizard-event-label"><I18nText k="wizard.onSiteEventSelect" /></p>
-                  <EventSelectDropdown
-                    :title="t('wizard.eventSelectSimple')"
-                    :events="futureEventsNearest"
-                    :loading="futureEventsNearestLoading"
-                    :model-value="futureEventId"
-                    :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
-                    :event-label-fn="futureEventOptionLabel"
-                    @update:model-value="futureEventId = $event"
-                  />
+                  <p class="wizard-hint wizard-event-team-hint">
+                    <I18nText k="wizard.onSiteEventTeamsHint" />
+                    <strong>{{ maxFutureEventTeamsByPupils }}</strong>
+                  </p>
+                  <div class="wizard-options wizard-options-three wizard-options-vertical wizard-event-team-options">
+                    <button
+                      v-for="count in futureTeamOptionCounts"
+                      :key="'future-event-team-' + count"
+                      type="button"
+                      class="wizard-option wizard-option-card wizard-option-team-count"
+                      :class="{
+                        active: futureEventTeamCount === count,
+                        'is-disabled': count > maxFutureEventTeamsByPupils,
+                      }"
+                      :aria-disabled="count > maxFutureEventTeamsByPupils ? 'true' : 'false'"
+                      @click="selectFutureEventTeamCount(count)"
+                    >
+                      <div class="wizard-option-main">
+                        {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
+                      </div>
+                      <div class="wizard-option-desc">
+                        {{ count * 8 }} <I18nText k="enrollFuture.pupils" />
+                      </div>
+                    </button>
+                  </div>
+                  <div v-if="futureEventTeamCount > 0" class="wizard-event-team-selects">
+                    <div
+                      v-for="(entry, idx) in futureTeamEvents"
+                      :key="'future-event-select-' + idx"
+                      class="wizard-event-team-select-block"
+                    >
+                      <p class="wizard-event-label">
+                        {{ t('wizard.onSiteEventSelectTeam', { team: idx + 1 }) }}
+                      </p>
+                      <EventSelectDropdown
+                        :title="t('wizard.eventSelectSimple')"
+                        :events="futureEventsNearest"
+                        :loading="futureEventsNearestLoading"
+                        :model-value="entry.eventId"
+                        :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                        :event-label-fn="futureEventOptionLabel"
+                        @update:model-value="selectFutureTeamEvent(idx, $event)"
+                      />
+                    </div>
+                  </div>
+                  <div
+                    v-if="requestedFutureTeamCount && requestedFutureTeamCount > maxFutureEventTeamsByPupils"
+                    class="wizard-event-team-upgrade"
+                  >
+                    <p>
+                      <I18nText
+                        k="wizard.eventTeamUpgradeNeeded"
+                        :args="{ teams: requestedFutureTeamCount, pupils: requestedFutureTeamCount * 8 }"
+                      />
+                    </p>
+                    <button
+                      v-if="FUTURE_PUPIL_OPTIONS.includes(requestedFutureTeamCount * 8)"
+                      type="button"
+                      class="btn btn-primary"
+                      @click="upgradeFuturePupilsForRequestedTeams"
+                    >
+                      <I18nText k="wizard.eventTeamUpgradeAction" />
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -1341,30 +1594,12 @@ watch(
                 <span><I18nText k="wizard.orderSchool" /></span>
                 <strong>{{ formData.organization.trim() }}</strong>
               </div>
-              <div v-if="futureOnSiteEvent === 'yes' && futureEventId" class="wizard-cart-row">
+              <div v-if="futureOnSiteEvent === 'yes' && futureTeamEventSummaries.length" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderOnSiteEvent" /></span>
-                <strong>{{ selectedFutureEventLabel || futureEventId }}</strong>
+                <strong class="wizard-cart-multi-lines">{{ futureTeamEventSummaries.join(' · ') }}</strong>
               </div>
             </div>
 
-            <div class="field" :class="{ filled: isFilled(voucher) }">
-              <input
-                v-model="voucher"
-                type="text"
-                placeholder=" "
-                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
-                @blur="onVoucherBlur"
-              />
-              <label><I18nText k="enroll.voucher" /></label>
-              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
-              <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
-              <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
-            </div>
-            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
-            </template>
-
-            <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
               <div class="field voucher-invoice-forced">
                 <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
@@ -1372,6 +1607,11 @@ watch(
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            <label class="wizard-delivery-toggle">
+              <input v-model="deliveryAddressDifferent" type="checkbox">
+              <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
+            </label>
+            <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <div class="wizard-next-steps">
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
               <ul>
@@ -1388,23 +1628,6 @@ watch(
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
-            <div class="field" :class="{ filled: isFilled(voucher) }">
-              <input
-                v-model="voucher"
-                type="text"
-                placeholder=" "
-                @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
-                @blur="onVoucherBlur"
-              />
-              <label><I18nText k="enroll.voucher" /></label>
-              <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
-              <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
-              <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
-            </div>
-            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
-              <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
-            </template>
-            <AddressSelector v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
               <div class="field voucher-invoice-forced">
                 <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
@@ -1412,6 +1635,11 @@ watch(
               </div>
             </template>
             <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            <label class="wizard-delivery-toggle">
+              <input v-model="deliveryAddressDifferent" type="checkbox">
+              <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
+            </label>
+            <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
           </div>
 
           <!-- Step 6: Order overview / Checkout (Founders class) / Step 8: Order overview (Founder team) -->
@@ -1508,6 +1736,7 @@ watch(
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  overflow: hidden;
 }
 .wizard-modal {
   width: 100%;
@@ -1592,6 +1821,13 @@ watch(
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   padding-bottom: max(var(--wizard-footer-safe), calc(env(safe-area-inset-bottom, 0px) + 5.5rem));
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.wizard-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 .wizard-step {
   min-height: 8rem;
@@ -1776,6 +2012,53 @@ watch(
   background: var(--color-bg-elevated);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
+}
+.wizard-event-team-hint {
+  margin-top: 0.9rem;
+  margin-bottom: 0.65rem;
+}
+.wizard-event-team-options {
+  max-width: none;
+}
+.wizard-option-team-count {
+  min-height: 3.9rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.wizard-event-team-selects {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.65rem;
+}
+.wizard-event-team-select-block {
+  padding: 0.7rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.wizard-event-team-upgrade {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.wizard-event-team-upgrade p {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+.wizard-delivery-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.35rem 0 0.8rem;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+.wizard-delivery-toggle input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
 }
 .wizard-event-dropdowns {
   display: flex;
@@ -2061,6 +2344,9 @@ watch(
 .wizard-cart-row strong {
   color: var(--color-text);
   font-weight: 600;
+}
+.wizard-cart-multi-lines {
+  line-height: 1.45;
 }
 .wizard-next-steps {
   margin-top: 0.75rem;

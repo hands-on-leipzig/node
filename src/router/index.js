@@ -22,19 +22,19 @@ const routes = [
       {
         path: 'enroll-team',
         name: 'enroll-team',
-        component: () => import('@/views/EnrollTeamView.vue'),
+        redirect: { name: 'dashboard', query: { wizard: '1' } },
         meta: { titleKey: 'nav.enrollTeam' },
       },
       {
         path: 'enroll-class',
         name: 'enroll-class',
-        component: () => import('@/views/EnrollClassView.vue'),
+        redirect: { name: 'dashboard', query: { wizard: '1' } },
         meta: { titleKey: 'nav.enrollClass' },
       },
       {
         path: 'enroll-future',
         name: 'enroll-future',
-        component: () => import('@/views/EnrollFutureView.vue'),
+        redirect: { name: 'dashboard', query: { wizard: '1' } },
         meta: { titleKey: 'nav.enrollFuture' },
       },
       {

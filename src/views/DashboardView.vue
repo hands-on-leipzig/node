@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import { listTeams, listClasses, listGroups, getOpenTasks, inviteCoCoach, checkCoCoachEmail } from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
@@ -13,8 +13,10 @@ import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 const wizardOpen = ref(false)
+const wizardRef = ref(null)
 const coCoachModalOpen = ref(false)
 const selectedRegistrationTarget = ref('')
 const coCoachEmail = ref('')
@@ -35,6 +37,12 @@ function resetCoCoachInviteForm() {
 
 function openWizard() {
   wizardOpen.value = true
+}
+function clearWizardQuery() {
+  if (!route.query?.wizard) return
+  const nextQuery = { ...route.query }
+  delete nextQuery.wizard
+  void router.replace({ name: 'dashboard', query: nextQuery })
 }
 function openCoCoachModal() {
   resetCoCoachInviteForm()
@@ -166,9 +174,19 @@ function coCoachTargetLabel(item) {
 }
 function onWizardClose() {
   wizardOpen.value = false
+  clearWizardQuery()
 }
 function onWizardSuccess() {
   loadLists()
+  clearWizardQuery()
+}
+
+function handleBrowserBackRequest(event) {
+  if (!wizardOpen.value) return
+  const handled = wizardRef.value?.handleBrowserBack?.()
+  if (handled && event?.detail) {
+    event.detail.handled = true
+  }
 }
 
 const teams = ref([])
@@ -286,6 +304,12 @@ function goToTask(item) {
 
 onMounted(async () => {
   loadLists()
+  if (route.query?.wizard === '1') {
+    wizardOpen.value = true
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('hot-browser-back', handleBrowserBackRequest)
+  }
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
     mobileMediaQuery = window.matchMedia('(max-width: 768px)')
     isMobileDashboard.value = !!mobileMediaQuery.matches
@@ -306,6 +330,9 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('hot-browser-back', handleBrowserBackRequest)
+  }
   if (detachMobileListener) detachMobileListener()
   if (pdfModalBlobUrl.value) {
     URL.revokeObjectURL(pdfModalBlobUrl.value)
@@ -318,6 +345,15 @@ watch(isMobileDashboard, async (mobile) => {
     await ensureDocumentsLoaded()
   }
 })
+
+watch(
+  () => route.query?.wizard,
+  (wizardFlag) => {
+    if (wizardFlag === '1') {
+      wizardOpen.value = true
+    }
+  },
+)
 
 async function ensureDocumentsLoaded() {
   if (documentsLoadedOnce.value || documentsLoading.value) return
@@ -724,7 +760,7 @@ const hasDocumentTreeContent = computed(() => {
       </div>
     </Teleport>
 
-    <EnrollWizard :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
+    <EnrollWizard ref="wizardRef" :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
     <PdfViewerModal
       :show="pdfModalOpen"
       :pdf-url="pdfModalUrl"
