@@ -83,6 +83,63 @@ export function getAddresses() {
   return api.get('/addresses')
 }
 
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value !== '') return value
+  }
+  return null
+}
+
+function normalizeAddressItem(raw, index = 0) {
+  if (!raw || typeof raw !== 'object') return null
+  const idRaw = firstDefined(raw.id, raw.addressId, raw.rowid, raw.fk_address, raw.fk_socpeople)
+  const street = firstDefined(raw.street, raw.address, raw.address1, raw.line1, raw.addr1, raw.adresse) || ''
+  const postalCode = firstDefined(raw.postalCode, raw.zip, raw.zipcode, raw.cp) || ''
+  const city = firstDefined(raw.city, raw.town) || ''
+  const country = firstDefined(raw.country, raw.countryCode, raw.country_code, raw.countrycode) || ''
+  const label = firstDefined(raw.label, raw.name, raw.title) || ''
+  const fallbackId = `addr-${index + 1}-${street}-${postalCode}-${city}`
+  return {
+    id: String(idRaw ?? fallbackId),
+    label: String(label || '').trim(),
+    street: String(street || '').trim(),
+    postalCode: String(postalCode || '').trim(),
+    city: String(city || '').trim(),
+    country: String(country || '').trim().toLowerCase(),
+  }
+}
+
+export function extractAddressesFromResponse(payload) {
+  const candidates = [
+    payload?.data?.data,
+    payload?.data?.addresses,
+    payload?.data,
+    payload?.addresses,
+    payload,
+  ]
+  const list = candidates.find((entry) => Array.isArray(entry)) || []
+  return list
+    .map((item, idx) => normalizeAddressItem(item, idx))
+    .filter(Boolean)
+}
+
+export async function listAddressBook() {
+  const res = await getAddresses()
+  return extractAddressesFromResponse(res)
+}
+
+export function createAddress(payload) {
+  return api.post('/addresses', payload)
+}
+
+export function updateAddress(addressId, payload) {
+  return api.put('/addresses/' + encodeURIComponent(addressId), payload)
+}
+
+export function deleteAddress(addressId) {
+  return api.delete('/addresses/' + encodeURIComponent(addressId))
+}
+
 /**
  * List events via flow API (for event registration, team nachmelden).
  * GET /handson/flow/events – returns list of events with capacity/usage (Auslastung) when provided.

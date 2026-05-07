@@ -2,10 +2,11 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent } from '@/services/draht'
+import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, extractAddressesFromResponse } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
+import { FUTURE_GROUP_PRICE_EUR } from '@/config/futureEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
@@ -45,7 +46,7 @@ const futureEventId = ref(null)
 const futureEventsNearest = ref([])
 const futureEventsNearestLoading = ref(false)
 const futureEventTeamCount = ref(1)
-const requestedFutureTeamCount = ref(null)
+const futureTeamAutoUpgrade = ref(null)
 const futureTeamEvents = ref([])
 const foundersType = ref(null)
 // Step 4
@@ -210,15 +211,26 @@ function scheduleAdvanceIfReady(expectedStep) {
   })
 }
 
+function formatFutureGroupPriceEur(pupils) {
+  const amount = FUTURE_GROUP_PRICE_EUR[Number(pupils)]
+  if (!Number.isFinite(amount)) return ''
+  try {
+    return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(amount)
+  } catch {
+    return `${amount} €`
+  }
+}
+
 function selectFuturePupils(num) {
   futurePupils.value = num
+  futureTeamAutoUpgrade.value = null
   const maxTeams = maxFutureEventTeamsByPupils.value
   if (futureEventTeamCount.value > maxTeams) {
     futureEventTeamCount.value = maxTeams
-  }
-  if (requestedFutureTeamCount.value != null && requestedFutureTeamCount.value <= maxTeams) {
-    futureEventTeamCount.value = requestedFutureTeamCount.value
-    requestedFutureTeamCount.value = null
   }
   scheduleAdvanceIfReady(3)
 }
@@ -229,20 +241,14 @@ function selectFutureEventTeamCount(count) {
   if (!Number.isFinite(n) || n <= 0) return
   if (n <= maxTeams) {
     futureEventTeamCount.value = n
-    requestedFutureTeamCount.value = null
+    futureTeamAutoUpgrade.value = null
     return
   }
-  requestedFutureTeamCount.value = n
-}
-
-function upgradeFuturePupilsForRequestedTeams() {
-  const requested = Number(requestedFutureTeamCount.value)
-  if (!Number.isFinite(requested) || requested <= 0) return
-  const neededPupils = requested * FUTURE_EVENT_TEAM_SIZE
+  const neededPupils = n * FUTURE_EVENT_TEAM_SIZE
   if (!FUTURE_PUPIL_OPTIONS.includes(neededPupils)) return
   futurePupils.value = neededPupils
-  futureEventTeamCount.value = requested
-  requestedFutureTeamCount.value = null
+  futureEventTeamCount.value = n
+  futureTeamAutoUpgrade.value = { teams: n, pupils: neededPupils }
 }
 
 function normalizeFutureEventTeamCount() {
@@ -491,7 +497,7 @@ function openWizard() {
   futureEventId.value = null
   futureEventsNearest.value = []
   futureEventTeamCount.value = 1
-  requestedFutureTeamCount.value = null
+  futureTeamAutoUpgrade.value = null
   futureTeamEvents.value = []
   foundersType.value = null
   formData.value = { name: '', schoolOrClub: '', schoolType: '', organization: '', country: '', zip: '', city: '', state: '', location: '', playersTotal: '' }
@@ -696,9 +702,15 @@ async function loadFounderTeamEventsNearest() {
 async function loadAddresses() {
   try {
     const res = await getAddresses()
-    const list = res.data?.data ?? (Array.isArray(res.data) ? res.data : [])
-    addresses.value = Array.isArray(list) ? list : []
-    if (addresses.value.length === 0) {
+    addresses.value = extractAddressesFromResponse(res)
+    if (addresses.value.length > 0) {
+      if (deliveryAddress.value.useExisting === false) {
+        deliveryAddress.value = { ...deliveryAddress.value, useExisting: true }
+      }
+      if (invoiceAddress.value.useExisting === false) {
+        invoiceAddress.value = { ...invoiceAddress.value, useExisting: true }
+      }
+    } else {
       deliveryAddress.value = { ...deliveryAddress.value, useExisting: false }
       invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
     }
@@ -1108,7 +1120,10 @@ async function submit() {
 }
 
 watch(() => props.open, (isOpen) => {
-  if (isOpen) openWizard()
+  if (isOpen) {
+    openWizard()
+    loadAddresses()
+  }
   if (typeof document !== 'undefined') {
     if (isOpen) {
       previousBodyOverflow.value = document.body.style.overflow || ''
@@ -1142,7 +1157,7 @@ watch(futureOnSiteEvent, (val) => {
   if (val === 'later') {
     futureEventId.value = null
     futureTeamEvents.value = []
-    requestedFutureTeamCount.value = null
+    futureTeamAutoUpgrade.value = null
     next()
   }
 })
@@ -1338,11 +1353,16 @@ watch(
                   v-for="num in FUTURE_PUPIL_OPTIONS"
                   :key="num"
                   type="button"
-                  class="wizard-option"
+                  class="wizard-option wizard-option-card"
                   :class="{ active: futurePupils === num }"
                   @click="selectFuturePupils(num)"
                 >
-                  {{ num }}
+                  <div class="wizard-option-main">
+                    {{ num }} <I18nText k="enrollFuture.pupils" />
+                  </div>
+                  <div class="wizard-option-desc">
+                    {{ formatFutureGroupPriceEur(num) }}
+                  </div>
                 </button>
               </div>
             </template>
@@ -1537,24 +1557,13 @@ watch(
                       />
                     </div>
                   </div>
-                  <div
-                    v-if="requestedFutureTeamCount && requestedFutureTeamCount > maxFutureEventTeamsByPupils"
-                    class="wizard-event-team-upgrade"
-                  >
+                  <div v-if="futureTeamAutoUpgrade" class="wizard-event-team-upgrade">
                     <p>
                       <I18nText
-                        k="wizard.eventTeamUpgradeNeeded"
-                        :args="{ teams: requestedFutureTeamCount, pupils: requestedFutureTeamCount * 8 }"
+                        k="wizard.eventTeamAutoUpgraded"
+                        :args="{ teams: futureTeamAutoUpgrade.teams, pupils: futureTeamAutoUpgrade.pupils }"
                       />
                     </p>
-                    <button
-                      v-if="FUTURE_PUPIL_OPTIONS.includes(requestedFutureTeamCount * 8)"
-                      type="button"
-                      class="btn btn-primary"
-                      @click="upgradeFuturePupilsForRequestedTeams"
-                    >
-                      <I18nText k="wizard.eventTeamUpgradeAction" />
-                    </button>
                   </div>
                 </div>
                 <button
@@ -1600,18 +1609,22 @@ watch(
               </div>
             </div>
 
-            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
-              <div class="field voucher-invoice-forced">
-                <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
-              </div>
-            </template>
-            <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
-            <label class="wizard-delivery-toggle">
-              <input v-model="deliveryAddressDifferent" type="checkbox">
-              <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
-            </label>
-            <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            <div class="wizard-address-section">
+              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
+              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+                <div class="field voucher-invoice-forced">
+                  <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
+                </div>
+              </template>
+              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            </div>
+            <div class="wizard-address-section">
+              <label class="wizard-delivery-toggle">
+                <input v-model="deliveryAddressDifferent" type="checkbox">
+                <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
+              </label>
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            </div>
             <div class="wizard-next-steps">
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
               <ul>
@@ -1628,18 +1641,22 @@ watch(
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
-            <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
-              <div class="field voucher-invoice-forced">
-                <label class="label"><I18nText k="enroll.invoiceAddress" /></label>
-                <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
-              </div>
-            </template>
-            <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
-            <label class="wizard-delivery-toggle">
-              <input v-model="deliveryAddressDifferent" type="checkbox">
-              <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
-            </label>
-            <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            <div class="wizard-address-section">
+              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
+              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+                <div class="field voucher-invoice-forced">
+                  <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
+                </div>
+              </template>
+              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            </div>
+            <div class="wizard-address-section">
+              <label class="wizard-delivery-toggle">
+                <input v-model="deliveryAddressDifferent" type="checkbox">
+                <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
+              </label>
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            </div>
           </div>
 
           <!-- Step 6: Order overview / Checkout (Founders class) / Step 8: Order overview (Founder team) -->
@@ -2059,6 +2076,16 @@ watch(
 .wizard-delivery-toggle input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
+}
+.wizard-address-section {
+  margin-top: 0.45rem;
+  margin-bottom: 1rem;
+}
+.wizard-address-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.97rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 .wizard-event-dropdowns {
   display: flex;

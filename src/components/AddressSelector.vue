@@ -40,11 +40,17 @@ let streetDebounceTimer = null
 let zipAbortController = null
 let streetAbortController = null
 
+function addressIdOf(addr, fallback = '') {
+  if (!addr || typeof addr !== 'object') return fallback
+  return String(addr.id ?? addr.addressId ?? addr.rowid ?? fallback)
+}
+
 const addressOptions = computed(() =>
-  props.addresses.map((addr) => ({
-    value: addr.id,
-    label: addr.label || formatAddress(addr),
-  }))
+  props.addresses
+    .map((addr, idx) => ({
+      value: addressIdOf(addr, `address-${idx + 1}`),
+      label: addr.label || formatAddress(addr),
+    }))
 )
 
 /** Strict boolean — avoids radios stuck when useExisting is undefined/null. */
@@ -68,7 +74,11 @@ const countryOptions = computed(() => {
 
 function formatAddress(addr) {
   if (!addr) return ''
-  const parts = [addr.street, addr.postalCode && addr.city ? `${addr.postalCode} ${addr.city}` : addr.city, addr.country].filter(Boolean)
+  const street = addr.street || addr.address || addr.address1 || ''
+  const postalCode = addr.postalCode || addr.zip || addr.zipcode || ''
+  const city = addr.city || addr.town || ''
+  const country = addr.country || addr.countryCode || addr.country_code || ''
+  const parts = [street, postalCode && city ? `${postalCode} ${city}` : city, country].filter(Boolean)
   return parts.join(', ')
 }
 
@@ -79,9 +89,9 @@ function setMode(useExisting) {
 
   let addressId = prev.addressId
   if (wantExisting) {
-    const stillValid = props.addresses.some((a) => String(a.id) === String(addressId))
+    const stillValid = props.addresses.some((a) => addressIdOf(a) === String(addressId))
     if (!stillValid) {
-      addressId = props.addresses[0]?.id != null ? String(props.addresses[0].id) : ''
+      addressId = props.addresses[0] ? addressIdOf(props.addresses[0]) : ''
     }
   }
 
@@ -350,13 +360,22 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <template v-if="isExistingMode">
-      <CustomSelect
-        :id="idPrefix + '-select'"
-        :model-value="modelValue.addressId"
-        :options="addressOptions"
-        :placeholder="t('enroll.selectAddress')"
-        @update:model-value="setAddressId"
-      />
+      <template v-if="addressOptions.length">
+        <CustomSelect
+          :id="idPrefix + '-select'"
+          :model-value="modelValue.addressId"
+          :options="addressOptions"
+          :placeholder="t('enroll.selectAddress')"
+          @update:model-value="setAddressId"
+        />
+      </template>
+      <div v-else class="address-empty-state">
+        <i class="bi bi-info-circle" />
+        <span><I18nText k="enroll.noSavedAddresses" /></span>
+        <button type="button" class="address-empty-action" @click="setMode(false)">
+          <I18nText k="enroll.enterNewAddress" />
+        </button>
+      </div>
     </template>
     <template v-else>
       <div class="address-fields">
@@ -673,6 +692,27 @@ onBeforeUnmount(() => {
 }
 .field-select {
   margin-bottom: 0.95rem;
+}
+.address-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.address-empty-action {
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.address-empty-action:hover {
+  background: var(--color-bg-hover);
 }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

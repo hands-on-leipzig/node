@@ -195,6 +195,11 @@ function doLogout() {
   logout()
 }
 
+function goSettings() {
+  closeProfileMenu()
+  router.push({ name: 'settings' })
+}
+
 const userInitials = computed(() => {
   const name = user.value?.name
   if (!name) return '?'
@@ -343,7 +348,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   <I18nText v-else k="common.coach" />
                 </span>
               </div>
-              <button type="button" class="profile-menu-item" role="menuitem" disabled>
+              <button type="button" class="profile-menu-item" role="menuitem" @click="goSettings">
                 <i class="bi bi-gear"></i>
                 <span><I18nText k="common.settings" /></span>
               </button>
