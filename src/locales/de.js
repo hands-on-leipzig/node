@@ -1,5 +1,5 @@
 /* eslint-disable */
-/* Locale — updated via DRAHT POST node/translations-pr */
+/* Locale — updated via Node translations PR (POST node/translations-pr) */
 export default {
     "common": {
         "appName": "",
@@ -254,7 +254,7 @@ export default {
         "mockEventLandesfinale": "Landesfinale Sachsen",
         "mockEventLandesfinaleDate": "Mai 2026",
         "mockEventLandesfinaleLocation": "Dresden",
-        "intro": "Hier kannst du deine FIRST LEGO League Gruppen für die Future Edition (8–16 Jahre) sowie die Founders Edition (Explore, Challenge) anmelden.",
+        "intro": "Hier meldest du deine FIRST LEGO League Gruppen für die Future Edition (8–16 Jahre) sowie die Founders Edition (Explore, Challenge) an.",
         "enrollTeam": "Team anmelden",
         "enrollTeamDesc": "Team für den Wettbewerb registrieren.",
         "enrollClass": "Klasse anmelden",
@@ -282,8 +282,8 @@ export default {
         "optionFoundersTeamChallenge": "Team Challenge",
         "optionFoundersClassExplore": "Klasse Explore",
         "optionFoundersClassChallenge": "Klasse Challenge",
-        "optionFutureGroup5": "Gruppe 5 - 7 Jahre",
-        "optionFutureGroup8": "Gruppe 8 - 16 Jahre",
+        "optionFutureGroup5": "5+ (1.–3. Klasse)",
+        "optionFutureGroup8": "8+ (4.–10. Klasse)",
         "optionCta": "Anmelden →",
         "addCoCoachButton": "Co-Coach verknüpfen"
     },
@@ -315,8 +315,8 @@ export default {
         "noTeamsInOrder": "Keine Event-Teams in dieser Bestellung (später möglich).",
         "stepDetails": "Schritt 4 — Stammdaten & Adressen",
         "continue": "Weiter",
-        "howManyPupils": "Wie viele Teilnehmende?",
-        "pupilsFlexibleHint": "Weitere Teilnehmende können später ergänzt werden.",
+        "howManyPupils": "Anzahl Teilnehmende in deiner Gruppe",
+        "pupilsFlexibleHint": "Wähle deine Gruppengröße und gib die Daten wahrheitsgemäß an. Nach der Anmeldung kannst du auf bis zu 24 Teilnehmende erweitern. Für mehr als 24 Teilnehmende melde bitte eine zweite Gruppe an.",
         "groupLabel": "Gruppe {group}+",
         "pupils": "Teilnehmende",
         "nameLabel": "Name / Gruppenname",
@@ -433,14 +433,14 @@ export default {
         "chooseFutureGroup": "Welche Gruppe?",
         "chooseVariant": "Explore oder Challenge?",
         "chooseTeamClass": "Team oder Klasse?",
-        "editionFoundersDesc": "Explore & Challenge für 6–16 Jahre: Bauen, Programmieren, Forschen und Präsentieren.",
-        "editionFutureDesc": "Future Edition ab 2026/27 mit LEGO Education Informatik & KI und neuen Spielmechaniken.",
+        "editionFoundersDesc": "Mit den Angeboten Explore (6 bis 9 Jahre) und Challenge (9 bis 16 Jahre) bei denen LEGO Education SPIKE und Vorgängerprodukte verwendet werden. ",
+        "editionFutureDesc": "Mit den Angeboten 8+ (4. bis 10. Klasse) und 5+ (1. bis 3. Klasse) bei denen mit LEGO Education Informatik & KI gearbeitet wird.",
         "optionExploreDesc": "6–10 Jahre: Team oder Klasse erforscht ein Thema und baut ein motorisiertes LEGO Modell.",
         "optionChallengeDesc": "9–16 Jahre: autonomen Roboter bauen, programmieren, forschen und präsentieren.",
         "teamDesc": "Teilnahme als Team mit Ausstellung bzw. Wettbewerb.",
         "classDesc": "Teilnahme als Schulklasse mit schulinterner Abschlussveranstaltung.",
-        "futureGroup5Desc": "Einstieg in MINT, ideal für größere Gruppen mit klaren Rollen.",
-        "futureGroup8Desc": "Jahre: Robotik, Coding & Problemlösen mit neuen Spielmechaniken.",
+        "futureGroup5Desc": "Das Future Edition Angebot bei dem Informatik & KI 5+ eingesetzt wird.\n\nACHTUNG: Die Anmeldung ist erst ab Oktober 2026 möglich.",
+        "futureGroup8Desc": "Das Future Edition Angebot bei dem Informatik & KI 8+ oder Informatik & KI 11+ verwendet wird.",
         "optionExplore": "Explore",
         "optionChallenge": "Challenge",
         "morePupils": "Mehr",

@@ -1,5 +1,5 @@
 /* eslint-disable */
-/* Locale — updated via DRAHT POST node/translations-pr */
+/* Locale — updated via Node translations PR (POST node/translations-pr) */
 export default {
     "common": {
         "appName": "",
@@ -290,8 +290,8 @@ export default {
         "optionFoundersTeamChallenge": "Team Challenge",
         "optionFoundersClassExplore": "Class Explore",
         "optionFoundersClassChallenge": "Class Challenge",
-        "optionFutureGroup5": "Group 5+",
-        "optionFutureGroup8": "Group 8+",
+        "optionFutureGroup5": "5+ (grades 1–3) ",
+        "optionFutureGroup8": "8+ (grades 4–10)",
         "optionCta": "Register →"
     },
     "enrollFuture": {
@@ -322,8 +322,8 @@ export default {
         "noTeamsInOrder": "No event teams in this order (can be added later).",
         "stepDetails": "Step 4 — Group details & addresses",
         "continue": "Continue",
-        "howManyPupils": "How many participants?",
-        "pupilsFlexibleHint": "Further participants can be added later.",
+        "howManyPupils": "Number of participants in your group",
+        "pupilsFlexibleHint": "Select your group size and provide accurate information. After registering, you can expand your group up to 24 participants. For larger groups, please register a second group.",
         "groupLabel": "Group {group}+",
         "pupils": "participants",
         "nameLabel": "Name / group name",
@@ -440,13 +440,13 @@ export default {
         "chooseFutureGroup": "Which group?",
         "chooseVariant": "Explore or Challenge?",
         "chooseTeamClass": "Team or class?",
-        "editionFoundersDesc": "Explore & Challenge for ages 6–16: build, code, research, and present.",
-        "editionFutureDesc": "Future Edition from 2026/27 with LEGO Education Computer Science & AI and new game mechanics.",
+        "editionFoundersDesc": "With the programs Explore (ages 6 to 9) and Challenge (ages 9 to 16), in which LEGO Education SPIKE and legacy products are used.",
+        "editionFutureDesc": "The 8+ program (grades 4–10) and 5+ program (grades 1–3) using LEGO Education Computer Science & AI.",
         "optionExploreDesc": "Ages 6–10: team or class explores a theme and builds a motorized LEGO model.",
         "optionChallengeDesc": "Ages 9–16: build and program an autonomous robot, research, and present.",
         "teamDesc": "Team participation with exhibitions or competitions.",
         "classDesc": "Class participation with a school-based final presentation.",
-        "futureGroup5Desc": "Ages 5–7: easy entry to STEM with clear team roles.",
+        "futureGroup5Desc": "The Future Edition program, in which Computer Science & AI 5+ is used.<br>\n\nPlease note: Registration opens in October 2026.",
         "futureGroup8Desc": "Ages 8–16: robotics, coding, and problem solving with new game mechanics.",
         "optionExplore": "Explore",
         "optionChallenge": "Challenge",
