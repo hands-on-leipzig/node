@@ -1,6 +1,6 @@
 /**
- * Future Edition – logical line items for DRAHT orders (products/services later).
- * Amounts are placeholders until DRAHT provides catalog prices via API.
+ * Future Edition – logical line items for orders (products/services later).
+ * Amounts are placeholders until catalog prices are available via API.
  */
 export const FUTURE_GROUP_PRODUCT_REFS = {
   8: 'FUTURE_GROUP_P8',

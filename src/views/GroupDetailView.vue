@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getGroup, getEvents, registerGroupForEvent } from '@/services/draht'
@@ -63,6 +63,13 @@ function formatAddress(addr) {
   return parts.join(', ')
 }
 
+function scrollToCoCoachesSection() {
+  if (route.query.focus !== 'coCoaches' || loading.value || !group.value) return
+  nextTick(() => {
+    document.getElementById('group-co-coaches-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 async function fetchGroup() {
   if (!id.value) return
   loading.value = true
@@ -75,6 +82,7 @@ async function fetchGroup() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
+    if (group.value) scrollToCoCoachesSection()
   }
 }
 
@@ -132,6 +140,12 @@ watch(id, async () => {
   await fetchGroup()
   loadEvents()
 })
+watch(
+  () => route.query.focus,
+  () => {
+    if (group.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
 </script>
 
 <template>
@@ -276,6 +290,18 @@ watch(id, async () => {
             <I18nText v-else k="detail.noData" />
           </p>
         </section>
+
+        <section id="group-co-coaches-anchor" class="detail-section detail-co-coaches-wrap">
+          <h3 class="detail-section-title"><I18nText k="detail.coCoaches" /></h3>
+          <p v-if="!(group.co_coaches && group.co_coaches.length)" class="detail-notes">
+            <I18nText k="detail.noData" />
+          </p>
+          <p v-else class="detail-coaches">
+            <span v-for="(c, i) in group.co_coaches" :key="'c-' + i">
+              {{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}
+            </span>
+          </p>
+        </section>
       </div>
     </template>
   </div>
@@ -305,6 +331,9 @@ watch(id, async () => {
 .detail-address { font-size: var(--text-base); color: var(--color-text); margin: 0 0 0.75rem; white-space: pre-line; }
 .detail-address:last-child { margin-bottom: 0; }
 .detail-notes { font-size: var(--text-base); color: var(--color-text-muted); margin: 1rem 0 0; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.detail-co-coaches-wrap { margin-top: 0.25rem; }
+.detail-coaches { margin: 0; font-size: var(--text-base); color: var(--color-text); }
+.detail-coaches span + span::before { content: ', '; }
 .detail-event-current {
   margin: 0 0 0.65rem;
   font-size: var(--text-base);

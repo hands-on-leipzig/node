@@ -1,12 +1,27 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  /** When set (e.g. in .env.local), dev server proxies /custom → DDEV so the browser stays same-origin. */
+  const ddevProxyTarget = env.VITE_DDEV_PROXY_TARGET?.trim()
+  const serverProxy =
+    mode === 'development' && ddevProxyTarget
+      ? {
+          '/custom': {
+            target: ddevProxyTarget,
+            changeOrigin: true,
+            secure: false,
+          },
+        }
+      : undefined
+
+  return {
   appType: 'spa',
   plugins: [
     vue(),
@@ -43,4 +58,6 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: serverProxy ? { proxy: serverProxy } : undefined,
+  }
 })

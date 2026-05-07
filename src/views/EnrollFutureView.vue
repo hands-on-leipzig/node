@@ -226,7 +226,7 @@ function buildInvoiceAddressPayload() {
   return buildAddressPayload(form.value.invoiceAddress)
 }
 
-/** Snapshot + refs for DRAHT order lines (prices from catalog later) */
+/** Snapshot + refs for order lines (prices from catalog later) */
 function buildPricingPayload() {
   const p = selectedPupils.value
   const groupLine = p

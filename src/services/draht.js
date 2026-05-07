@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { getToken, updateToken } from '@/auth/keycloak'
 
-// Use proxy when api/index.php cannot be changed: set VITE_DRAHT_API_URL to https://your-domain/custom/handson/api_proxy.php
+// Base URL for the HandsOn API (env: VITE_DRAHT_API_URL). Proxies to Dolibarr when needed.
 const baseURL = (import.meta.env.VITE_DRAHT_API_URL || '') + '/handson/node'
 const handsonBaseURL = (import.meta.env.VITE_DRAHT_API_URL || '') + '/handson'
 
@@ -84,7 +84,7 @@ export function getAddresses() {
 }
 
 /**
- * List events via DRAHT flow API (for event registration, team nachmelden).
+ * List events via flow API (for event registration, team nachmelden).
  * GET /handson/flow/events – returns list of events with capacity/usage (Auslastung) when provided.
  * Response may be: array, or { data: [] }, or { events: [] }. Each event may have id, label/name/title/ref, capacity, registered, etc.
  */
@@ -134,7 +134,7 @@ export function enrollClass(payload) {
  * Future edition enrollment. Payload includes:
  * group, pupils (8|16|24), seasonSetCount (0–2), registerEventTeams, eventTeamCount, eventTeams[{index, players[]}],
  * pricing.lines[{ productRef, quantity, unitPriceEurPlaceholder }], name, addresses, voucher, …
- * DRAHT creates a future group (program 6 for 5-8, program 7 for 8-16).
+ * Backend creates a future group (program 6 for 5-8, program 7 for 8-16).
  */
 export function enrollFuture(payload) {
   return api.post('/groups', payload)
@@ -208,7 +208,7 @@ export function postDocumentsProbeFolder(url) {
  *
  * **Combined (preferred):** `{ locales: { en: nested, de: nested }, prTitle?, editorUsername?, baseBranch? }` — one PR for both files.
  *
- * **Legacy:** `{ locale: 'en'|'de', messages: nested, ... }` — single file if DRAHT still supports it.
+ * **Legacy:** `{ locale: 'en'|'de', messages: nested, ... }` — single-file shape when the API expects it.
  *
  * @param {{
  *   locales?: Record<'en'|'de', Record<string, unknown>>,
@@ -264,6 +264,22 @@ export function getClass(id) {
  */
 export function getGroup(id) {
   return api.get('/groups/' + encodeURIComponent(id))
+}
+
+/**
+ * Check whether an email belongs to a coach account (primary coach only).
+ * Payload: { targetType, targetId, email }
+ */
+export function checkCoCoachEmail(payload) {
+  return api.post('/co-coach-email-check', payload)
+}
+
+/**
+ * Invite a co-coach by e-mail (primary coach only). Backend sends confirmation link.
+ * Payload: { targetType, targetId, email, inviteUnregistered?: boolean }
+ */
+export function inviteCoCoach(payload) {
+  return api.post('/co-coach-invite', payload)
 }
 
 /**

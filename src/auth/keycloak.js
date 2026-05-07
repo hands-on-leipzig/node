@@ -65,7 +65,7 @@ export function hasAdminRole() {
   return Array.isArray(realmRoles) && realmRoles.includes('admin')
 }
 
-/** Claim name for the coach's Dolibarr contact ID in the token (must match Keycloak mapper and DRAHT config) */
+/** Claim name for the coach's Dolibarr contact ID in the token (must match Keycloak mapper and server config) */
 const DOLIBARR_CONTACT_CLAIM = 'dolibarr_contact_id'
 
 export function getUserProfile() {
@@ -81,8 +81,8 @@ export function getUserProfile() {
 
 /**
  * Dolibarr contact ID for the current coach (from Keycloak user attribute, exposed in token).
- * Used by DRAHT to identify the coach and find their teams. Frontend does not need to send it;
- * the DRAHT middleware reads it from the Bearer token.
+ * Used by the API to identify the coach and find their teams. The frontend does not need to send it;
+ * the API middleware reads it from the Bearer token.
  * @returns {number|null} Contact ID or null if not in token
  */
 export function getCoachDolibarrContactId() {

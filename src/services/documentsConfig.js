@@ -1,5 +1,5 @@
 /**
- * Coach dashboard documents: config from DRAHT + folder file list from Graph API.
+ * Coach dashboard documents: config from the API + optional folder file list from Graph.
  */
 import { getDocumentsConfig, getDocumentsFolderFiles } from '@/services/draht'
 

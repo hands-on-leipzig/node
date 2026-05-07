@@ -67,7 +67,7 @@ const voucherInvoiceName = ref(null)
 /** Optional invoice address from voucher JSON preset (llx_societe / address book id). */
 const voucherPresetInvoiceId = ref(null)
 const voucherPresetInvoiceName = ref(null)
-/** 0|1|2 — maps to seasonSetCount / num_boards in DRAHT payloads. */
+/** 0|1|2 — maps to seasonSetCount / num_boards in enrollment API payloads. */
 const presetSeasonSetCount = ref(null)
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
@@ -690,6 +690,15 @@ function applyVoucherPreset(raw) {
       ...invoiceAddress.value,
       useExisting: true,
       addressId: String(invId),
+    }
+  }
+
+  const fd = data.formDefaults
+  if (fd && typeof fd === 'object') {
+    const keys = ['name', 'schoolOrClub', 'schoolType', 'organization', 'country', 'zip', 'city', 'state', 'location', 'playersTotal']
+    for (const k of keys) {
+      if (fd[k] == null || fd[k] === '') continue
+      formData.value[k] = String(fd[k])
     }
   }
 

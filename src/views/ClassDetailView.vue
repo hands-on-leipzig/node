@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getClass } from '@/services/draht'
@@ -43,6 +43,13 @@ function formatDate(timestamp) {
   return d.toLocaleDateString(locale.value === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function scrollToCoCoachesSection() {
+  if (route.query.focus !== 'coCoaches' || loading.value || !cls.value) return
+  nextTick(() => {
+    document.getElementById('class-co-coaches-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 async function fetchClass() {
   if (!id.value) return
   loading.value = true
@@ -55,11 +62,18 @@ async function fetchClass() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
+    if (cls.value) scrollToCoCoachesSection()
   }
 }
 
 onMounted(fetchClass)
 watch(id, fetchClass)
+watch(
+  () => route.query.focus,
+  () => {
+    if (cls.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
 </script>
 
 <template>
@@ -165,6 +179,18 @@ watch(id, fetchClass)
         <p class="detail-notes">
           <template v-if="cls.note_public">{{ cls.note_public }}</template>
           <I18nText v-else k="detail.noData" />
+        </p>
+      </section>
+
+      <section id="class-co-coaches-anchor" class="detail-section detail-co-coaches-wrap">
+        <h3 class="detail-section-title"><I18nText k="detail.coCoaches" /></h3>
+        <p v-if="!(cls.co_coaches && cls.co_coaches.length)" class="detail-notes">
+          <I18nText k="detail.noData" />
+        </p>
+        <p v-else class="detail-coaches">
+          <span v-for="(c, i) in cls.co_coaches" :key="'c-' + i">
+            {{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}
+          </span>
         </p>
       </section>
       </div>
@@ -286,6 +312,17 @@ watch(id, fetchClass)
   margin: 1rem 0 0;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
+}
+.detail-co-coaches-wrap {
+  margin-top: 0.25rem;
+}
+.detail-coaches {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+.detail-coaches span + span::before {
+  content: ', ';
 }
 
 @media (min-width: 960px) {

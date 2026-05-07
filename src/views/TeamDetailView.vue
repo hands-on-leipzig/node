@@ -546,15 +546,10 @@ watch(
           </div>
           <h4 class="detail-subsection-title"><I18nText k="detail.coCoaches" /></h4>
         </div>
-        <p v-if="!(team.co_coaches && team.co_coaches.length) && !(team.manual_co_coaches && team.manual_co_coaches.length)" class="detail-empty-hint"><I18nText k="detail.noData" /></p>
-        <template v-else>
-          <p v-if="team.co_coaches && team.co_coaches.length" class="detail-coaches">
-            <span v-for="(c, i) in team.co_coaches" :key="'c-' + i">{{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}</span>
-          </p>
-          <p v-if="team.manual_co_coaches && team.manual_co_coaches.length" class="detail-coaches">
-            <span v-for="(c, i) in team.manual_co_coaches" :key="'m-' + i">{{ [c.firstname, c.name].filter(Boolean).join(' ') }}</span>
-          </p>
-        </template>
+        <p v-if="!(team.co_coaches && team.co_coaches.length)" class="detail-empty-hint"><I18nText k="detail.noData" /></p>
+        <p v-else class="detail-coaches">
+          <span v-for="(c, i) in team.co_coaches" :key="'c-' + i">{{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}</span>
+        </p>
       </section>
 
       <!-- 5) Note (always shown, placeholder when missing) -->

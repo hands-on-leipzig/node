@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
-import { listTeams, listClasses, getOpenTasks } from '@/services/draht'
+import { listTeams, listClasses, listGroups, getOpenTasks, inviteCoCoach, checkCoCoachEmail } from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
@@ -16,33 +16,153 @@ const router = useRouter()
 
 const wizardOpen = ref(false)
 const coCoachModalOpen = ref(false)
-const selectedTeamId = ref('')
+const selectedRegistrationTarget = ref('')
+const coCoachEmail = ref('')
+const coCoachProbe = ref(null)
+const coCoachChecking = ref(false)
+const coCoachInviteSubmitting = ref(false)
+const coCoachInviteSuccess = ref(false)
+const coCoachInviteError = ref('')
+
+function resetCoCoachInviteForm() {
+  coCoachEmail.value = ''
+  coCoachProbe.value = null
+  coCoachInviteSuccess.value = false
+  coCoachInviteError.value = ''
+  coCoachInviteSubmitting.value = false
+  coCoachChecking.value = false
+}
 
 function openWizard() {
   wizardOpen.value = true
 }
 function openCoCoachModal() {
+  resetCoCoachInviteForm()
   coCoachModalOpen.value = true
-  const list = teams.value
+  const list = coCoachTargets.value
   if (list.length === 1) {
-    selectedTeamId.value = String(list[0].id)
+    selectedRegistrationTarget.value = list[0].value
   } else if (list.length > 1) {
-    selectedTeamId.value = String(list[0].id)
+    selectedRegistrationTarget.value = list[0].value
   } else {
-    selectedTeamId.value = ''
+    selectedRegistrationTarget.value = ''
   }
 }
 function closeCoCoachModal() {
   coCoachModalOpen.value = false
 }
-function goToCoCoachTeamPage() {
-  const id = selectedTeamId.value
-  if (!id) return
-  closeCoCoachModal()
-  router.push({ name: 'team-detail', params: { id }, query: { focus: 'coCoaches' } })
+
+function parseCoCoachTarget() {
+  const target = String(selectedRegistrationTarget.value || '')
+  if (!target.includes(':')) return null
+  const [type, idStr] = target.split(':')
+  const targetId = parseInt(idStr, 10)
+  const targetType = type === 'team' || type === 'class' || type === 'group' ? type : ''
+  if (!targetType || Number.isNaN(targetId)) return null
+  return { targetType, targetId }
 }
-function teamSelectLabel(team) {
-  return team.name || team.label || team.ref || '#' + team.id
+
+const canCheckCoCoachEmail = computed(() => {
+  if (coCoachChecking.value || coCoachInviteSuccess.value) return false
+  if (!selectedRegistrationTarget.value) return false
+  const e = coCoachEmail.value.trim()
+  if (!e) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
+})
+
+watch([selectedRegistrationTarget, coCoachEmail], () => {
+  coCoachProbe.value = null
+})
+
+async function runCoCoachEmailCheck() {
+  coCoachInviteError.value = ''
+  const parsed = parseCoCoachTarget()
+  if (!parsed || !canCheckCoCoachEmail.value) {
+    coCoachInviteError.value = t('common.requiredField')
+    return
+  }
+  coCoachChecking.value = true
+  try {
+    const res = await checkCoCoachEmail({
+      ...parsed,
+      email: coCoachEmail.value.trim(),
+    })
+    const d = res?.data?.data ?? res?.data
+    coCoachProbe.value = {
+      coachAccountExists: !!d?.coachAccountExists,
+      alreadyCoCoach: !!d?.alreadyCoCoach,
+    }
+  } catch (e) {
+    const d = e.response?.data
+    const msg =
+      (typeof d === 'string' && d) ||
+      d?.message ||
+      d?.error?.message ||
+      (Array.isArray(d?.errors) ? d.errors.join(' ') : '') ||
+      e.message
+    coCoachInviteError.value = (msg && String(msg).trim()) || t('dashboard.addCoCoachErrorGeneric')
+    coCoachProbe.value = null
+  } finally {
+    coCoachChecking.value = false
+  }
+}
+
+async function submitCoCoachInvite(inviteUnregistered) {
+  coCoachInviteError.value = ''
+  const parsed = parseCoCoachTarget()
+  if (!parsed) {
+    coCoachInviteError.value = t('dashboard.addCoCoachErrorGeneric')
+    return
+  }
+  const email = coCoachEmail.value.trim()
+  if (!email) {
+    coCoachInviteError.value = t('common.requiredField')
+    return
+  }
+  coCoachInviteSubmitting.value = true
+  try {
+    await inviteCoCoach({
+      ...parsed,
+      email,
+      inviteUnregistered: !!inviteUnregistered,
+    })
+    coCoachInviteSuccess.value = true
+  } catch (e) {
+    const d = e.response?.data
+    const msg =
+      (typeof d === 'string' && d) ||
+      d?.message ||
+      d?.error?.message ||
+      (Array.isArray(d?.errors) ? d.errors.join(' ') : '') ||
+      e.message
+    coCoachInviteError.value = (msg && String(msg).trim()) || t('dashboard.addCoCoachErrorGeneric')
+  } finally {
+    coCoachInviteSubmitting.value = false
+  }
+}
+function goToCoCoachPage() {
+  const target = String(selectedRegistrationTarget.value || '')
+  if (!target.includes(':')) return
+  const [type, id] = target.split(':')
+  if (!type || !id) return
+  closeCoCoachModal()
+  if (type === 'team') {
+    router.push({ name: 'team-detail', params: { id }, query: { focus: 'coCoaches' } })
+    return
+  }
+  if (type === 'class') {
+    router.push({ name: 'class-detail', params: { id }, query: { focus: 'coCoaches' } })
+    return
+  }
+  if (type === 'group') {
+    router.push({ name: 'group-detail', params: { id }, query: { focus: 'coCoaches' } })
+  }
+}
+function coCoachTargetLabel(item) {
+  const label = item.name || item.label || item.ref || '#' + item.id
+  if (item.type === 'class') return `${t('dashboard.coCoachTypeClass')}: ${label}`
+  if (item.type === 'group') return `${t('dashboard.coCoachTypeGroup')}: ${label}`
+  return `${t('dashboard.coCoachTypeTeam')}: ${label}`
 }
 function onWizardClose() {
   wizardOpen.value = false
@@ -53,8 +173,16 @@ function onWizardSuccess() {
 
 const teams = ref([])
 const classes = ref([])
+const groups = ref([])
 const loading = ref(true)
 const error = ref(null)
+const coCoachTargets = computed(() => {
+  const teamTargets = teams.value.map((item) => ({ ...item, type: 'team', value: `team:${item.id}` }))
+  const classTargets = classes.value.map((item) => ({ ...item, type: 'class', value: `class:${item.id}` }))
+  const groupTargets = groups.value.map((item) => ({ ...item, type: 'group', value: `group:${item.id}` }))
+  return [...teamTargets, ...classTargets, ...groupTargets]
+})
+
 
 /** Tasks to do: built from getTeam/getClass detail responses (same data as team detail page). */
 const taskItems = ref([])
@@ -96,12 +224,14 @@ async function loadLists() {
   loading.value = true
   error.value = null
   try {
-    const [teamsRes, classesRes] = await Promise.allSettled([
+    const [teamsRes, classesRes, groupsRes] = await Promise.allSettled([
       listTeams(),
       listClasses(),
+      listGroups(),
     ])
     let teamList = []
     let classList = []
+    let groupList = []
     if (teamsRes.status === 'fulfilled' && teamsRes.value?.data != null) {
       const d = teamsRes.value.data
       teamList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
@@ -110,9 +240,14 @@ async function loadLists() {
       const d = classesRes.value.data
       classList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
     }
+    if (groupsRes.status === 'fulfilled' && groupsRes.value?.data != null) {
+      const d = groupsRes.value.data
+      groupList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    }
     // Show list immediately so dashboard never hangs
     teams.value = [...teamList]
     classes.value = [...classList]
+    groups.value = [...groupList]
   } catch (e) {
     error.value = e.message || t('errors.loadFailed')
   } finally {
@@ -496,20 +631,49 @@ const hasDocumentTreeContent = computed(() => {
             </button>
           </header>
           <div class="co-coach-modal-body">
-            <template v-if="teams.length === 0">
-              <p class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachNoTeams" /></p>
+            <template v-if="coCoachTargets.length === 0">
+              <p class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachNoRegistrations" /></p>
             </template>
             <template v-else>
-              <p class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachModalLead" /></p>
-              <label v-if="teams.length > 1" class="co-coach-modal-label">
-                <span><I18nText k="dashboard.addCoCoachChooseTeam" /></span>
-                <select v-model="selectedTeamId" class="co-coach-modal-select">
-                  <option v-for="tm in teams" :key="tm.id" :value="String(tm.id)">
-                    {{ teamSelectLabel(tm) }}
+              <p v-if="!coCoachInviteSuccess" class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachModalLead" /></p>
+              <label v-if="coCoachTargets.length > 1 && !coCoachInviteSuccess" class="co-coach-modal-label">
+                <span><I18nText k="dashboard.addCoCoachChooseRegistration" /></span>
+                <select v-model="selectedRegistrationTarget" class="co-coach-modal-select">
+                  <option v-for="item in coCoachTargets" :key="item.value" :value="item.value">
+                    {{ coCoachTargetLabel(item) }}
                   </option>
                 </select>
               </label>
-              <p class="co-coach-modal-note"><I18nText k="dashboard.addCoCoachModalNote" /></p>
+              <template v-if="!coCoachInviteSuccess">
+                <label class="co-coach-modal-label co-coach-modal-span2">
+                  <span><I18nText k="dashboard.addCoCoachEmail" /></span>
+                  <input
+                    v-model="coCoachEmail"
+                    type="email"
+                    class="co-coach-modal-input"
+                    name="co-coach-email-manual"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    data-lpignore="true"
+                    data-1p-ignore
+                  />
+                </label>
+                <p v-if="coCoachProbe?.alreadyCoCoach" class="co-coach-modal-info">
+                  <I18nText k="dashboard.addCoCoachAlreadyLinked" />
+                </p>
+                <template v-else-if="coCoachProbe && coCoachProbe.coachAccountExists">
+                  <p class="co-coach-modal-info"><I18nText k="dashboard.addCoCoachResultHasCoach" /></p>
+                </template>
+                <template v-else-if="coCoachProbe && !coCoachProbe.coachAccountExists">
+                  <p class="co-coach-modal-info"><I18nText k="dashboard.addCoCoachResultNoCoach" /></p>
+                  <p class="co-coach-modal-note co-coach-modal-note-spaced"><I18nText k="dashboard.addCoCoachUnregisteredHint" /></p>
+                </template>
+                <p class="co-coach-modal-note co-coach-modal-note-spaced"><I18nText k="dashboard.addCoCoachModalNote" /></p>
+              </template>
+              <p v-else class="co-coach-modal-success"><I18nText k="dashboard.addCoCoachSuccess" /></p>
+              <p v-if="coCoachInviteError" class="co-coach-modal-error">{{ coCoachInviteError }}</p>
             </template>
           </div>
           <footer class="co-coach-modal-foot">
@@ -517,13 +681,43 @@ const hasDocumentTreeContent = computed(() => {
               <I18nText k="dashboard.addCoCoachClose" />
             </button>
             <button
-              v-if="teams.length > 0"
+              v-if="coCoachTargets.length > 0 && !coCoachInviteSuccess"
               type="button"
-              class="co-coach-modal-btn co-coach-modal-btn-primary"
-              :disabled="!selectedTeamId"
-              @click="goToCoCoachTeamPage"
+              class="co-coach-modal-btn co-coach-modal-btn-ghost"
+              :disabled="!selectedRegistrationTarget"
+              @click="goToCoCoachPage"
             >
               <I18nText k="dashboard.addCoCoachGo" />
+            </button>
+            <button
+              v-if="coCoachTargets.length > 0 && !coCoachInviteSuccess && !coCoachProbe"
+              type="button"
+              class="co-coach-modal-btn co-coach-modal-btn-primary"
+              :disabled="!canCheckCoCoachEmail"
+              @click="runCoCoachEmailCheck"
+            >
+              <template v-if="coCoachChecking"><I18nText k="dashboard.addCoCoachChecking" /></template>
+              <template v-else><I18nText k="dashboard.addCoCoachCheckEmail" /></template>
+            </button>
+            <button
+              v-if="coCoachTargets.length > 0 && !coCoachInviteSuccess && coCoachProbe && !coCoachProbe.alreadyCoCoach && coCoachProbe.coachAccountExists"
+              type="button"
+              class="co-coach-modal-btn co-coach-modal-btn-primary"
+              :disabled="coCoachInviteSubmitting"
+              @click="submitCoCoachInvite(false)"
+            >
+              <template v-if="coCoachInviteSubmitting"><I18nText k="dashboard.addCoCoachSending" /></template>
+              <template v-else><I18nText k="dashboard.addCoCoachSendInviteExisting" /></template>
+            </button>
+            <button
+              v-if="coCoachTargets.length > 0 && !coCoachInviteSuccess && coCoachProbe && !coCoachProbe.alreadyCoCoach && !coCoachProbe.coachAccountExists"
+              type="button"
+              class="co-coach-modal-btn co-coach-modal-btn-primary"
+              :disabled="coCoachInviteSubmitting"
+              @click="submitCoCoachInvite(true)"
+            >
+              <template v-if="coCoachInviteSubmitting"><I18nText k="dashboard.addCoCoachSending" /></template>
+              <template v-else><I18nText k="dashboard.addCoCoachSendInviteUnregistered" /></template>
             </button>
           </footer>
         </div>
@@ -904,8 +1098,8 @@ const hasDocumentTreeContent = computed(() => {
 
 .co-coach-modal-dialog {
   width: 100%;
-  max-width: 26rem;
-  max-height: min(90vh, 520px);
+  max-width: 28rem;
+  max-height: min(92vh, 720px);
   overflow: auto;
   background: var(--color-bg-elevated);
   color: var(--color-text);
@@ -981,6 +1175,63 @@ const hasDocumentTreeContent = computed(() => {
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+.co-coach-modal-span2 {
+  width: 100%;
+}
+
+.co-coach-modal-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  font-size: var(--text-sm);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.co-coach-modal-note-spaced {
+  margin-top: 0.5rem;
+}
+
+.co-coach-modal-info {
+  margin: 0.65rem 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.co-coach-modal-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.co-coach-modal-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.co-coach-modal-success {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: #15803d;
+}
+
+.co-coach-modal-error {
+  margin: 0.65rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-error, #dc2626);
 }
 
 .co-coach-modal-foot {
