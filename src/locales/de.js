@@ -25,7 +25,8 @@ export default {
         "githubExportBannerCta": "Übersetzungseditor öffnen",
         "githubExportBannerDismiss": "Ausblenden",
         "settings": "Einstellungen",
-        "help": "Hilfe"
+        "help": "Hilfe",
+        "devDummyFormFill": "Dummy-Daten eintragen"
     },
     "auth": {
         "forbiddenMessage": "Nur Nutzer mit der Rolle „Coach“ können diese App nutzen. Melde dich mit einem Coach-Account an oder wende dich an deinen Administrator.",
@@ -525,6 +526,7 @@ export default {
         "onSiteEventLoading": "Events werden geladen…",
         "onSiteEventSelected": "Event vor Ort",
         "onSiteEventSelectTeam": "Event für Team {team} wählen",
+        "onSiteEventPerTeam": "Für jedes Team das Event wählen:",
         "onSiteEventTeamsHint": "Ein Event-Team besteht immer aus 8 Teilnehmenden. Mit deiner aktuellen Auswahl kannst du maximal",
         "teamSingular": "Team",
         "teamsPlural": "Teams",

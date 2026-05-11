@@ -25,7 +25,8 @@ export default {
         "githubExportBannerCta": "Open translation editor",
         "githubExportBannerDismiss": "Dismiss",
         "settings": "Settings",
-        "help": "Help"
+        "help": "Help",
+        "devDummyFormFill": "Fill dummy data"
     },
     "auth": {
         "forbiddenMessage": "Only users with the \"Coach\" role can use this app. Sign in with a coach account or contact your administrator.",
@@ -525,6 +526,7 @@ export default {
         "onSiteEventLoading": "Loading events…",
         "onSiteEventSelected": "On-site event",
         "onSiteEventSelectTeam": "Select event for team {team}",
+        "onSiteEventPerTeam": "Choose an event for each team:",
         "onSiteEventTeamsHint": "Each event team has 8 participants. With your current selection you can register up to",
         "teamSingular": "Team",
         "teamsPlural": "Teams",

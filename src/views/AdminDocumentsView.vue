@@ -7,6 +7,7 @@ import {
   getDocumentsGraphStatus,
   postDocumentsProbeFolder,
 } from '@/services/draht'
+import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
 
 const { t } = useI18n()
 
@@ -225,6 +226,18 @@ async function save() {
   }
 }
 
+function fillDevDummy() {
+  error.value = null
+  success.value = false
+  folderUrl.value = 'https://contoso.sharepoint.com/sites/Robotics/Shared%20Documents'
+  title.value = 'Coach-Dokumente (Test)'
+  skipGraphFileListing.value = false
+  files.value = [
+    { name: 'Teilnehmerhinweise', url: 'https://example.org/hinweise.pdf', folder: 'Allgemein' },
+    { name: 'Score Sheet', url: 'https://example.org/score-sheet.pdf', folder: 'Wettkampf' },
+  ]
+}
+
 onMounted(load)
 </script>
 
@@ -242,6 +255,7 @@ onMounted(load)
       <i class="bi bi-arrow-repeat spin"></i> <I18nText k="dashboard.loading" />
     </div>
     <form v-else class="admin-form" @submit.prevent="save">
+      <DevDummyFormFillButton @click="fillDevDummy" />
       <fieldset class="admin-fieldset">
         <legend><I18nText k="admin.documentsFilesSection" /></legend>
         <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsFilesHint" /></p>

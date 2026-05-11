@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollClass, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
+import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 
 const router = useRouter()
@@ -181,6 +183,26 @@ function onFormFieldFocus(e) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
   }
 }
+
+function fillDevDummy() {
+  error.value = null
+  voucherValid.value = null
+  voucherMessage.value = ''
+  voucherType.value = null
+  voucherInvoiceId.value = null
+  voucherInvoiceName.value = null
+  const addr = cloneDummyAddressState()
+  form.value = {
+    schoolType: 'gymnasium_de',
+    location: 'Hamburg',
+    zip: '20095',
+    playersTotal: '18',
+    organization: 'Gymnasium Oberhafen',
+    voucher: '',
+    deliveryAddress: cloneDummyAddressState(),
+    invoiceAddress: addr,
+  }
+}
 </script>
 
 <template>
@@ -195,6 +217,7 @@ function onFormFieldFocus(e) {
     </div>
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
+      <DevDummyFormFillButton @click="fillDevDummy" />
       <div class="field">
         <label for="class-location"><I18nText k="enroll.location" /></label>
         <input

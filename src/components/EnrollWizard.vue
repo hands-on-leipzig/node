@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, extractAddressesFromResponse } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
+import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
+import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { FUTURE_GROUP_PRICE_EUR } from '@/config/futureEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
@@ -521,6 +523,124 @@ function openWizard() {
   error.value = null
   success.value = false
   step4ValidationAttempted.value = false
+}
+
+/** Dev/test: plausible values across the active edition path (jumps to step 4 — Stammdaten). */
+function fillWizardDummy() {
+  const addr = cloneDummyAddressState()
+  hasVoucherCode.value = 'no'
+  voucher.value = ''
+  voucherValid.value = null
+  voucherMessage.value = ''
+  voucherType.value = null
+  voucherInvoiceId.value = null
+  voucherInvoiceName.value = null
+  voucherPresetInvoiceId.value = null
+  voucherPresetInvoiceName.value = null
+  presetSeasonSetCount.value = null
+  presetRegisterEventTeams.value = null
+  presetEventTeamCount.value = null
+  error.value = null
+  step4ValidationAttempted.value = false
+
+  if (edition.value !== 'founders' && edition.value !== 'future') {
+    edition.value = 'future'
+    futureGroup.value = '8'
+    futurePupils.value = 16
+    futureOnSiteEvent.value = 'later'
+    futureEventTeamCount.value = 1
+    futureTeamAutoUpgrade.value = null
+    futureTeamEvents.value = []
+    foundersType.value = null
+    foundersVariant.value = null
+    founderTeamPlayers.value = []
+    founderTeamEventId.value = null
+  }
+
+  if (edition.value === 'future') {
+    if (!futureGroup.value) futureGroup.value = '8'
+    if (!futurePupils.value) futurePupils.value = 16
+    if (!futureOnSiteEvent.value) futureOnSiteEvent.value = 'later'
+    futureEventTeamCount.value = normalizeFutureEventTeamCount()
+    syncFutureTeamEventsArray()
+    formData.value = {
+      name: 'Future-Gruppe Demo',
+      schoolOrClub: '',
+      schoolType: 'gymnasium_de',
+      organization: 'Albertus-Magnus-Gymnasium Regensburg',
+      country: 'de',
+      zip: '93049',
+      city: 'Regensburg',
+      state: 'Bayern',
+      location: 'Regensburg',
+      playersTotal: '',
+    }
+  } else if (edition.value === 'founders') {
+    if (!foundersVariant.value) foundersVariant.value = 'explore'
+    if (!foundersType.value) foundersType.value = 'team'
+    if (foundersType.value === 'team') {
+      formData.value = {
+        name: 'FLL Explore Testteam',
+        schoolOrClub: 'Robotik-AG',
+        schoolType: '',
+        organization: '',
+        country: 'de',
+        zip: '90402',
+        city: 'Nürnberg',
+        state: 'Bayern',
+        location: 'Nürnberg',
+        playersTotal: '',
+      }
+      if (founderTeamPlayers.value.length === 0) {
+        founderTeamPlayers.value = [
+          { firstname: 'Jamie', name: 'Testinger', gender: 'D', birthdayStr: '2011-03-20' },
+        ]
+      } else {
+        founderTeamPlayers.value = founderTeamPlayers.value.map((p) => ({
+          firstname: p.firstname || 'Jamie',
+          name: p.name || 'Testinger',
+          gender: p.gender || 'D',
+          birthdayStr: p.birthdayStr || '2011-03-20',
+        }))
+      }
+    } else {
+      formData.value = {
+        name: '',
+        schoolOrClub: '',
+        schoolType: 'grundschule',
+        organization: 'Grundschule am Stadtpark',
+        country: 'de',
+        zip: '20095',
+        city: 'Hamburg',
+        state: 'Hamburg',
+        location: 'Hamburg',
+        playersTotal: '20',
+      }
+      founderTeamPlayers.value = []
+    }
+  }
+
+  deliveryAddress.value = cloneDummyAddressState()
+  invoiceAddress.value = addr
+  deliveryAddressDifferent.value = false
+
+  nextTick(() => {
+    const firstFounder = founderEventsNearest.value[0]
+    if (edition.value === 'founders' && foundersType.value === 'team' && firstFounder?.id != null) {
+      founderTeamEventId.value = Number(firstFounder.id)
+    }
+    const firstFuture = futureEventsNearest.value[0]
+    if (
+      edition.value === 'future'
+      && futureOnSiteEvent.value === 'yes'
+      && futureTeamEvents.value.length
+      && firstFuture?.id != null
+    ) {
+      futureTeamEvents.value = futureTeamEvents.value.map(() => ({ eventId: Number(firstFuture.id) }))
+      updateDerivedFutureEventId()
+    }
+    step.value = 4
+  })
 }
 
 function close() {
@@ -1247,6 +1367,7 @@ watch(
 
         <div class="wizard-panel-main">
           <div class="wizard-scroll">
+            <DevDummyFormFillButton class="wizard-dev-dummy" @click="fillWizardDummy" />
             <div class="wizard-body" :class="{ 'wizard-body--center-options': centeredOptionStep }">
           <!-- Step 0: Voucher-Code / Direkteinstieg -->
           <div
@@ -1511,17 +1632,19 @@ watch(
                   <div class="wizard-option-desc"><I18nText k="wizard.onSiteEventYesDesc" /></div>
                 </button>
                 <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
-                  <p class="wizard-event-label"><I18nText k="wizard.onSiteEventSelect" /></p>
                   <p class="wizard-hint wizard-event-team-hint">
                     <I18nText k="wizard.onSiteEventTeamsHint" />
                     <strong>{{ maxFutureEventTeamsByPupils }}</strong>
                   </p>
-                  <div class="wizard-options wizard-options-three wizard-options-vertical wizard-event-team-options">
+                  <p class="wizard-event-label wizard-event-team-count-label">
+                    {{ t('groupDetail.eventTeamsLabel') }}
+                  </p>
+                  <div class="wizard-event-team-count-row" role="group" :aria-label="t('groupDetail.eventTeamsLabel')">
                     <button
                       v-for="count in futureTeamOptionCounts"
                       :key="'future-event-team-' + count"
                       type="button"
-                      class="wizard-option wizard-option-card wizard-option-team-count"
+                      class="wizard-event-team-count-pill"
                       :class="{
                         active: futureEventTeamCount === count,
                         'is-disabled': count > maxFutureEventTeamsByPupils,
@@ -1529,32 +1652,42 @@ watch(
                       :aria-disabled="count > maxFutureEventTeamsByPupils ? 'true' : 'false'"
                       @click="selectFutureEventTeamCount(count)"
                     >
-                      <div class="wizard-option-main">
+                      <span class="wizard-event-team-count-pill-main">
                         {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
-                      </div>
-                      <div class="wizard-option-desc">
-                        {{ count * 8 }} <I18nText k="enrollFuture.pupils" />
-                      </div>
+                      </span>
+                      <span class="wizard-event-team-count-pill-meta">
+                        {{ count * FUTURE_EVENT_TEAM_SIZE }} <I18nText k="enrollFuture.pupils" />
+                      </span>
                     </button>
                   </div>
-                  <div v-if="futureEventTeamCount > 0" class="wizard-event-team-selects">
+                  <p class="wizard-event-label wizard-event-per-team-label">
+                    <I18nText k="wizard.onSiteEventPerTeam" />
+                  </p>
+                  <div v-if="futureEventTeamCount > 0" class="wizard-event-team-rows">
                     <div
                       v-for="(entry, idx) in futureTeamEvents"
                       :key="'future-event-select-' + idx"
-                      class="wizard-event-team-select-block"
+                      class="wizard-event-team-combined-card"
                     >
-                      <p class="wizard-event-label">
-                        {{ t('wizard.onSiteEventSelectTeam', { team: idx + 1 }) }}
-                      </p>
-                      <EventSelectDropdown
-                        :title="t('wizard.eventSelectSimple')"
-                        :events="futureEventsNearest"
-                        :loading="futureEventsNearestLoading"
-                        :model-value="entry.eventId"
-                        :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
-                        :event-label-fn="futureEventOptionLabel"
-                        @update:model-value="selectFutureTeamEvent(idx, $event)"
-                      />
+                      <div class="wizard-event-team-combined-grid">
+                        <div class="wizard-event-team-combined-meta">
+                          <span class="wizard-event-team-name">{{ t('wizard.teamSingular') }} {{ idx + 1 }}</span>
+                          <span class="wizard-event-team-pupils">
+                            {{ FUTURE_EVENT_TEAM_SIZE }} <I18nText k="enrollFuture.pupils" />
+                          </span>
+                        </div>
+                        <div class="wizard-event-team-combined-dropdown">
+                          <EventSelectDropdown
+                            :title="t('wizard.eventSelectSimple')"
+                            :events="futureEventsNearest"
+                            :loading="futureEventsNearestLoading"
+                            :model-value="entry.eventId"
+                            :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                            :event-label-fn="futureEventOptionLabel"
+                            @update:model-value="selectFutureTeamEvent(idx, $event)"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div v-if="futureTeamAutoUpgrade" class="wizard-event-team-upgrade">
@@ -1846,6 +1979,10 @@ watch(
   height: 0;
   display: none;
 }
+.wizard-dev-dummy {
+  flex-shrink: 0;
+  padding: 0.35rem 1.25rem 0;
+}
 .wizard-step {
   min-height: 8rem;
   flex: 1;
@@ -2034,24 +2171,95 @@ watch(
   margin-top: 0.9rem;
   margin-bottom: 0.65rem;
 }
-.wizard-event-team-options {
-  max-width: none;
+.wizard-event-team-count-label {
+  margin-top: 0.35rem;
+  margin-bottom: 0.45rem;
 }
-.wizard-option-team-count {
-  min-height: 3.9rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+.wizard-event-team-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
-.wizard-event-team-selects {
-  display: grid;
-  gap: 0.85rem;
-  margin-top: 0.65rem;
-}
-.wizard-event-team-select-block {
-  padding: 0.7rem;
+.wizard-event-team-count-pill {
+  flex: 1 1 6.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 3.1rem;
+  padding: 0.5rem 0.65rem;
+  border: 2px solid var(--color-border);
   border-radius: 0.7rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.wizard-event-team-count-pill:hover:not(.is-disabled) {
+  border-color: var(--color-accent);
+}
+.wizard-event-team-count-pill.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.wizard-event-team-count-pill.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.wizard-event-team-count-pill-main {
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+.wizard-event-team-count-pill-meta {
+  font-size: 0.82rem;
+  color: var(--color-text-muted, var(--color-text));
+  opacity: 0.92;
+}
+.wizard-event-per-team-label {
+  margin-bottom: 0.5rem;
+}
+.wizard-event-team-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.wizard-event-team-combined-card {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
   border: 1px solid var(--color-border);
   background: var(--color-bg);
+}
+.wizard-event-team-combined-grid {
+  display: grid;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+@media (min-width: 36rem) {
+  .wizard-event-team-combined-grid {
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.85rem;
+  }
+}
+.wizard-event-team-combined-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.wizard-event-team-name {
+  font-weight: 600;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+.wizard-event-team-pupils {
+  font-size: 0.86rem;
+  color: var(--color-text-muted, var(--color-text));
+}
+.wizard-event-team-combined-dropdown {
+  min-width: 0;
 }
 .wizard-event-team-upgrade {
   margin-top: 0.85rem;

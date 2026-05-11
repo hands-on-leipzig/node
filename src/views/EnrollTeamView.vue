@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
+import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 
 const router = useRouter()
 const route = useRoute()
@@ -237,6 +239,28 @@ function onFormFieldFocus(e) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
   }
 }
+
+function fillDevDummy() {
+  error.value = null
+  voucherValid.value = null
+  voucherMessage.value = ''
+  voucherType.value = null
+  voucherInvoiceId.value = null
+  voucherInvoiceName.value = null
+  const addr = cloneDummyAddressState()
+  form.value = {
+    name: 'FLL Challenge Team Phoenix',
+    schoolOrClub: 'MINT-AG am Einstein-Gymnasium',
+    country: 'de',
+    zip: '80331',
+    city: 'München',
+    state: 'Bayern',
+    organization: 'Einstein-Gymnasium München',
+    voucher: '',
+    deliveryAddress: cloneDummyAddressState(),
+    invoiceAddress: addr,
+  }
+}
 </script>
 
 <template>
@@ -251,6 +275,7 @@ function onFormFieldFocus(e) {
     </div>
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
+      <DevDummyFormFillButton @click="fillDevDummy" />
       <div class="field">
         <label for="team-name"><I18nText k="enrollTeam.teamName" /> <span class="required">*</span></label>
         <input

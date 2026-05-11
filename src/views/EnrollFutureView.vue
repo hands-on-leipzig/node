@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
+import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
+import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import {
   FUTURE_GROUP_PRICE_EUR,
@@ -365,6 +367,27 @@ const stepIndex = computed(() => {
   const s = ['voucher', 'pupils', 'seasonSets', 'teams', 'form'].indexOf(step.value)
   return s >= 0 ? s : 0
 })
+
+function fillFutureFormDummy() {
+  error.value = null
+  form.value.name = 'Future-Coach Taylor'
+  form.value.schoolType = 'realschule_de'
+  form.value.location = 'Stuttgart'
+  form.value.zip = '70173'
+  form.value.organization = 'Realschule Mitte'
+  const inv = cloneDummyAddressState()
+  form.value.deliveryAddress = cloneDummyAddressState()
+  form.value.invoiceAddress = inv
+  if (registerEventTeams.value) {
+    syncEventTeamsArray()
+    eventTeams.value.forEach((team) => {
+      team.players = [
+        { firstname: 'Alex', name: 'Muster', gender: 'M', birthdayStr: '2011-04-12' },
+        { firstname: 'Sam', name: 'Demo', gender: 'D', birthdayStr: '2011-08-03' },
+      ]
+    })
+  }
+}
 </script>
 
 <template>
@@ -553,6 +576,7 @@ const stepIndex = computed(() => {
         @submit.prevent="submit"
         @focusin="onFormFieldFocus"
       >
+        <DevDummyFormFillButton @click="fillFutureFormDummy" />
         <h3 class="step-title"><I18nText k="enrollFuture.stepDetails" /></h3>
         <div class="summary-box">
           <p>
