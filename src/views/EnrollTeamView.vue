@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,6 +33,10 @@ const form = ref({
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
+
+const consentDataProcessing = ref(false)
+const consentTerms = ref(false)
+const consentNewsletter = ref(false)
 
 const addresses = ref([])
 const submitting = ref(false)
@@ -176,6 +181,10 @@ function buildInvoiceAddressPayload() {
 }
 
 async function submit() {
+  if (!consentDataProcessing.value || !consentTerms.value) {
+    error.value = t('enroll.consentRequired')
+    return
+  }
   if (!form.value.name?.trim()) {
     error.value = t('enrollTeam.teamNameRequired')
     return
@@ -199,6 +208,9 @@ async function submit() {
       voucher: form.value.voucher.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
       invoiceAddress: buildInvoiceAddressPayload(),
+      consentDataProcessing: true,
+      consentTerms: true,
+      newsletterOptIn: !!consentNewsletter.value,
     }
     if (programId != null) payload.program = programId
     await enrollTeam(payload)
@@ -220,6 +232,9 @@ async function submit() {
       deliveryAddress: emptyAddressState(),
       invoiceAddress: emptyAddressState(),
     }
+    consentDataProcessing.value = false
+    consentTerms.value = false
+    consentNewsletter.value = false
   } catch (e) {
     error.value = e.response?.data?.message || e.message || t('enrollTeam.enrollmentFailed')
   } finally {
@@ -360,6 +375,13 @@ function onFormFieldFocus(e) {
         :addresses="addresses"
         :label="t('enroll.invoiceAddress')"
         id-prefix="team-invoice"
+      />
+
+      <EnrollConsentCheckboxes
+        id-prefix="team-consent"
+        v-model:consent-data-processing="consentDataProcessing"
+        v-model:consent-terms="consentTerms"
+        v-model:consent-newsletter="consentNewsletter"
       />
 
       <div v-if="error" class="message error">

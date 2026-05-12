@@ -38,3 +38,22 @@ export function futureMaxEventTeams(pupilCount) {
   if (pupilCount <= 24) return 3
   return 4
 }
+
+/** Pro Event-Team vorgesehene Teilnehmendenzahl (CRM-Logik). */
+export const FUTURE_EVENT_TEAM_SIZE = 8
+
+/**
+ * Kleinste erlaubte Gruppengröße aus {@link FUTURE_PUPIL_COUNTS}, für die `teamCount` 8er-Teams möglich sind.
+ */
+export function minPupilsForEventTeamCount(teamCount) {
+  const t = Math.max(1, Math.min(4, Math.floor(Number(teamCount)) || 1))
+  for (const p of FUTURE_PUPIL_COUNTS) {
+    if (futureMaxEventTeams(p) >= t) return p
+  }
+  return FUTURE_PUPIL_COUNTS[FUTURE_PUPIL_COUNTS.length - 1]
+}
+
+/** Maximal wählbare Event-Teams (höchste CRM-Stufe 32 TN → 4 Teams). */
+export function futureMaxSelectableEventTeams() {
+  return futureMaxEventTeams(Math.max(...FUTURE_PUPIL_COUNTS))
+}

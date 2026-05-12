@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
+import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import {
@@ -16,6 +17,8 @@ import {
   FUTURE_TEAM_EVENT_PRODUCT_REF,
   FUTURE_PUPIL_COUNTS,
   futureMaxEventTeams,
+  futureMaxSelectableEventTeams,
+  minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 
 const router = useRouter()
@@ -59,6 +62,10 @@ const form = ref({
 
 const { isPrivateInstitution } = usePrivateInstitutionOrganization(form)
 
+const consentDataProcessing = ref(false)
+const consentTerms = ref(false)
+const consentNewsletter = ref(false)
+
 const addresses = ref([])
 const submitting = ref(false)
 const error = ref(null)
@@ -79,6 +86,11 @@ const maxTeams = computed(() =>
   selectedPupils.value ? futureMaxEventTeams(selectedPupils.value) : 1
 )
 
+const futureEventTeamSelectOptions = computed(() => {
+  const n = futureMaxSelectableEventTeams()
+  return Array.from({ length: n }, (_, i) => i + 1)
+})
+
 function formatMoney(eur) {
   try {
     return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
@@ -91,6 +103,13 @@ function formatMoney(eur) {
 }
 
 function syncEventTeamsArray() {
+  if (registerEventTeams.value && selectedPupils.value != null) {
+    const maxChoice = futureMaxSelectableEventTeams()
+    const tc = Math.min(Math.max(1, teamCount.value), maxChoice)
+    const need = minPupilsForEventTeamCount(tc)
+    if (need > selectedPupils.value) selectedPupils.value = need
+    if (teamCount.value !== tc) teamCount.value = tc
+  }
   const n = registerEventTeams.value ? Math.min(Math.max(1, teamCount.value), maxTeams.value) : 0
   while (eventTeams.value.length < n) {
     eventTeams.value.push({ players: [] })
@@ -276,6 +295,10 @@ function playersToPayload(players) {
 }
 
 async function submit() {
+  if (!consentDataProcessing.value || !consentTerms.value) {
+    error.value = t('enroll.consentRequired')
+    return
+  }
   if (!form.value.name?.trim()) {
     error.value = t('enrollFuture.nameRequired')
     return
@@ -311,6 +334,9 @@ async function submit() {
       voucher: form.value.voucher.trim() || undefined,
       deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
       invoiceAddress: buildInvoiceAddressPayload(),
+      consentDataProcessing: true,
+      consentTerms: true,
+      newsletterOptIn: !!consentNewsletter.value,
     }
     await enrollFuture(payload)
     success.value = true
@@ -335,6 +361,9 @@ async function submit() {
       deliveryAddress: emptyAddressState(),
       invoiceAddress: emptyAddressState(),
     }
+    consentDataProcessing.value = false
+    consentTerms.value = false
+    consentNewsletter.value = false
   } catch (e) {
     error.value = e.response?.data?.message || e.message || t('enrollFuture.enrollmentFailed')
   } finally {
@@ -515,7 +544,7 @@ const stepIndex = computed(() => {
           <div class="field">
             <label><I18nText k="enrollFuture.teamCountLabel" /></label>
             <select v-model.number="teamCount" class="select-input">
-              <option v-for="n in maxTeams" :key="n" :value="n">
+              <option v-for="n in futureEventTeamSelectOptions" :key="n" :value="n">
                 {{ n }} {{ n === 1 ? t('enrollFuture.teamSingular') : t('enrollFuture.teamPlural') }}
                 — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * n) }}
               </option>
@@ -634,6 +663,13 @@ const stepIndex = computed(() => {
           :addresses="addresses"
           :label="t('enroll.invoiceAddress')"
           id-prefix="future-invoice"
+        />
+
+        <EnrollConsentCheckboxes
+          id-prefix="future-consent"
+          v-model:consent-data-processing="consentDataProcessing"
+          v-model:consent-terms="consentTerms"
+          v-model:consent-newsletter="consentNewsletter"
         />
 
         <div v-if="error" class="message error">

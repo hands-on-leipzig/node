@@ -6,7 +6,12 @@ import { getGroup, getEvents, registerGroupForEvent } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import { FUTURE_TEAM_EVENT_UNIT_EUR, futureMaxEventTeams } from '@/config/futureEditionConfig'
+import {
+  FUTURE_TEAM_EVENT_UNIT_EUR,
+  futureMaxEventTeams,
+  futureMaxSelectableEventTeams,
+  minPupilsForEventTeamCount,
+} from '@/config/futureEditionConfig'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -34,16 +39,26 @@ const registeredPupils = computed(() => {
   return Number.isFinite(n) && n > 0 ? n : 0
 })
 
-const maxEventTeams = computed(() => {
-  const backendVal = Number(group.value?.maxEventTeams || 0)
-  if (Number.isFinite(backendVal) && backendVal > 0) return backendVal
-  return registeredPupils.value > 0 ? futureMaxEventTeams(registeredPupils.value) : 1
-})
+/** Teams allowed with current group size (8 TN → 1 Team, …). */
+const maxEventTeamsForCurrentPupils = computed(() =>
+  registeredPupils.value > 0 ? futureMaxEventTeams(registeredPupils.value) : 1,
+)
+
+/** Nachmeldung: bis CRM-Maximum wählbar; bei Bedarf wird die TN-Zahl automatisch angehoben. */
+const maxEventTeamsSelectable = computed(() => futureMaxSelectableEventTeams())
 
 const eventTeamCountOptions = computed(() => {
-  const max = Math.max(1, maxEventTeams.value)
+  const max = Math.max(1, maxEventTeamsSelectable.value)
   return Array.from({ length: max }, (_, idx) => idx + 1)
 })
+
+const pupilsRequiredForSelectedTeams = computed(() =>
+  minPupilsForEventTeamCount(registerEventTeamCount.value),
+)
+
+const willAutoIncreasePupils = computed(
+  () => pupilsRequiredForSelectedTeams.value > registeredPupils.value,
+)
 
 const estimatedEventCostEur = computed(() => {
   const count = Number(registerEventTeamCount.value || 0)
@@ -101,8 +116,16 @@ async function submitRegisterForEvent() {
   registerEventError.value = null
   registerEventSuccess.value = false
   try {
-    const teamCount = Math.min(Math.max(1, Number(registerEventTeamCount.value || 1)), maxEventTeams.value)
-    const res = await registerGroupForEvent(id.value, eventId, teamCount)
+    const teamCount = Math.min(
+      Math.max(1, Number(registerEventTeamCount.value || 1)),
+      maxEventTeamsSelectable.value,
+    )
+    const neededPupils = minPupilsForEventTeamCount(teamCount)
+    const currentPupils = registeredPupils.value
+    const registeredPupilsPayload = Math.max(currentPupils, neededPupils)
+    const res = await registerGroupForEvent(id.value, eventId, teamCount, {
+      registeredPupils: registeredPupilsPayload > currentPupils ? registeredPupilsPayload : undefined,
+    })
     group.value = res.data
     registerEventSuccess.value = true
     setTimeout(() => { registerEventSuccess.value = false }, 3000)
@@ -131,6 +154,10 @@ onMounted(async () => {
 watch(id, async () => {
   await fetchGroup()
   loadEvents()
+})
+
+watch(maxEventTeamsSelectable, (max) => {
+  if (registerEventTeamCount.value > max) registerEventTeamCount.value = max
 })
 watch(
   () => route.query.focus,
@@ -213,7 +240,23 @@ watch(
           <p class="detail-hint detail-hint-sm">
             <I18nText
               k="groupDetail.teamCountHint"
-              :params="{ pupils: registeredPupils || '—', maxTeams: maxEventTeams }"
+              :values="{
+                pupils: registeredPupils || '—',
+                maxCurrent: maxEventTeamsForCurrentPupils,
+                maxSelectable: maxEventTeamsSelectable,
+              }"
+            />
+          </p>
+          <p
+            v-if="willAutoIncreasePupils"
+            class="detail-hint detail-hint-sm detail-hint-accent"
+          >
+            <I18nText
+              k="groupDetail.eventTeamAutoPupilsHint"
+              :values="{
+                teams: registerEventTeamCount,
+                pupils: pupilsRequiredForSelectedTeams,
+              }"
             />
           </p>
           <div class="detail-register-event">
@@ -234,7 +277,7 @@ watch(
                 </option>
               </select>
               <p class="detail-hint detail-hint-sm">
-                <I18nText k="groupDetail.eventCostHint" :params="{ cost: estimatedEventCostEur }" />
+                <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedEventCostEur }" />
               </p>
             </div>
             <button
@@ -341,6 +384,10 @@ watch(
 .detail-hint-sm {
   font-size: 0.82rem;
   margin-bottom: 0.75rem;
+}
+.detail-hint-accent {
+  color: color-mix(in srgb, var(--color-accent) 85%, var(--color-text));
+  font-weight: 500;
 }
 .detail-register-event {
   display: flex;

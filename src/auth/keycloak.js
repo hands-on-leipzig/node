@@ -65,8 +65,14 @@ export function hasAdminRole() {
   return Array.isArray(realmRoles) && realmRoles.includes('admin')
 }
 
-/** Claim name for the coach's Dolibarr contact ID in the token (must match Keycloak mapper and server config) */
-const DOLIBARR_CONTACT_CLAIM = 'dolibarr_contact_id'
+/** Claim(s) for the coach's Dolibarr contact ID in the token (Keycloak protocol mapper). Server may use a different name via API_KEYCLOAK_DOLIBARR_CONTACT_CLAIM; set VITE_KEYCLOAK_DOLIBARR_CONTACT_CLAIM to match. */
+function dolibarrContactClaimCandidates() {
+  const fromEnv = import.meta.env.VITE_KEYCLOAK_DOLIBARR_CONTACT_CLAIM
+  const list = []
+  if (fromEnv && String(fromEnv).trim()) list.push(String(fromEnv).trim())
+  list.push('dolibarr_contact_id', 'dolibarrContactId', 'dolibarr_id')
+  return [...new Set(list)]
+}
 
 export function getUserProfile() {
   if (!keycloak.authenticated || !keycloak.tokenParsed) return null
@@ -80,17 +86,21 @@ export function getUserProfile() {
 }
 
 /**
- * Dolibarr contact ID for the current coach (from Keycloak user attribute, exposed in token).
- * Used by the API to identify the coach and find their teams. The frontend does not need to send it;
- * the API middleware reads it from the Bearer token.
- * @returns {number|null} Contact ID or null if not in token
+ * Dolibarr contact ID from the Keycloak token, if the mapper exposes it to this client’s access token.
+ * Team enrollment uses the same Bearer on the server; for the authoritative ID use getNodeCoachMe() in draht.js.
+ * @returns {number|null}
  */
 export function getCoachDolibarrContactId() {
   if (!keycloak.authenticated || !keycloak.tokenParsed) return null
-  const v = keycloak.tokenParsed[DOLIBARR_CONTACT_CLAIM]
-  if (v == null || v === '') return null
-  const n = parseInt(v, 10)
-  return Number.isFinite(n) ? n : null
+  const p = keycloak.tokenParsed
+  for (const claim of dolibarrContactClaimCandidates()) {
+    const v = p[claim]
+    if (v != null && v !== '') {
+      const n = parseInt(v, 10)
+      if (Number.isFinite(n)) return n
+    }
+  }
+  return null
 }
 
 export async function login() {

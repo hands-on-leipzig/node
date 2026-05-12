@@ -83,6 +83,15 @@ export function getAddresses() {
   return api.get('/addresses')
 }
 
+/**
+ * Current coach identity from the API (Dolibarr contact id as set by Bearer middleware).
+ * Prefer this over parsing the JWT in the browser — the claim name may differ or be omitted from tokenParsed.
+ * @returns {Promise<{ data: { coachContactId: number } }>}
+ */
+export function getNodeCoachMe() {
+  return api.get('/me')
+}
+
 function firstDefined(...values) {
   for (const value of values) {
     if (value !== null && value !== undefined && value !== '') return value
@@ -126,6 +135,39 @@ export function extractAddressesFromResponse(payload) {
 export async function listAddressBook() {
   const res = await getAddresses()
   return extractAddressesFromResponse(res)
+}
+
+/**
+ * Saved addresses split by kind (delivery = contact, invoice = third party).
+ * Uses GET /addresses response keys `delivery` and `invoice` when present; otherwise falls back to the flat merged list (legacy API).
+ * @returns {Promise<{ delivery: object[], invoice: object[], combined: object[], legacyFlat: boolean }>}
+ */
+export async function listAddressBookGrouped() {
+  const res = await getAddresses()
+  const body = res?.data ?? {}
+
+  const mapList = (arr) =>
+    (Array.isArray(arr) ? arr : [])
+      .map((item, idx) => normalizeAddressItem(item, idx))
+      .filter(Boolean)
+
+  const hasSplit =
+    Object.prototype.hasOwnProperty.call(body, 'delivery') &&
+    Object.prototype.hasOwnProperty.call(body, 'invoice') &&
+    Array.isArray(body.delivery) &&
+    Array.isArray(body.invoice)
+
+  if (hasSplit) {
+    return {
+      delivery: mapList(body.delivery),
+      invoice: mapList(body.invoice),
+      legacyFlat: false,
+      combined: [],
+    }
+  }
+
+  const flat = extractAddressesFromResponse(res)
+  return { delivery: [], invoice: [], legacyFlat: true, combined: flat }
 }
 
 export function createAddress(payload) {
@@ -342,9 +384,14 @@ export function inviteCoCoach(payload) {
 /**
  * Register future group for an event (or update/clear).
  * Payload: { eventId, eventTeamCount } where eventTeamCount is number of 8-pupil teams.
+ * Optional `registeredPupils` bumps group capacity when more teams require a higher tier (8/16/24/32).
  */
-export function registerGroupForEvent(groupId, eventId, eventTeamCount) {
-  return api.put('/groups/' + encodeURIComponent(groupId) + '/event', { eventId, eventTeamCount })
+export function registerGroupForEvent(groupId, eventId, eventTeamCount, options = {}) {
+  const body = { eventId, eventTeamCount }
+  if (options.registeredPupils != null && Number.isFinite(Number(options.registeredPupils))) {
+    body.registeredPupils = Number(options.registeredPupils)
+  }
+  return api.put('/groups/' + encodeURIComponent(groupId) + '/event', body)
 }
 
 /**

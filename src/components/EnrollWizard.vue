@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, extractAddressesFromResponse } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { FUTURE_GROUP_PRICE_EUR } from '@/config/futureEditionConfig'
@@ -36,10 +37,11 @@ const emptyAddressState = () => ({
 const hasVoucherCode = ref(null) // null | 'yes' | 'no'
 // Step 1
 const edition = ref(null) // 'founders' | 'future'
-// Step 2: Future = group '5'|'8', Founders = variant 'explore'|'challenge'
+// Step 2: Future = group '5'|'8', Founders = variant + type 'team'|'class' (same step)
 const futureGroup = ref(null)
 const foundersVariant = ref(null)
-// Step 3: Future = pupils 8|16|24, Founders = type 'team'|'class'
+// Step 3: Institution (school / location — same step for all modes)
+// Step 4: Future = pupils 8|16|24, Founders class = players count, Founders team = name + participant list
 const futurePupils = ref(null)
 // Future: optional on-site event registration (+100€)
 const futureOnSiteEvent = ref(null) // null | 'yes' | 'later'
@@ -93,6 +95,10 @@ const invoiceAddress = ref(emptyAddressState())
 const addresses = ref([])
 const deliveryAddressDifferent = ref(false)
 
+const consentDataProcessing = ref(false)
+const consentTerms = ref(false)
+const consentNewsletter = ref(false)
+
 const step = ref(1)
 const submitting = ref(false)
 const error = ref(null)
@@ -104,12 +110,15 @@ const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
 )
 
+/** Founders inserts team/class between variant (2) and institution — institution shifts +1 vs Future. */
+const institutionStepIndex = computed(() => (edition.value === 'founders' ? 4 : 3))
+const participantsStepIndex = computed(() => (edition.value === 'founders' ? 5 : 4))
+
 const lastStep = computed(() => {
-  // Step indexes: future ends at 6, founders class at 6, founders team at 8.
-  if (edition.value === 'future') return 6
+  // Future: 6=addresses, 7=order. Founders class: 7=order. Founder team: 8=order (extra step for team/class split).
+  if (edition.value === 'future') return 7
   if (foundersTeamHasParticipantsStep.value) return 8
-  if (edition.value === 'founders') return 6
-  // Before edition is selected only voucher + edition are reachable.
+  if (edition.value === 'founders') return 7
   return 1
 })
 
@@ -158,16 +167,19 @@ const wizardProgressSteps = computed(() => {
 
   if (edition.value === 'future') {
     return withIndex([
-      { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
-      { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
+      { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
+      { key: 'wizard.progressDetails', active: s === 3, done: s > 3 },
+      { key: 'wizard.progressParticipants', active: s === 4, done: s > 4 },
       { key: 'wizard.progressOnSite', active: s === 5, done: s > 5 },
-      { key: 'wizard.progressCheckout', active: s === 6, done: success.value },
+      { key: 'wizard.progressAddresses', active: s === 6, done: s > 6 },
+      { key: 'wizard.progressReview', active: s === 7, done: success.value },
     ])
   }
 
   if (foundersTeamHasParticipantsStep.value) {
     return withIndex([
-      { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
+      { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
+      { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
       { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
       { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
       { key: 'wizard.progressEvent', active: s === 6, done: s > 6 },
@@ -177,32 +189,51 @@ const wizardProgressSteps = computed(() => {
   }
 
   return withIndex([
-    { key: 'wizard.progressChoose', active: s <= 3, done: s > 3 },
+    { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
+    { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
     { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
-    { key: 'wizard.progressAddresses', active: s === 5, done: s > 5 },
-    { key: 'wizard.progressReview', active: s === 6, done: success.value },
+    { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
+    { key: 'wizard.progressAddresses', active: s === 6, done: s > 6 },
+    { key: 'wizard.progressReview', active: s === 7, done: success.value },
   ])
 })
 
 const stepTitle = computed(() => {
-  if (step.value === 0) return t('wizard.stepVoucherCode')
-  if (step.value === 1) return t('wizard.stepEdition')
-  if (step.value === 2) return edition.value === 'future' ? t('wizard.stepFutureGroup') : t('wizard.stepVariant')
-  if (step.value === 3) return edition.value === 'future' ? t('wizard.stepPupils') : t('wizard.stepTeamClass')
-  if (step.value === 4) return t('wizard.stepData')
-  if (step.value === 5) {
+  const s = step.value
+  const ft = foundersTeamHasParticipantsStep.value
+  if (s === 0) return t('wizard.stepVoucherCode')
+  if (s === 1) return t('wizard.stepEdition')
+  if (s === 2) return edition.value === 'future' ? t('wizard.stepFutureGroup') : t('wizard.stepVariant')
+  if (s === 3) {
+    if (edition.value === 'future') return t('wizard.stepInstitution')
+    return t('wizard.stepTeamClass')
+  }
+  if (s === 4) {
+    if (edition.value === 'future') return t('wizard.stepPupils')
+    if (edition.value === 'founders') return t('wizard.stepInstitution')
+    return ''
+  }
+  if (s === 5) {
     if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
-    if (foundersTeamHasParticipantsStep.value) return t('wizard.stepParticipants')
-    return t('wizard.stepAddresses') // Founders class: no voucher step, Addresses is step 5
+    if (edition.value === 'founders') {
+      if (foundersType.value === 'class') return t('wizard.stepClassParticipants')
+      return t('wizard.stepParticipants')
+    }
+    return ''
   }
-  if (step.value === 6) {
+  if (s === 6) {
+    if (edition.value === 'future') return t('wizard.stepAddresses')
+    if (ft) return t('wizard.stepEvent')
+    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepAddresses')
+    return ''
+  }
+  if (s === 7) {
     if (edition.value === 'future') return t('wizard.stepOrder')
-    if (foundersTeamHasParticipantsStep.value) return t('wizard.stepEvent')
-    return t('wizard.stepAddresses')
+    if (ft) return t('wizard.stepAddresses')
+    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepOrder')
+    return ''
   }
-  if (step.value === 7) return t('wizard.stepAddresses') // Founder team: Addresses (no voucher step)
-  if (step.value === 6 && edition.value === 'founders' && foundersType.value === 'class') return t('wizard.orderTitle')
-  if (step.value === 8 && foundersTeamHasParticipantsStep.value) return t('wizard.orderTitle')
+  if (s === 8 && ft) return t('wizard.stepOrder')
   return ''
 })
 
@@ -236,7 +267,7 @@ function selectFuturePupils(num) {
   if (futureEventTeamCount.value > maxTeams) {
     futureEventTeamCount.value = maxTeams
   }
-  scheduleAdvanceIfReady(3)
+  scheduleAdvanceIfReady(4)
 }
 
 function selectFutureEventTeamCount(count) {
@@ -361,7 +392,10 @@ const selectedFounderEventLabel = computed(() => {
 
 const centeredOptionStep = computed(() => {
   if (step.value === 0) return hasVoucherCode.value === null
-  return step.value === 1 || step.value === 2 || step.value === 3
+  return step.value === 1
+    || step.value === 2
+    || (step.value === 3 && edition.value === 'founders')
+    || (step.value === 4 && edition.value === 'future')
 })
 
 /** Event display label with optional capacity (from flow API). */
@@ -519,6 +553,9 @@ function openWizard() {
   deliveryAddress.value = emptyAddressState()
   invoiceAddress.value = emptyAddressState()
   deliveryAddressDifferent.value = false
+  consentDataProcessing.value = false
+  consentTerms.value = false
+  consentNewsletter.value = false
   founderTeamPlayers.value = []
   founderTeamEventId.value = null
   step.value = 0
@@ -535,11 +572,9 @@ function isFilled(value) {
   return value !== null && value !== undefined && String(value).trim() !== ''
 }
 
-function isStep4RequiredFieldMissing(field) {
-  const requiresSchoolDetails = edition.value === 'future' || foundersType.value === 'class'
-  const requiresLocation = edition.value === 'future' || foundersType.value === 'class' || foundersType.value === 'team'
-
-  if (field === 'name') return edition.value !== 'future' && !formData.value.name?.trim()
+function isInstitutionFieldMissing(field) {
+  const requiresSchoolDetails = edition.value === 'future' || foundersType.value === 'class' || foundersType.value === 'team'
+  const requiresLocation = requiresSchoolDetails
   if (field === 'organization') return requiresSchoolDetails && !formData.value.organization?.trim()
   if (field === 'schoolType') return requiresSchoolDetails && !formData.value.schoolType
   if (field === 'country') return requiresLocation && !formData.value.country?.trim()
@@ -547,14 +582,28 @@ function isStep4RequiredFieldMissing(field) {
   return false
 }
 
-function hasRequiredSchoolFields() {
+function hasRequiredInstitutionFields() {
   return !(
-    isStep4RequiredFieldMissing('name')
-    || isStep4RequiredFieldMissing('organization')
-    || isStep4RequiredFieldMissing('schoolType')
-    || isStep4RequiredFieldMissing('country')
-    || isStep4RequiredFieldMissing('zip')
+    isInstitutionFieldMissing('organization')
+    || isInstitutionFieldMissing('schoolType')
+    || isInstitutionFieldMissing('country')
+    || isInstitutionFieldMissing('zip')
   )
+}
+
+function hasRequiredParticipantFields() {
+  if (edition.value === 'future') return futurePupils.value != null
+  if (foundersType.value === 'team') return !!formData.value.name?.trim()
+  return true
+}
+
+function hasRequiredSchoolFields() {
+  return hasRequiredInstitutionFields() && hasRequiredParticipantFields()
+}
+
+function isStep4RequiredFieldMissing(field) {
+  if (field === 'name') return foundersType.value === 'team' && !formData.value.name?.trim()
+  return false
 }
 
 function addFounderParticipant() {
@@ -589,57 +638,85 @@ function successMessageFor(kind) {
 }
 
 function canNext() {
-  if (step.value === 0) {
+  const s = step.value
+  const ft = foundersTeamHasParticipantsStep.value
+  if (s === 0) {
     if (hasVoucherCode.value === 'no') return true
     if (hasVoucherCode.value === 'yes') return !!voucher.value?.trim() && voucherValid.value === true
     return false
   }
-  if (step.value === 1) return edition.value != null
-  if (step.value === 2) return edition.value === 'future' ? futureGroup.value != null : foundersVariant.value != null
-  if (step.value === 3) return edition.value === 'future' ? futurePupils.value != null : foundersType.value != null
-  if (step.value === 4) return hasRequiredSchoolFields()
-  if (step.value === 5 && foundersTeamHasParticipantsStep.value) return true // participants optional
-  if (step.value === 5 && edition.value === 'future') {
-    if (!futureOnSiteEvent.value) return false
-    if (futureOnSiteEvent.value === 'yes') {
-      const n = Number(futureEventTeamCount.value)
-      return Number.isFinite(n)
-        && n >= 1
-        && n <= maxFutureEventTeamsByPupils.value
-        && futureTeamEventsAllSelected.value
+  if (s === 1) return edition.value != null
+  if (s === 2) {
+    return edition.value === 'future' ? futureGroup.value != null : !!foundersVariant.value
+  }
+  if (s === 3) {
+    if (edition.value === 'future') return hasRequiredInstitutionFields()
+    return foundersType.value != null
+  }
+  if (s === 4) {
+    if (edition.value === 'future') return hasRequiredParticipantFields()
+    return hasRequiredInstitutionFields()
+  }
+  if (s === 5) {
+    if (edition.value === 'future') {
+      if (!futureOnSiteEvent.value) return false
+      if (futureOnSiteEvent.value === 'yes') {
+        const n = Number(futureEventTeamCount.value)
+        return Number.isFinite(n)
+          && n >= 1
+          && n <= maxFutureEventTeamsByPupils.value
+          && futureTeamEventsAllSelected.value
+      }
+      return true
     }
+    if (edition.value === 'founders') return hasRequiredParticipantFields()
     return true
   }
-  if (step.value === 5 && edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
-  if (step.value === 5) return true
-  if (step.value === 6) return true
-  if (step.value === 7 && foundersTeamHasParticipantsStep.value) return areAddressesValid()
-  if (step.value === 7) return true
+  if (s === 6) {
+    if (edition.value === 'future') return areAddressesValid()
+    if (ft) return true
+    if (edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
+    return false
+  }
+  if (s === 7) {
+    if (edition.value === 'future') return false
+    if (ft) return areAddressesValid()
+    if (edition.value === 'founders' && foundersType.value === 'class') return false
+    return false
+  }
+  if (s === 8) {
+    if (ft) return false
+  }
   return false
 }
 
 function next() {
-  if (step.value === 4 && !hasRequiredSchoolFields()) {
+  if (step.value === institutionStepIndex.value && !hasRequiredInstitutionFields()) {
+    step4ValidationAttempted.value = true
+    return
+  }
+  if (step.value === participantsStepIndex.value && !hasRequiredParticipantFields()) {
     step4ValidationAttempted.value = true
     return
   }
   if (step.value === 0) {
     step.value = firstIncompleteEnrollmentStep()
     if (edition.value === 'future' && futureGroup.value && step.value >= 2) loadAddresses()
-    else if (edition.value === 'founders' && step.value >= 3) loadAddresses()
-      if (step.value >= 4 && edition.value === 'future') loadFutureEventsNearest()
-    if (step.value >= 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
+    else if (edition.value === 'founders' && step.value >= institutionStepIndex.value) loadAddresses()
+    if (step.value >= 4 && edition.value === 'future') loadFutureEventsNearest()
+    if (step.value >= participantsStepIndex.value && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
       addFounderParticipant()
     }
+    if (step.value >= 6 && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
     return
   }
   if (step.value === 2 && edition.value === 'future') loadAddresses()
-  if (step.value === 3) loadAddresses()
+  if (step.value === institutionStepIndex.value) loadAddresses()
   if (step.value === 4 && edition.value === 'future') loadFutureEventsNearest()
-  if (step.value === 4 && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
-    addFounderParticipant()
+  if (step.value === participantsStepIndex.value && foundersTeamHasParticipantsStep.value) {
+    if (founderTeamPlayers.value.length === 0) addFounderParticipant()
+    loadFounderTeamEventsNearest()
   }
-  if (step.value === 5 && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
   if (step.value < lastStep.value) step.value++
   step4ValidationAttempted.value = false
 }
@@ -890,18 +967,21 @@ function applyVoucherPreset(raw) {
   })
 }
 
-/** First wizard step that still needs input after optional voucher preset (1=edition … 4=data). */
+/** First wizard step that still needs input after optional voucher preset (1=edition …). */
 function firstIncompleteEnrollmentStep() {
   if (!edition.value) return 1
   if (edition.value === 'future') {
     if (!futureGroup.value) return 2
-    if (futurePupils.value == null) return 3
-    return 4
+    if (!hasRequiredInstitutionFields()) return 3
+    if (futurePupils.value == null) return 4
+    return 5
   }
   if (edition.value === 'founders') {
     if (!foundersVariant.value) return 2
     if (!foundersType.value) return 3
-    return 4
+    if (!hasRequiredInstitutionFields()) return 4
+    if (!hasRequiredParticipantFields()) return 5
+    return 6
   }
   return 1
 }
@@ -1002,6 +1082,10 @@ async function submit() {
     error.value = t('wizard.addressesRequired')
     return
   }
+  if (!consentDataProcessing.value || !consentTerms.value) {
+    error.value = t('enroll.consentRequired')
+    return
+  }
   error.value = null
   submitting.value = true
   try {
@@ -1019,6 +1103,9 @@ async function submit() {
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: buildDeliveryPayload(),
         invoiceAddress: buildInvoicePayload(),
+        consentDataProcessing: true,
+        consentTerms: true,
+        newsletterOptIn: !!consentNewsletter.value,
       }
       if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
         payload.seasonSetCount = presetSeasonSetCount.value
@@ -1067,7 +1154,7 @@ async function submit() {
         program,
         name: resolvedName,
         schoolOrClub: isTeam ? (formData.value.schoolOrClub?.trim() || undefined) : undefined,
-        schoolType: !isTeam ? (formData.value.schoolType || undefined) : undefined,
+        schoolType: formData.value.schoolType || undefined,
         organization: formData.value.organization?.trim() || undefined,
         country: formData.value.country?.trim() || undefined,
         zip: formData.value.zip?.trim() || undefined,
@@ -1076,6 +1163,9 @@ async function submit() {
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
         invoiceAddress: invoicePayload ?? undefined,
+        consentDataProcessing: true,
+        consentTerms: true,
+        newsletterOptIn: !!consentNewsletter.value,
       }
       if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
         payload.num_boards = presetSeasonSetCount.value
@@ -1347,8 +1437,76 @@ watch(
             </template>
           </div>
 
-          <!-- Step 3: Future = pupils, Founders = Team/Class -->
-          <div v-show="step === 3" class="wizard-step wizard-step-animate" :class="{ 'wizard-step-pupils': edition === 'future' }">
+          <!-- Step 3: Founders only — Team or class (Future uses this step for institution) -->
+          <div v-show="step === 3 && edition === 'founders'" class="wizard-step wizard-step-animate">
+            <div class="wizard-options wizard-options-two">
+              <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="selectFoundersType('team')">
+                <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
+                <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
+              </button>
+              <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="selectFoundersType('class')">
+                <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
+                <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3 (Future) / Step 4 (Founders): Institution -->
+          <div v-show="(step === 3 && edition === 'future') || (step === 4 && edition === 'founders')" class="wizard-step wizard-step-form wizard-step-animate">
+            <p class="wizard-form-section-title"><I18nText k="wizard.stepInstitution" /></p>
+            <p class="wizard-hint wizard-hint-compact"><I18nText k="wizard.requiredLegend" /></p>
+            <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
+              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('schoolType') }">
+                <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
+                <select v-model="formData.schoolType">
+                  <option value="" disabled><I18nText k="schoolTypes.none" /></option>
+                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
+                    {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
+                  </option>
+                </select>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              </div>
+              <div
+                class="field"
+                :class="{
+                  filled: isFilled(formData.organization) || isPrivateInstitution,
+                  invalid: step4ValidationAttempted && isInstitutionFieldMissing('organization'),
+                }"
+              >
+                <input v-model="formData.organization" type="text" placeholder=" " :disabled="isPrivateInstitution" />
+                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              </div>
+              <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
+                <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
+                <label><I18nText k="enrollTeam.schoolClub" /></label>
+              </div>
+              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('country') }">
+                <label><I18nText k="enroll.schoolCountry" /> <span class="required">*</span></label>
+                <select v-model="formData.country">
+                  <option value="" disabled><I18nText k="enroll.selectCountry" /></option>
+                  <optgroup :label="t('enroll.countriesTop')">
+                    <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                  <optgroup :label="t('enroll.countriesOther')">
+                    <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                </select>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              </div>
+              <div class="field" :class="{ filled: isFilled(formData.zip), invalid: step4ValidationAttempted && isInstitutionFieldMissing('zip') }">
+                <input v-model="formData.zip" type="text" placeholder=" " />
+                <label><I18nText k="enroll.schoolZip" /> <span class="required">*</span></label>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              </div>
+              <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
+                <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- Step 4 (Future) / Step 5 (Founders): Pupils / class count / team + members -->
+          <div v-show="(step === 4 && edition === 'future') || (step === 5 && edition === 'founders')" class="wizard-step wizard-step-animate" :class="{ 'wizard-step-pupils': edition === 'future', 'wizard-step-form': edition !== 'future' }">
             <template v-if="edition === 'future'">
               <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
               <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
@@ -1370,126 +1528,57 @@ watch(
                 </button>
               </div>
             </template>
-            <template v-else>
-              <div class="wizard-options wizard-options-two">
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="selectFoundersType('team')">
-                  <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
-                  <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
-                </button>
-                <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="selectFoundersType('class')">
-                  <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
-                  <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>
-                </button>
-              </div>
-            </template>
-          </div>
-
-          <!-- Step 4: Form data -->
-          <div v-show="step === 4" class="wizard-step wizard-step-form wizard-step-animate">
-            <p class="wizard-form-section-title"><I18nText k="wizard.formRequiredSection" /></p>
-            <p class="wizard-hint wizard-hint-compact"><I18nText k="wizard.requiredLegend" /></p>
-            <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
-              <input v-model="formData.name" type="text" placeholder=" " />
-              <label>
-                <I18nText k="enrollTeam.teamName" />
-                <span class="required">*</span>
-              </label>
-              <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('name')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-            </div>
-            <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
-              <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
-              <label><I18nText k="enrollTeam.schoolClub" /></label>
-            </div>
-            <template v-if="foundersType === 'class' || edition === 'future'">
-              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType') }">
-                <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
-                <select v-model="formData.schoolType">
-                  <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
-                    {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
-                  </option>
-                </select>
-                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-              </div>
-              <div
-                class="field"
-                :class="{
-                  filled: isFilled(formData.organization) || isPrivateInstitution,
-                  invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('organization'),
-                }"
-              >
-                <input v-model="formData.organization" type="text" placeholder=" " :disabled="isPrivateInstitution" />
-                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
-                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-              </div>
-            </template>
-            <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
-              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('country') }">
-                <label><I18nText k="enroll.schoolCountry" /> <span class="required">*</span></label>
-                <select v-model="formData.country">
-                  <option value="" disabled><I18nText k="enroll.selectCountry" /></option>
-                  <optgroup :label="t('enroll.countriesTop')">
-                    <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                  </optgroup>
-                  <optgroup :label="t('enroll.countriesOther')">
-                    <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                  </optgroup>
-                </select>
-                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('country')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-              </div>
-              <div class="field" :class="{ filled: isFilled(formData.zip), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('zip') }">
-                <input v-model="formData.zip" type="text" placeholder=" " />
-                <label><I18nText k="enroll.schoolZip" /> <span class="required">*</span></label>
-                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('zip')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-              </div>
-              <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
-                <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
-              </div>
-            </template>
-            <template v-if="foundersType === 'class'">
+            <template v-else-if="foundersType === 'class'">
+              <p class="wizard-form-section-title"><I18nText k="wizard.stepClassParticipants" /></p>
               <div class="field" :class="{ filled: isFilled(formData.playersTotal) }">
                 <input v-model="formData.playersTotal" type="number" min="0" step="1" placeholder=" " />
                 <label><I18nText k="enrollClass.playersTotal" /></label>
               </div>
             </template>
-          </div>
-
-          <!-- Step 5: Participants (Founder team only) -->
-          <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
-            <p class="wizard-hint"><I18nText k="wizard.participantsHint" /></p>
-            <div class="wizard-participants">
-              <div class="wizard-participant-row wizard-participant-header">
-                <span class="wizard-participant-label"><I18nText k="detail.firstname" /></span>
-                <span class="wizard-participant-label"><I18nText k="detail.lastname" /></span>
-                <span class="wizard-participant-label"><I18nText k="detail.dateOfBirth" /></span>
-                <span class="wizard-participant-label"><I18nText k="detail.gender" /></span>
-                <span></span>
+            <template v-else-if="foundersTeamHasParticipantsStep">
+              <div class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
+                <input v-model="formData.name" type="text" placeholder=" " />
+                <label>
+                  <I18nText k="enrollTeam.teamName" />
+                  <span class="required">*</span>
+                </label>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('name')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
-              <div
-                v-for="(p, idx) in founderTeamPlayers"
-                :key="'p-' + idx"
-                class="wizard-participant-row"
-              >
-                <input v-model="p.firstname" type="text" class="wizard-participant-input" :placeholder="t('detail.firstname')" />
-                <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
-                <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
-                <select v-model="p.gender" class="wizard-participant-select">
-                  <option value=""><I18nText k="detail.gender" /></option>
-                  <option value="M"><I18nText k="detail.genderM" /></option>
-                  <option value="F"><I18nText k="detail.genderF" /></option>
-                  <option value="D"><I18nText k="detail.genderD" /></option>
-                </select>
-                <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
-                  <i class="bi bi-trash"></i>
+              <p class="wizard-hint"><I18nText k="wizard.participantsHint" /></p>
+              <div class="wizard-participants">
+                <div class="wizard-participant-row wizard-participant-header">
+                  <span class="wizard-participant-label"><I18nText k="detail.firstname" /></span>
+                  <span class="wizard-participant-label"><I18nText k="detail.lastname" /></span>
+                  <span class="wizard-participant-label"><I18nText k="detail.dateOfBirth" /></span>
+                  <span class="wizard-participant-label"><I18nText k="detail.gender" /></span>
+                  <span></span>
+                </div>
+                <div
+                  v-for="(p, idx) in founderTeamPlayers"
+                  :key="'p-' + idx"
+                  class="wizard-participant-row"
+                >
+                  <input v-model="p.firstname" type="text" class="wizard-participant-input" :placeholder="t('detail.firstname')" />
+                  <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
+                  <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
+                  <select v-model="p.gender" class="wizard-participant-select">
+                    <option value=""><I18nText k="detail.gender" /></option>
+                    <option value="M"><I18nText k="detail.genderM" /></option>
+                    <option value="F"><I18nText k="detail.genderF" /></option>
+                    <option value="D"><I18nText k="detail.genderD" /></option>
+                  </select>
+                  <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                <button type="button" class="wizard-btn-add-participant" @click="addFounderParticipant">
+                  <i class="bi bi-plus-lg"></i> <I18nText k="detail.addPlayer" />
                 </button>
               </div>
-              <button type="button" class="wizard-btn-add-participant" @click="addFounderParticipant">
-                <i class="bi bi-plus-lg"></i> <I18nText k="detail.addPlayer" />
-              </button>
-            </div>
+            </template>
           </div>
 
-          <!-- Step 6: Event (Founder team only) -->
+          <!-- Step 6: Event (Founder team only; Future uses step 5 for on-site event) -->
           <div v-show="step === 6 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
             <div class="wizard-event-select-wrap">
@@ -1601,9 +1690,29 @@ watch(
             </div>
           </div>
 
-          <!-- Step 6: Order overview (Future) -->
+          <!-- Step 6: Addresses only (Future) -->
           <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
+            <div class="wizard-address-section">
+              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
+              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+                <div class="field voucher-invoice-forced">
+                  <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
+                </div>
+              </template>
+              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+            </div>
+            <div class="wizard-address-section">
+              <label class="wizard-delivery-toggle">
+                <input v-model="deliveryAddressDifferent" type="checkbox">
+                <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
+              </label>
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+            </div>
+          </div>
+
+          <!-- Step 7: Order overview (Future) -->
+          <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <div class="wizard-cart">
               <h3 class="wizard-cart-title"><I18nText k="wizard.orderTitle" /></h3>
               <div class="wizard-cart-row">
@@ -1630,23 +1739,13 @@ watch(
                 <strong class="wizard-cart-multi-lines">{{ futureTeamEventSummaries.join(' · ') }}</strong>
               </div>
             </div>
-
-            <div class="wizard-address-section">
-              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
-              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
-                <div class="field voucher-invoice-forced">
-                  <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
-                </div>
-              </template>
-              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
-            </div>
-            <div class="wizard-address-section">
-              <label class="wizard-delivery-toggle">
-                <input v-model="deliveryAddressDifferent" type="checkbox">
-                <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
-              </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
-            </div>
+            <EnrollConsentCheckboxes
+              id-prefix="wizard-consent-future"
+              v-model:consent-data-processing="consentDataProcessing"
+              v-model:consent-terms="consentTerms"
+              v-model:consent-newsletter="consentNewsletter"
+            />
+            <p class="wizard-hint"><I18nText k="wizard.orderReviewHint" /></p>
             <div class="wizard-next-steps">
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
               <ul>
@@ -1657,9 +1756,9 @@ watch(
             </div>
           </div>
 
-          <!-- Step 5: Addresses (Founders class) / Step 7: Addresses (Founder team) – voucher available at checkout here -->
+          <!-- Step 6: Addresses (Founders class) / Step 7: Addresses (Founder team) -->
           <div
-            v-show="(step === 5 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
+            v-show="(step === 6 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
@@ -1681,9 +1780,9 @@ watch(
             </div>
           </div>
 
-          <!-- Step 6: Order overview / Checkout (Founders class) / Step 8: Order overview (Founder team) -->
+          <!-- Step 7: Order (Founders class) / Step 8: Order (Founder team) -->
           <div
-            v-show="(step === 6 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
+            v-show="(step === 7 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <div class="wizard-cart">
@@ -1723,6 +1822,12 @@ watch(
                 <strong>{{ voucherValid === true ? (voucherMessage || voucher) : voucher }}</strong>
               </div>
             </div>
+            <EnrollConsentCheckboxes
+              id-prefix="wizard-consent-founders"
+              v-model:consent-data-processing="consentDataProcessing"
+              v-model:consent-terms="consentTerms"
+              v-model:consent-newsletter="consentNewsletter"
+            />
             <p class="wizard-hint"><I18nText k="wizard.orderReviewHint" /></p>
             <div class="wizard-next-steps">
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
@@ -1733,6 +1838,7 @@ watch(
               </ul>
             </div>
           </div>
+
             </div>
 
             <div v-if="error" class="wizard-message error"><i class="bi bi-exclamation-circle"></i> {{ error }}</div>
@@ -1747,10 +1853,10 @@ watch(
             <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
               <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
             </button>
-            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== 4 && !canNext()" @click="next">
+            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== participantsStepIndex && !canNext()" @click="next">
               <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
             </button>
-            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid()" @click="submit">
+            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid() || !consentDataProcessing || !consentTerms" @click="submit">
               <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
               <i v-else class="bi bi-check-lg"></i>
               <I18nText v-if="submitting" k="wizard.submitting" />
