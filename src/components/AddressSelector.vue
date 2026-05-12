@@ -2,8 +2,9 @@
 import { computed, ref, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomSelect from '@/components/CustomSelect.vue'
+import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -49,7 +50,7 @@ const addressOptions = computed(() =>
   props.addresses
     .map((addr, idx) => ({
       value: addressIdOf(addr, `address-${idx + 1}`),
-      label: addr.label || formatAddress(addr),
+      label: addr.label || formatOverviewAddress(addr, locale.value),
     }))
 )
 
@@ -71,16 +72,6 @@ const countryOptions = computed(() => {
   const all = [...top, ...extra]
   return all.map((c) => ({ value: c, label: toLabel(c) || c.toUpperCase() }))
 })
-
-function formatAddress(addr) {
-  if (!addr) return ''
-  const street = addr.street || addr.address || addr.address1 || ''
-  const postalCode = addr.postalCode || addr.zip || addr.zipcode || ''
-  const city = addr.city || addr.town || ''
-  const country = addr.country || addr.countryCode || addr.country_code || ''
-  const parts = [street, postalCode && city ? `${postalCode} ${city}` : city, country].filter(Boolean)
-  return parts.join(', ')
-}
 
 function setMode(useExisting) {
   const wantExisting = !!useExisting

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getTeam, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
@@ -56,16 +57,7 @@ function statusLabel(obj) {
 }
 
 function formatAddress(addr) {
-  if (!addr) return ''
-  const parts = [
-    addr.name,
-    [addr.street, addr.number].filter(Boolean).join(' '),
-    addr.line2,
-    addr.line3,
-    [addr.zip, addr.town].filter(Boolean).join(' '),
-    addr.country,
-  ].filter(Boolean)
-  return parts.join(', ')
+  return formatOverviewAddress(addr, locale.value)
 }
 
 function formatDate(timestamp) {

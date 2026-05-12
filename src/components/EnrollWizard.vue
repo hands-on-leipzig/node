@@ -5,11 +5,10 @@ import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, extractAddressesFromResponse } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
-import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { FUTURE_GROUP_PRICE_EUR } from '@/config/futureEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
+import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -64,6 +63,9 @@ const formData = ref({
   location: '',
   playersTotal: '',
 })
+
+const { isPrivateInstitution } = usePrivateInstitutionOrganization(formData)
+
 // Step 5
 const voucher = ref('')
 const voucherChecking = ref(false)
@@ -523,124 +525,6 @@ function openWizard() {
   error.value = null
   success.value = false
   step4ValidationAttempted.value = false
-}
-
-/** Dev/test: plausible values across the active edition path (jumps to step 4 — Stammdaten). */
-function fillWizardDummy() {
-  const addr = cloneDummyAddressState()
-  hasVoucherCode.value = 'no'
-  voucher.value = ''
-  voucherValid.value = null
-  voucherMessage.value = ''
-  voucherType.value = null
-  voucherInvoiceId.value = null
-  voucherInvoiceName.value = null
-  voucherPresetInvoiceId.value = null
-  voucherPresetInvoiceName.value = null
-  presetSeasonSetCount.value = null
-  presetRegisterEventTeams.value = null
-  presetEventTeamCount.value = null
-  error.value = null
-  step4ValidationAttempted.value = false
-
-  if (edition.value !== 'founders' && edition.value !== 'future') {
-    edition.value = 'future'
-    futureGroup.value = '8'
-    futurePupils.value = 16
-    futureOnSiteEvent.value = 'later'
-    futureEventTeamCount.value = 1
-    futureTeamAutoUpgrade.value = null
-    futureTeamEvents.value = []
-    foundersType.value = null
-    foundersVariant.value = null
-    founderTeamPlayers.value = []
-    founderTeamEventId.value = null
-  }
-
-  if (edition.value === 'future') {
-    if (!futureGroup.value) futureGroup.value = '8'
-    if (!futurePupils.value) futurePupils.value = 16
-    if (!futureOnSiteEvent.value) futureOnSiteEvent.value = 'later'
-    futureEventTeamCount.value = normalizeFutureEventTeamCount()
-    syncFutureTeamEventsArray()
-    formData.value = {
-      name: 'Future-Gruppe Demo',
-      schoolOrClub: '',
-      schoolType: 'gymnasium_de',
-      organization: 'Albertus-Magnus-Gymnasium Regensburg',
-      country: 'de',
-      zip: '93049',
-      city: 'Regensburg',
-      state: 'Bayern',
-      location: 'Regensburg',
-      playersTotal: '',
-    }
-  } else if (edition.value === 'founders') {
-    if (!foundersVariant.value) foundersVariant.value = 'explore'
-    if (!foundersType.value) foundersType.value = 'team'
-    if (foundersType.value === 'team') {
-      formData.value = {
-        name: 'FLL Explore Testteam',
-        schoolOrClub: 'Robotik-AG',
-        schoolType: '',
-        organization: '',
-        country: 'de',
-        zip: '90402',
-        city: 'Nürnberg',
-        state: 'Bayern',
-        location: 'Nürnberg',
-        playersTotal: '',
-      }
-      if (founderTeamPlayers.value.length === 0) {
-        founderTeamPlayers.value = [
-          { firstname: 'Jamie', name: 'Testinger', gender: 'D', birthdayStr: '2011-03-20' },
-        ]
-      } else {
-        founderTeamPlayers.value = founderTeamPlayers.value.map((p) => ({
-          firstname: p.firstname || 'Jamie',
-          name: p.name || 'Testinger',
-          gender: p.gender || 'D',
-          birthdayStr: p.birthdayStr || '2011-03-20',
-        }))
-      }
-    } else {
-      formData.value = {
-        name: '',
-        schoolOrClub: '',
-        schoolType: 'grundschule',
-        organization: 'Grundschule am Stadtpark',
-        country: 'de',
-        zip: '20095',
-        city: 'Hamburg',
-        state: 'Hamburg',
-        location: 'Hamburg',
-        playersTotal: '20',
-      }
-      founderTeamPlayers.value = []
-    }
-  }
-
-  deliveryAddress.value = cloneDummyAddressState()
-  invoiceAddress.value = addr
-  deliveryAddressDifferent.value = false
-
-  nextTick(() => {
-    const firstFounder = founderEventsNearest.value[0]
-    if (edition.value === 'founders' && foundersType.value === 'team' && firstFounder?.id != null) {
-      founderTeamEventId.value = Number(firstFounder.id)
-    }
-    const firstFuture = futureEventsNearest.value[0]
-    if (
-      edition.value === 'future'
-      && futureOnSiteEvent.value === 'yes'
-      && futureTeamEvents.value.length
-      && firstFuture?.id != null
-    ) {
-      futureTeamEvents.value = futureTeamEvents.value.map(() => ({ eventId: Number(firstFuture.id) }))
-      updateDerivedFutureEventId()
-    }
-    step.value = 4
-  })
 }
 
 function close() {
@@ -1367,7 +1251,6 @@ watch(
 
         <div class="wizard-panel-main">
           <div class="wizard-scroll">
-            <DevDummyFormFillButton class="wizard-dev-dummy" @click="fillWizardDummy" />
             <div class="wizard-body" :class="{ 'wizard-body--center-options': centeredOptionStep }">
           <!-- Step 0: Voucher-Code / Direkteinstieg -->
           <div
@@ -1518,11 +1401,6 @@ watch(
               <label><I18nText k="enrollTeam.schoolClub" /></label>
             </div>
             <template v-if="foundersType === 'class' || edition === 'future'">
-              <div class="field" :class="{ filled: isFilled(formData.organization), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('organization') }">
-                <input v-model="formData.organization" type="text" placeholder=" " />
-                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
-                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
-              </div>
               <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType') }">
                 <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
                 <select v-model="formData.schoolType">
@@ -1532,6 +1410,17 @@ watch(
                   </option>
                 </select>
                 <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              </div>
+              <div
+                class="field"
+                :class="{
+                  filled: isFilled(formData.organization) || isPrivateInstitution,
+                  invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('organization'),
+                }"
+              >
+                <input v-model="formData.organization" type="text" placeholder=" " :disabled="isPrivateInstitution" />
+                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
+                <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
             </template>
             <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
@@ -1979,10 +1868,6 @@ watch(
   height: 0;
   display: none;
 }
-.wizard-dev-dummy {
-  flex-shrink: 0;
-  padding: 0.35rem 1.25rem 0;
-}
 .wizard-step {
   min-height: 8rem;
   flex: 1;
@@ -2274,16 +2159,28 @@ watch(
   color: var(--color-text);
 }
 .wizard-delivery-toggle {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 0.55rem;
   margin: 0.35rem 0 0.8rem;
   font-size: 0.95rem;
+  font-weight: 500;
   color: var(--color-text);
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
 }
 .wizard-delivery-toggle input[type='checkbox'] {
   width: 1rem;
   height: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  cursor: pointer;
+}
+.wizard-delivery-toggle > span {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
 }
 .wizard-address-section {
   margin-top: 0.45rem;
@@ -2522,6 +2419,11 @@ watch(
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.6);
 }
+.wizard-step-form .field input:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
 .wizard-step-form .field.invalid input,
 .wizard-step-form .field.invalid textarea,
 .wizard-step-form .field.invalid select {
@@ -2536,6 +2438,14 @@ watch(
   color: var(--color-text-muted);
   pointer-events: none;
   transition: transform 0.2s, color 0.2s, font-size 0.2s, top 0.2s;
+}
+/* Delivery checkbox row is a <label>; must not use floating-label positioning. */
+.wizard-step-form label.wizard-delivery-toggle {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  pointer-events: auto;
 }
 .wizard-step-form .field.filled label,
 .wizard-step-form .field:focus-within label {

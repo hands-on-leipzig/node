@@ -2,7 +2,6 @@
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { listAddressBook, createAddress, updateAddress, deleteAddress } from '@/services/draht'
-import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
 
 const { t } = useI18n()
 
@@ -101,18 +100,6 @@ async function removeAddress(addressId) {
   }
 }
 
-function fillDevDummy() {
-  error.value = ''
-  success.value = ''
-  form.value = {
-    label: 'Büro (Test)',
-    street: 'Auguststraße 1',
-    postalCode: '10117',
-    city: 'Berlin',
-    country: 'de',
-  }
-}
-
 onMounted(loadAddresses)
 </script>
 
@@ -155,7 +142,6 @@ onMounted(loadAddresses)
         </div>
 
         <form class="settings-block" @submit.prevent="saveAddress">
-          <DevDummyFormFillButton @click="fillDevDummy" />
           <h2>{{ isEditing ? t('settings.editAddressTitle') : t('settings.newAddressTitle') }}</h2>
           <div class="field">
             <label for="addr-label"><I18nText k="settings.addressLabel" /></label>

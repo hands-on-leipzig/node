@@ -288,7 +288,7 @@ export function getTeam(id) {
 }
 
 /**
- * Update team players. Payload: { players: [ { firstname, name, gender, birthday } ] }. birthday: Y-m-d or null.
+ * Update team roster (participants). Payload: { players: [ { firstname, name, gender, birthday } ] }. birthday: Y-m-d or null.
  * Returns updated team card.
  */
 export function updateTeamPlayers(teamId, payload) {

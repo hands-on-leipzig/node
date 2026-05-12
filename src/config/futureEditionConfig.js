@@ -25,7 +25,7 @@ export const FUTURE_TEAM_EVENT_PRODUCT_REF = 'FUTURE_TEAM_EVENT'
 /** Team-Event-Anmeldung pro Team – EUR placeholder */
 export const FUTURE_TEAM_EVENT_UNIT_EUR = 100
 
-/** Zulässige Teilnehmerzahlen pro Gruppe (CRM-Logik) */
+/** Zulässige Teilnehmendenzahlen pro Gruppe (CRM-Logik) */
 export const FUTURE_PUPIL_COUNTS = [8, 16, 24, 32]
 
 /**

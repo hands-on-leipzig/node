@@ -5,9 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
-import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
-import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
+import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import {
   FUTURE_GROUP_PRICE_EUR,
   FUTURE_GROUP_PRODUCT_REFS,
@@ -57,6 +56,8 @@ const form = ref({
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
+
+const { isPrivateInstitution } = usePrivateInstitutionOrganization(form)
 
 const addresses = ref([])
 const submitting = ref(false)
@@ -368,26 +369,6 @@ const stepIndex = computed(() => {
   return s >= 0 ? s : 0
 })
 
-function fillFutureFormDummy() {
-  error.value = null
-  form.value.name = 'Future-Coach Taylor'
-  form.value.schoolType = 'realschule_de'
-  form.value.location = 'Stuttgart'
-  form.value.zip = '70173'
-  form.value.organization = 'Realschule Mitte'
-  const inv = cloneDummyAddressState()
-  form.value.deliveryAddress = cloneDummyAddressState()
-  form.value.invoiceAddress = inv
-  if (registerEventTeams.value) {
-    syncEventTeamsArray()
-    eventTeams.value.forEach((team) => {
-      team.players = [
-        { firstname: 'Alex', name: 'Muster', gender: 'M', birthdayStr: '2011-04-12' },
-        { firstname: 'Sam', name: 'Demo', gender: 'D', birthdayStr: '2011-08-03' },
-      ]
-    })
-  }
-}
 </script>
 
 <template>
@@ -576,7 +557,6 @@ function fillFutureFormDummy() {
         @submit.prevent="submit"
         @focusin="onFormFieldFocus"
       >
-        <DevDummyFormFillButton @click="fillFutureFormDummy" />
         <h3 class="step-title"><I18nText k="enrollFuture.stepDetails" /></h3>
         <div class="summary-box">
           <p>
@@ -620,16 +600,16 @@ function fillFutureFormDummy() {
           </select>
         </div>
         <div class="field">
+          <label for="future-organization"><I18nText k="enroll.schoolName" /></label>
+          <input id="future-organization" v-model="form.organization" type="text" :disabled="isPrivateInstitution" />
+        </div>
+        <div class="field">
           <label for="future-location"><I18nText k="enroll.location" /></label>
           <input id="future-location" v-model="form.location" type="text" />
         </div>
         <div class="field">
           <label for="future-zip"><I18nText k="enroll.postalCode" /></label>
           <input id="future-zip" v-model="form.zip" type="text" />
-        </div>
-        <div class="field">
-          <label for="future-organization"><I18nText k="enroll.schoolName" /></label>
-          <input id="future-organization" v-model="form.organization" type="text" />
         </div>
 
         <AddressSelector

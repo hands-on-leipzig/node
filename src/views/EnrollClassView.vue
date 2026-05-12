@@ -4,9 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollClass, getAddresses, validateVoucher } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
-import DevDummyFormFillButton from '@/components/DevDummyFormFillButton.vue'
-import { cloneDummyAddressState } from '@/utils/devDummyFormDefaults'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
+import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 
 const router = useRouter()
 const route = useRoute()
@@ -33,6 +32,8 @@ const form = ref({
   deliveryAddress: emptyAddressState(),
   invoiceAddress: emptyAddressState(),
 })
+
+const { isPrivateInstitution } = usePrivateInstitutionOrganization(form)
 
 const addresses = ref([])
 const submitting = ref(false)
@@ -184,25 +185,6 @@ function onFormFieldFocus(e) {
   }
 }
 
-function fillDevDummy() {
-  error.value = null
-  voucherValid.value = null
-  voucherMessage.value = ''
-  voucherType.value = null
-  voucherInvoiceId.value = null
-  voucherInvoiceName.value = null
-  const addr = cloneDummyAddressState()
-  form.value = {
-    schoolType: 'gymnasium_de',
-    location: 'Hamburg',
-    zip: '20095',
-    playersTotal: '18',
-    organization: 'Gymnasium Oberhafen',
-    voucher: '',
-    deliveryAddress: cloneDummyAddressState(),
-    invoiceAddress: addr,
-  }
-}
 </script>
 
 <template>
@@ -217,7 +199,24 @@ function fillDevDummy() {
     </div>
 
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
-      <DevDummyFormFillButton @click="fillDevDummy" />
+      <div class="field">
+        <label for="class-school-type"><I18nText k="enroll.schoolType" /></label>
+        <select id="class-school-type" v-model="form.schoolType">
+          <option value="" disabled><I18nText k="schoolTypes.none" /></option>
+          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
+            {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
+          </option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="class-organization"><I18nText k="enroll.schoolName" /></label>
+        <input
+          id="class-organization"
+          v-model="form.organization"
+          type="text"
+          :disabled="isPrivateInstitution"
+        />
+      </div>
       <div class="field">
         <label for="class-location"><I18nText k="enroll.location" /></label>
         <input
@@ -235,23 +234,6 @@ function fillDevDummy() {
           type="text"
           :placeholder="t('enrollClass.placeholderZip')"
         />
-      </div>
-      <div class="field">
-        <label for="class-organization"><I18nText k="enroll.schoolName" /></label>
-        <input
-          id="class-organization"
-          v-model="form.organization"
-          type="text"
-        />
-      </div>
-      <div class="field">
-        <label for="class-school-type"><I18nText k="enroll.schoolType" /></label>
-        <select id="class-school-type" v-model="form.schoolType">
-          <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
-            {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
-          </option>
-        </select>
       </div>
       <div class="field">
         <label for="class-players-total"><I18nText k="enrollClass.playersTotal" /></label>

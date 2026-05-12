@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getGroup, getEvents, registerGroupForEvent } from '@/services/draht'
+import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_TEAM_EVENT_UNIT_EUR, futureMaxEventTeams } from '@/config/futureEditionConfig'
@@ -51,16 +52,7 @@ const estimatedEventCostEur = computed(() => {
 })
 
 function formatAddress(addr) {
-  if (!addr) return ''
-  const parts = [
-    addr.name,
-    [addr.street, addr.number].filter(Boolean).join(' '),
-    addr.line2,
-    addr.line3,
-    [addr.zip, addr.town].filter(Boolean).join(' '),
-    addr.country,
-  ].filter(Boolean)
-  return parts.join(', ')
+  return formatOverviewAddress(addr, locale.value)
 }
 
 function scrollToCoCoachesSection() {
