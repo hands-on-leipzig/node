@@ -195,7 +195,7 @@ export default {
         "genderM": "Male",
         "genderF": "Female",
         "genderD": "Diverse",
-        "addPlayer": "Add participant",
+        "addPlayer": "add team member ",
         "add": "Add",
         "savePlayers": "Save participants",
         "edit": "Edit",
@@ -230,7 +230,7 @@ export default {
         "registerEventFailed": "Registration for the event failed."
     },
     "dashboard": {
-        "cockpitTitle": "My Dashboard",
+        "cockpitTitle": "My Coach Dashboard",
         "cockpitSubtitle": "Overview of pending tasks, registrations and dates.",
         "tasksToDo": "Tasks to do",
         "checkingTasks": "Checking tasks…",
