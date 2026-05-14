@@ -99,17 +99,28 @@ function firstDefined(...values) {
   return null
 }
 
-function normalizeAddressItem(raw, index = 0) {
+/** Dolibarr rowid: positive integer string only (not "address-1" or composite keys). */
+export function isDolibarrRowId(value) {
+  if (value == null || value === '') return false
+  const s = String(value).trim()
+  if (!/^\d+$/.test(s)) return false
+  const n = Number(s)
+  return Number.isFinite(n) && n > 0
+}
+
+function normalizeAddressItem(raw) {
   if (!raw || typeof raw !== 'object') return null
   const idRaw = firstDefined(raw.id, raw.addressId, raw.rowid, raw.fk_address, raw.fk_socpeople)
+  if (!isDolibarrRowId(idRaw)) {
+    return null
+  }
   const street = firstDefined(raw.street, raw.address, raw.address1, raw.line1, raw.addr1, raw.adresse) || ''
   const postalCode = firstDefined(raw.postalCode, raw.zip, raw.zipcode, raw.cp) || ''
   const city = firstDefined(raw.city, raw.town) || ''
   const country = firstDefined(raw.country, raw.countryCode, raw.country_code, raw.countrycode) || ''
   const label = firstDefined(raw.label, raw.name, raw.title) || ''
-  const fallbackId = `addr-${index + 1}-${street}-${postalCode}-${city}`
   return {
-    id: String(idRaw ?? fallbackId),
+    id: String(Number(String(idRaw).trim())),
     label: String(label || '').trim(),
     street: String(street || '').trim(),
     postalCode: String(postalCode || '').trim(),
@@ -128,7 +139,7 @@ export function extractAddressesFromResponse(payload) {
   ]
   const list = candidates.find((entry) => Array.isArray(entry)) || []
   return list
-    .map((item, idx) => normalizeAddressItem(item, idx))
+    .map((item) => normalizeAddressItem(item))
     .filter(Boolean)
 }
 
@@ -148,7 +159,7 @@ export async function listAddressBookGrouped() {
 
   const mapList = (arr) =>
     (Array.isArray(arr) ? arr : [])
-      .map((item, idx) => normalizeAddressItem(item, idx))
+      .map((item) => normalizeAddressItem(item))
       .filter(Boolean)
 
   const hasSplit =

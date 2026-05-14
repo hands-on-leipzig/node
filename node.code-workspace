@@ -4,7 +4,8 @@
 			"path": "."
 		},
 		{
-			"path": "../../PhpstormProjects/draht-dev"
+			"name": "mod-handson",
+			"path": "../../PhpstormProjects/mod-handson"
 		}
 	],
 	"settings": {}

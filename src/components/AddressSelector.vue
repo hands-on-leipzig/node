@@ -48,10 +48,15 @@ function addressIdOf(addr, fallback = '') {
 
 const addressOptions = computed(() =>
   props.addresses
-    .map((addr, idx) => ({
-      value: addressIdOf(addr, `address-${idx + 1}`),
-      label: addr.label || formatOverviewAddress(addr, locale.value),
-    }))
+    .map((addr) => {
+      const id = addressIdOf(addr, '')
+      if (!/^\d+$/.test(String(id).trim())) return null
+      return {
+        value: String(Number(String(id).trim())),
+        label: addr.label || formatOverviewAddress(addr, locale.value),
+      }
+    })
+    .filter(Boolean)
 )
 
 /** Strict boolean — avoids radios stuck when useExisting is undefined/null. */

@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollFuture, getAddresses, validateVoucher } from '@/services/draht'
+import { enrollFuture, getAddresses, validateVoucher, extractAddressesFromResponse, isDolibarrRowId } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
@@ -151,8 +151,7 @@ onMounted(() => {
 async function loadAddresses() {
   try {
     const res = await getAddresses()
-    const list = res.data?.data ?? (Array.isArray(res.data) ? res.data : [])
-    addresses.value = Array.isArray(list) ? list : []
+    addresses.value = extractAddressesFromResponse(res)
     if (addresses.value.length === 0) {
       form.value.deliveryAddress = { ...form.value.deliveryAddress, useExisting: false }
       form.value.invoiceAddress = { ...form.value.invoiceAddress, useExisting: false }
@@ -189,7 +188,7 @@ async function onVoucherBlur() {
       if (result.voucherType === '1') {
         voucherInvoiceId.value = result.invoiceAddressId ?? null
         voucherInvoiceName.value = result.invoiceAddressName ?? null
-        if (voucherInvoiceId.value == null) {
+        if (!isDolibarrRowId(voucherInvoiceId.value)) {
           voucherValid.value = false
           voucherMessage.value = t('enroll.voucherInvalid')
         }
@@ -228,8 +227,8 @@ function teamsNext() {
 }
 
 function buildAddressPayload(addr) {
-  if (addr.useExisting && addr.addressId) {
-    return { addressId: addr.addressId }
+  if (addr.useExisting && isDolibarrRowId(addr.addressId)) {
+    return { addressId: String(Number(String(addr.addressId).trim())) }
   }
   const n = addr.new || {}
   if (!n.street && !n.city && !n.country) return undefined
@@ -242,8 +241,8 @@ function buildAddressPayload(addr) {
 }
 
 function buildInvoiceAddressPayload() {
-  if (voucherType.value === '1' && voucherInvoiceId.value != null) {
-    return { addressId: voucherInvoiceId.value }
+  if (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value)) {
+    return { addressId: String(Number(String(voucherInvoiceId.value).trim())) }
   }
   return buildAddressPayload(form.value.invoiceAddress)
 }
@@ -322,6 +321,7 @@ async function submit() {
       group: group.value,
       pupils: selectedPupils.value,
       seasonSetCount: seasonSetCount.value,
+      num_boards: seasonSetCount.value,
       registerEventTeams: registerEventTeams.value,
       eventTeamCount: registerEventTeams.value ? teamCount.value : 0,
       eventTeams: eventTeamsPayload,

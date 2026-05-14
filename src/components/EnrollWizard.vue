@@ -2,12 +2,12 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getAddresses, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, extractAddressesFromResponse } from '@/services/draht'
+import { enrollTeam, enrollClass, enrollFuture, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, listAddressBookGrouped, isDolibarrRowId } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import { FUTURE_GROUP_PRICE_EUR } from '@/config/futureEditionConfig'
+import { FUTURE_GROUP_PRICE_EUR, FUTURE_SEASON_SET_UNIT_EUR } from '@/config/futureEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -81,6 +81,16 @@ const voucherPresetInvoiceId = ref(null)
 const voucherPresetInvoiceName = ref(null)
 /** 0|1|2 — maps to seasonSetCount / num_boards in enrollment API payloads. */
 const presetSeasonSetCount = ref(null)
+/** User-chosen season sets (0–2); overridden in payload when voucher preset sets count. */
+const wizardSeasonSetCount = ref(1)
+
+const effectiveSeasonSetCount = computed(() => {
+  if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
+    return presetSeasonSetCount.value
+  }
+  const w = Number(wizardSeasonSetCount.value)
+  return [0, 1, 2].includes(w) ? w : 1
+})
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
 // Founder team: participants (first name, last name, date of birth, gender)
@@ -92,7 +102,10 @@ const founderEventsNearestLoading = ref(false)
 // Step 6
 const deliveryAddress = ref(emptyAddressState())
 const invoiceAddress = ref(emptyAddressState())
-const addresses = ref([])
+/** Options for delivery selector (contacts only when API returns split lists). */
+const deliveryAddresses = ref([])
+/** Options for invoice selector (third parties only when API returns split lists). */
+const invoiceAddresses = ref([])
 const deliveryAddressDifferent = ref(false)
 
 const consentDataProcessing = ref(false)
@@ -115,10 +128,10 @@ const institutionStepIndex = computed(() => (edition.value === 'founders' ? 4 : 
 const participantsStepIndex = computed(() => (edition.value === 'founders' ? 5 : 4))
 
 const lastStep = computed(() => {
-  // Future: 6=addresses, 7=order. Founders class: 7=order. Founder team: 8=order (extra step for team/class split).
-  if (edition.value === 'future') return 7
-  if (foundersTeamHasParticipantsStep.value) return 8
-  if (edition.value === 'founders') return 7
+  // Future: 5=sets, 6=on-site, 7=addresses, 8=review. Founders class: +sets before addresses. Team: event, then sets, addresses, order.
+  if (edition.value === 'future') return 8
+  if (foundersTeamHasParticipantsStep.value) return 9
+  if (edition.value === 'founders') return 8
   return 1
 })
 
@@ -170,9 +183,10 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.progressDetails', active: s === 3, done: s > 3 },
       { key: 'wizard.progressParticipants', active: s === 4, done: s > 4 },
-      { key: 'wizard.progressOnSite', active: s === 5, done: s > 5 },
-      { key: 'wizard.progressAddresses', active: s === 6, done: s > 6 },
-      { key: 'wizard.progressReview', active: s === 7, done: success.value },
+      { key: 'wizard.progressSeasonSets', active: s === 5, done: s > 5 },
+      { key: 'wizard.progressOnSite', active: s === 6, done: s > 6 },
+      { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
+      { key: 'wizard.progressReview', active: s === 8, done: success.value },
     ])
   }
 
@@ -183,8 +197,9 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
       { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
       { key: 'wizard.progressEvent', active: s === 6, done: s > 6 },
-      { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
-      { key: 'wizard.progressReview', active: s === 8, done: success.value },
+      { key: 'wizard.progressSeasonSets', active: s === 7, done: s > 7 },
+      { key: 'wizard.progressAddresses', active: s === 8, done: s > 8 },
+      { key: 'wizard.progressReview', active: s === 9, done: success.value },
     ])
   }
 
@@ -193,8 +208,9 @@ const wizardProgressSteps = computed(() => {
     { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
     { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
     { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
-    { key: 'wizard.progressAddresses', active: s === 6, done: s > 6 },
-    { key: 'wizard.progressReview', active: s === 7, done: success.value },
+    { key: 'wizard.progressSeasonSets', active: s === 6, done: s > 6 },
+    { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
+    { key: 'wizard.progressReview', active: s === 8, done: success.value },
   ])
 })
 
@@ -214,7 +230,7 @@ const stepTitle = computed(() => {
     return ''
   }
   if (s === 5) {
-    if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
+    if (edition.value === 'future') return t('enrollFuture.stepSeasonSets')
     if (edition.value === 'founders') {
       if (foundersType.value === 'class') return t('wizard.stepClassParticipants')
       return t('wizard.stepParticipants')
@@ -222,18 +238,24 @@ const stepTitle = computed(() => {
     return ''
   }
   if (s === 6) {
-    if (edition.value === 'future') return t('wizard.stepAddresses')
+    if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
     if (ft) return t('wizard.stepEvent')
-    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepAddresses')
+    if (edition.value === 'founders' && foundersType.value === 'class') return t('enrollFuture.stepSeasonSets')
     return ''
   }
   if (s === 7) {
+    if (edition.value === 'future') return t('wizard.stepAddresses')
+    if (ft) return t('enrollFuture.stepSeasonSets')
+    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepAddresses')
+    return ''
+  }
+  if (s === 8) {
     if (edition.value === 'future') return t('wizard.stepOrder')
     if (ft) return t('wizard.stepAddresses')
     if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepOrder')
     return ''
   }
-  if (s === 8 && ft) return t('wizard.stepOrder')
+  if (s === 9 && ft) return t('wizard.stepOrder')
   return ''
 })
 
@@ -257,6 +279,20 @@ function formatFutureGroupPriceEur(pupils) {
     }).format(amount)
   } catch {
     return `${amount} €`
+  }
+}
+
+function formatWizardEur(amount) {
+  const n = Number(amount)
+  if (!Number.isFinite(n)) return ''
+  try {
+    return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(n)
+  } catch {
+    return `${n} €`
   }
 }
 
@@ -350,6 +386,11 @@ const summaryItems = computed(() => {
   if (edition.value === 'future' && futurePupils.value != null) {
     items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
   }
+  if (edition.value === 'future' || edition.value === 'founders') {
+    const sc = effectiveSeasonSetCount.value
+    const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
+    items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
+  }
   if (edition.value === 'future' && futureOnSiteEvent.value === 'yes') {
     if (futureTeamEventSummaries.value.length > 0) {
       futureTeamEventSummaries.value.forEach((line) => items.push({ label: line }))
@@ -396,6 +437,9 @@ const centeredOptionStep = computed(() => {
     || step.value === 2
     || (step.value === 3 && edition.value === 'founders')
     || (step.value === 4 && edition.value === 'future')
+    || (step.value === 5 && edition.value === 'future')
+    || (step.value === 6 && edition.value === 'founders' && foundersType.value === 'class')
+    || (step.value === 7 && foundersTeamHasParticipantsStep.value)
 })
 
 /** Event display label with optional capacity (from flow API). */
@@ -548,6 +592,7 @@ function openWizard() {
   voucherPresetInvoiceId.value = null
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
+  wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   deliveryAddress.value = emptyAddressState()
@@ -659,6 +704,14 @@ function canNext() {
   }
   if (s === 5) {
     if (edition.value === 'future') {
+      const w = Number(wizardSeasonSetCount.value)
+      return [0, 1, 2].includes(w)
+    }
+    if (edition.value === 'founders') return hasRequiredParticipantFields()
+    return true
+  }
+  if (s === 6) {
+    if (edition.value === 'future') {
       if (!futureOnSiteEvent.value) return false
       if (futureOnSiteEvent.value === 'yes') {
         const n = Number(futureEventTeamCount.value)
@@ -669,22 +722,29 @@ function canNext() {
       }
       return true
     }
-    if (edition.value === 'founders') return hasRequiredParticipantFields()
-    return true
-  }
-  if (s === 6) {
-    if (edition.value === 'future') return areAddressesValid()
     if (ft) return true
-    if (edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
+    if (edition.value === 'founders' && foundersType.value === 'class') {
+      const w = Number(wizardSeasonSetCount.value)
+      return [0, 1, 2].includes(w)
+    }
     return false
   }
   if (s === 7) {
+    if (edition.value === 'future') return areAddressesValid()
+    if (ft) {
+      const w = Number(wizardSeasonSetCount.value)
+      return [0, 1, 2].includes(w)
+    }
+    if (edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
+    return false
+  }
+  if (s === 8) {
     if (edition.value === 'future') return false
     if (ft) return areAddressesValid()
     if (edition.value === 'founders' && foundersType.value === 'class') return false
     return false
   }
-  if (s === 8) {
+  if (s === 9) {
     if (ft) return false
   }
   return false
@@ -782,9 +842,16 @@ async function loadFounderTeamEventsNearest() {
 
 async function loadAddresses() {
   try {
-    const res = await getAddresses()
-    addresses.value = extractAddressesFromResponse(res)
-    if (addresses.value.length > 0) {
+    const grouped = await listAddressBookGrouped()
+    if (!grouped.legacyFlat) {
+      deliveryAddresses.value = grouped.delivery
+      invoiceAddresses.value = grouped.invoice
+    } else {
+      deliveryAddresses.value = grouped.combined
+      invoiceAddresses.value = grouped.combined
+    }
+    const hasAny = deliveryAddresses.value.length > 0 || invoiceAddresses.value.length > 0
+    if (hasAny) {
       if (deliveryAddress.value.useExisting === false) {
         deliveryAddress.value = { ...deliveryAddress.value, useExisting: true }
       }
@@ -796,22 +863,29 @@ async function loadAddresses() {
       invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
     }
   } catch (_) {
-    addresses.value = []
+    deliveryAddresses.value = []
+    invoiceAddresses.value = []
     deliveryAddress.value = { ...deliveryAddress.value, useExisting: false }
     invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
   }
 }
 
 function buildAddressPayload(addr) {
-  if (addr.useExisting && addr.addressId) return { addressId: addr.addressId }
+  if (addr.useExisting && isDolibarrRowId(addr.addressId)) {
+    return { addressId: String(Number(String(addr.addressId).trim())) }
+  }
   const n = addr.new || {}
   if (!n.street && !n.city && !n.country) return undefined
   return { street: n.street?.trim() || undefined, postalCode: n.postalCode?.trim() || undefined, city: n.city?.trim() || undefined, country: n.country?.trim() || undefined }
 }
 
 function buildInvoicePayload() {
-  if (voucherType.value === '1' && voucherInvoiceId.value != null) return { addressId: voucherInvoiceId.value }
-  if (voucherPresetInvoiceId.value != null) return { addressId: voucherPresetInvoiceId.value }
+  if (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value)) {
+    return { addressId: String(Number(String(voucherInvoiceId.value).trim())) }
+  }
+  if (isDolibarrRowId(voucherPresetInvoiceId.value)) {
+    return { addressId: String(Number(String(voucherPresetInvoiceId.value).trim())) }
+  }
   return buildAddressPayload(invoiceAddress.value)
 }
 
@@ -827,8 +901,8 @@ function isDeliveryAddressValid() {
 
 /** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
 function isInvoiceAddressValid() {
-  if (voucherType.value === '1') return voucherInvoiceId.value != null
-  if (voucherPresetInvoiceId.value != null) return true
+  if (voucherType.value === '1') return isDolibarrRowId(voucherInvoiceId.value)
+  if (isDolibarrRowId(voucherPresetInvoiceId.value)) return true
   return !!buildAddressPayload(invoiceAddress.value)
 }
 
@@ -903,6 +977,7 @@ function applyVoucherPreset(raw) {
   const setsNum = data.seasonSetCount != null ? Number(data.seasonSetCount) : (data.num_boards != null ? Number(data.num_boards) : NaN)
   if ([0, 1, 2].includes(setsNum)) {
     presetSeasonSetCount.value = setsNum
+    wizardSeasonSetCount.value = setsNum
   }
   if (typeof data.registerEventTeams === 'boolean') {
     presetRegisterEventTeams.value = data.registerEventTeams
@@ -997,6 +1072,7 @@ async function onVoucherBlur() {
     voucherPresetInvoiceId.value = null
     voucherPresetInvoiceName.value = null
     presetSeasonSetCount.value = null
+    wizardSeasonSetCount.value = 1
     presetRegisterEventTeams.value = null
     presetEventTeamCount.value = null
     return
@@ -1010,6 +1086,7 @@ async function onVoucherBlur() {
   voucherPresetInvoiceId.value = null
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
+  wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   try {
@@ -1025,7 +1102,7 @@ async function onVoucherBlur() {
       if (result.voucherType === '1') {
         voucherInvoiceId.value = result.invoiceAddressId ?? null
         voucherInvoiceName.value = result.invoiceAddressName ?? null
-        if (voucherInvoiceId.value == null) {
+        if (!isDolibarrRowId(voucherInvoiceId.value)) {
           voucherValid.value = false
           voucherMessage.value = t('enroll.voucherInvalid')
         }
@@ -1091,6 +1168,7 @@ async function submit() {
   try {
     if (edition.value === 'future') {
       const payload = {
+        create_order: 1,
         group: futureGroup.value,
         pupils: futurePupils.value,
         name: formData.value.name?.trim() || undefined,
@@ -1107,10 +1185,9 @@ async function submit() {
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
       }
-      if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
-        payload.seasonSetCount = presetSeasonSetCount.value
-        payload.num_boards = presetSeasonSetCount.value
-      }
+      const sc = effectiveSeasonSetCount.value
+      payload.seasonSetCount = sc
+      payload.num_boards = sc
       if (futureOnSiteEvent.value === 'yes') {
         payload.registerEventTeams = true
         const n = Number(futureEventTeamCount.value)
@@ -1151,6 +1228,7 @@ async function submit() {
         ? formData.value.name.trim()
         : (formData.value.organization?.trim() || formData.value.city?.trim() || 'Klasse')
       const payload = {
+        create_order: 1,
         program,
         name: resolvedName,
         schoolOrClub: isTeam ? (formData.value.schoolOrClub?.trim() || undefined) : undefined,
@@ -1167,10 +1245,9 @@ async function submit() {
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
       }
-      if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
-        payload.num_boards = presetSeasonSetCount.value
-        payload.seasonSetCount = presetSeasonSetCount.value
-      }
+      const sc = effectiveSeasonSetCount.value
+      payload.seasonSetCount = sc
+      payload.num_boards = sc
       if (!isTeam) {
         const v = formData.value.playersTotal
         if (v !== '' && v != null) {
@@ -1240,7 +1317,7 @@ onBeforeUnmount(() => {
 
 watch(futureOnSiteEvent, (val) => {
   if (!props.open || edition.value !== 'future') return
-  if (step.value !== 5) return
+  if (step.value !== 6) return
   if (val === 'yes') {
     if (!Number.isFinite(Number(futureEventTeamCount.value)) || Number(futureEventTeamCount.value) < 1) {
       futureEventTeamCount.value = 1
@@ -1578,7 +1655,53 @@ watch(
             </template>
           </div>
 
-          <!-- Step 6: Event (Founder team only; Future uses step 5 for on-site event) -->
+          <!-- Season sets (Future step 5 / Founders class step 6 / Founder team step 7) → numberOfBoards / Versandregel -->
+          <div
+            v-show="(step === 5 && edition === 'future') || (step === 6 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
+            class="wizard-step wizard-step-animate"
+            :class="{ 'wizard-step-centered': centeredOptionStep }"
+          >
+            <p class="wizard-question"><I18nText k="enrollFuture.stepSeasonSets" /></p>
+            <p class="wizard-hint"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
+            <p v-if="presetSeasonSetCount != null && [0, 1, 2].includes(presetSeasonSetCount)" class="field-hint valid voucher-forced-msg">
+              <i class="bi bi-info-circle-fill" /> <I18nText k="wizard.seasonSetsPresetLocked" /> ({{ effectiveSeasonSetCount }})
+            </p>
+            <div v-else class="wizard-options wizard-options-three wizard-options-vertical">
+              <button
+                type="button"
+                class="wizard-option wizard-option-card"
+                :class="{ active: wizardSeasonSetCount === 0 }"
+                @click="wizardSeasonSetCount = 0"
+              >
+                <div class="wizard-option-main"><I18nText k="enrollFuture.seasonNone" /></div>
+                <div class="wizard-option-desc">{{ edition === 'future' ? formatWizardEur(0) : '—' }}</div>
+              </button>
+              <button
+                type="button"
+                class="wizard-option wizard-option-card"
+                :class="{ active: wizardSeasonSetCount === 1 }"
+                @click="wizardSeasonSetCount = 1"
+              >
+                <div class="wizard-option-main"><I18nText k="enrollFuture.seasonOne" /></div>
+                <div class="wizard-option-desc">
+                  {{ edition === 'future' ? formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR) : '—' }}
+                </div>
+              </button>
+              <button
+                type="button"
+                class="wizard-option wizard-option-card"
+                :class="{ active: wizardSeasonSetCount === 2 }"
+                @click="wizardSeasonSetCount = 2"
+              >
+                <div class="wizard-option-main"><I18nText k="enrollFuture.seasonTwo" /></div>
+                <div class="wizard-option-desc">
+                  {{ edition === 'future' ? formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR * 2) : '—' }}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 6: Event (Founder team only; Future uses step 6 for on-site event) -->
           <div v-show="step === 6 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
             <div class="wizard-event-select-wrap">
@@ -1594,8 +1717,8 @@ watch(
             </div>
           </div>
 
-          <!-- Step 5: On-site event (Future only) -->
-          <div v-show="step === 5 && edition === 'future'" class="wizard-step wizard-step-animate">
+          <!-- Step 6: On-site event (Future only) -->
+          <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-animate">
             <div class="wizard-step-voucher-inner wizard-step-onsite-event">
               <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
               <p class="wizard-hint"><I18nText k="wizard.onSiteEventHint" /></p>
@@ -1690,8 +1813,8 @@ watch(
             </div>
           </div>
 
-          <!-- Step 6: Addresses only (Future) -->
-          <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
+          <!-- Step 7: Addresses only (Future) -->
+          <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
               <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
@@ -1700,19 +1823,19 @@ watch(
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
               </template>
-              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+              <AddressSelector v-else v-model="invoiceAddress" :addresses="invoiceAddresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
             </div>
             <div class="wizard-address-section">
               <label class="wizard-delivery-toggle">
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             </div>
           </div>
 
-          <!-- Step 7: Order overview (Future) -->
-          <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
+          <!-- Step 8: Order overview (Future) -->
+          <div v-show="step === 8 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <div class="wizard-cart">
               <h3 class="wizard-cart-title"><I18nText k="wizard.orderTitle" /></h3>
               <div class="wizard-cart-row">
@@ -1729,6 +1852,14 @@ watch(
               <div class="wizard-cart-row">
                 <span><I18nText k="wizard.orderPupils" /></span>
                 <strong>{{ futurePupils }} <I18nText k="enrollFuture.pupils" /></strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span><I18nText k="wizard.orderSeasonSets" /></span>
+                <strong>
+                  <I18nText v-if="effectiveSeasonSetCount === 0" k="enrollFuture.seasonNone" tag="span" />
+                  <I18nText v-else-if="effectiveSeasonSetCount === 1" k="enrollFuture.seasonOne" tag="span" />
+                  <I18nText v-else k="enrollFuture.seasonTwo" tag="span" />
+                </strong>
               </div>
               <div v-if="formData.organization?.trim()" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderSchool" /></span>
@@ -1756,9 +1887,9 @@ watch(
             </div>
           </div>
 
-          <!-- Step 6: Addresses (Founders class) / Step 7: Addresses (Founder team) -->
+          <!-- Step 7: Addresses (Founders class) / Step 8: Addresses (Founder team) -->
           <div
-            v-show="(step === 6 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
+            v-show="(step === 7 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
@@ -1769,20 +1900,20 @@ watch(
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
               </template>
-              <AddressSelector v-else v-model="invoiceAddress" :addresses="addresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+              <AddressSelector v-else v-model="invoiceAddress" :addresses="invoiceAddresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
             </div>
             <div class="wizard-address-section">
               <label class="wizard-delivery-toggle">
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="addresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             </div>
           </div>
 
-          <!-- Step 7: Order (Founders class) / Step 8: Order (Founder team) -->
+          <!-- Step 8: Order (Founders class) / Step 9: Order (Founder team) -->
           <div
-            v-show="(step === 7 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
+            v-show="(step === 8 && edition === 'founders' && foundersType === 'class') || (step === 9 && foundersTeamHasParticipantsStep)"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <div class="wizard-cart">
@@ -1799,6 +1930,14 @@ watch(
                 <strong>
                   <I18nText v-if="foundersVariant === 'explore'" k="wizard.optionExplore" tag="span" />
                   <I18nText v-else k="wizard.optionChallenge" tag="span" />
+                </strong>
+              </div>
+              <div class="wizard-cart-row">
+                <span><I18nText k="wizard.orderSeasonSets" /></span>
+                <strong>
+                  <I18nText v-if="effectiveSeasonSetCount === 0" k="enrollFuture.seasonNone" tag="span" />
+                  <I18nText v-else-if="effectiveSeasonSetCount === 1" k="enrollFuture.seasonOne" tag="span" />
+                  <I18nText v-else k="enrollFuture.seasonTwo" tag="span" />
                 </strong>
               </div>
               <div v-if="foundersType === 'team'" class="wizard-cart-row">
