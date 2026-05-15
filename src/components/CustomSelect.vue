@@ -148,9 +148,9 @@ onUnmounted(() => {
   font-family: inherit;
   color: var(--color-text);
   background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--liquid-border, var(--color-border));
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -204,11 +204,13 @@ onUnmounted(() => {
   z-index: 50;
   max-height: 16rem;
   overflow-y: auto;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-popover-fill);
+  border: 1px solid var(--liquid-border, var(--color-border));
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  padding: 0.25rem;
+  padding: 0.3rem;
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
 }
 .custom-select-option {
   display: block;

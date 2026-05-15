@@ -121,12 +121,14 @@ function doLogin() {
 <style scoped>
 .home {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
   position: relative;
+  background: transparent;
 }
 .home-settings {
   position: absolute;
@@ -135,6 +137,13 @@ function doLogin() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg-strong);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .icon-btn {
   width: var(--touch-lg);
@@ -142,18 +151,19 @@ function doLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-bg-elevated);
+  border: 1px solid var(--liquid-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-bg-subtle);
   color: var(--color-text-muted);
   cursor: pointer;
   font-size: 1.25rem;
-  transition: color 0.15s, background 0.15s;
-  box-shadow: var(--shadow-sm);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  box-shadow: none;
 }
 .icon-btn:hover {
   color: var(--color-text);
-  background: var(--color-bg-hover);
+  background: var(--liquid-bg);
+  border-color: var(--liquid-border);
 }
 .icon-btn.active {
   color: var(--color-accent);
@@ -164,17 +174,18 @@ function doLogin() {
   min-height: var(--touch);
   font-size: var(--text-sm);
   font-weight: 600;
-  border: none;
+  border: 1px solid var(--liquid-border-soft);
   border-radius: var(--radius-full);
-  background: var(--color-bg-elevated);
+  background: var(--liquid-bg-subtle);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  box-shadow: var(--shadow-sm);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  box-shadow: none;
 }
 .pill-btn:hover {
   color: var(--color-text);
-  background: var(--color-bg-hover);
+  background: var(--liquid-bg);
+  border-color: var(--liquid-border);
 }
 .pill-btn.active {
   color: white;
@@ -185,6 +196,13 @@ function doLogin() {
   max-width: 28rem;
   width: 100%;
   position: relative;
+  padding: 2.25rem 1.75rem 2rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg-strong);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .hero-glow {
   position: absolute;
@@ -268,9 +286,12 @@ html[data-theme='dark'] .btn-primary:hover {
 .forbidden-message {
   text-align: center;
   padding: 1rem;
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.9));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.9));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--liquid-shadow);
 }
 .forbidden-message p {
   margin: 0 0 1rem;

@@ -11,6 +11,15 @@ export function venueMatchesFilters(venue, filters) {
   return true
 }
 
+/** Future Edition regio venues (not shown on the public map — list/accordion only). */
+export function isFutureEditionVenue(venue) {
+  return (
+    venue.offerCategory === 'future' ||
+    venue.program === 'future5' ||
+    venue.program === 'future8'
+  )
+}
+
 /**
  * Cluster venues with coordinates for map markers.
  * @param {object[]} venues

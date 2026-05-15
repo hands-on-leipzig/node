@@ -240,12 +240,14 @@ watch(() => props.events.length, () => {
   z-index: 100;
   max-height: 280px;
   overflow-y: auto;
-  background: var(--color-bg-elevated);
+  background: var(--liquid-popover-fill);
   border: 2px solid var(--color-accent);
   border-top: none;
   border-radius: 0 0 12px 12px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
   padding: 0.35rem;
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
 }
 .event-select-option {
   display: flex;

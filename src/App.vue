@@ -13,5 +13,7 @@ import TranslationQuickEditModal from '@/components/TranslationQuickEditModal.vu
 <style>
 #app {
   min-height: 100vh;
+  min-height: 100dvh;
+  background: transparent;
 }
 </style>

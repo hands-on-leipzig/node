@@ -75,6 +75,12 @@ const routes = [
         meta: { titleKey: 'nav.adminDocuments', requiresAdmin: true },
       },
       {
+        path: 'admin/calendar',
+        name: 'admin-calendar',
+        component: () => import('@/views/AdminCalendarView.vue'),
+        meta: { titleKey: 'nav.adminCalendar', requiresAdmin: true },
+      },
+      {
         path: 'admin/translations',
         name: 'admin-translations',
         component: () => import('@/views/AdminTranslationsView.vue'),

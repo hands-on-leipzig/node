@@ -151,7 +151,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 10050;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--liquid-modal-scrim-bg, rgba(12, 10, 8, 0.34));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,10 +163,13 @@ onBeforeUnmount(() => {
   max-width: 32rem;
   max-height: min(90vh, 640px);
   overflow: auto;
-  background: var(--color-bg, #fff);
+  background: var(--liquid-popover-fill, rgba(255, 255, 255, 0.92));
   color: var(--color-text, #212529);
+  border: 1px solid var(--liquid-border, rgba(0, 0, 0, 0.08));
   border-radius: var(--radius-lg, 0.5rem);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(var(--liquid-popover-blur, 80px)) saturate(var(--liquid-popover-saturate, 1.85));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur, 80px)) saturate(var(--liquid-popover-saturate, 1.85));
 }
 .tqem-head {
   display: flex;

@@ -91,10 +91,10 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   min-height: 320px;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-muted);
+  border: none;
+  background: transparent;
 }
 .venues-map {
   width: 100%;

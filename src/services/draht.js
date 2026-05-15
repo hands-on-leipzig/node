@@ -311,6 +311,25 @@ export function postDocumentsProbeFolder(url) {
   return api.post('/documents-probe-folder', { url: url || '' })
 }
 
+/** Admin: dashboard M365 calendar config (GET/PUT) */
+export function getDashboardCalendarConfig() {
+  return api.get('/dashboard-calendar-config')
+}
+
+export function putDashboardCalendarConfig(payload) {
+  return api.put('/dashboard-calendar-config', payload)
+}
+
+/** Admin: quick Graph calendar test */
+export function getDashboardCalendarTest() {
+  return api.get('/dashboard-calendar-test')
+}
+
+/** Coach dashboard: upcoming events from M365 when configured */
+export function getDashboardCalendarEvents() {
+  return api.get('/dashboard-calendar-events')
+}
+
 /**
  * Admin: create GitHub PR with updated locale file(s) (POST /handson/node/translations-pr).
  * Configure on server: Dolibarr constants HANDSON_GITHUB_TOKEN, HANDSON_GITHUB_REPO;

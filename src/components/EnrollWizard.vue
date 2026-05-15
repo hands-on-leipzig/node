@@ -7,7 +7,11 @@ import AddressSelector from '@/components/AddressSelector.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import { FUTURE_GROUP_PRICE_EUR, FUTURE_SEASON_SET_UNIT_EUR } from '@/config/futureEditionConfig'
+import {
+  FUTURE_GROUP_PRICE_EUR,
+  FUTURE_SEASON_SET_UNIT_EUR,
+  FUTURE_TEAM_EVENT_UNIT_EUR,
+} from '@/config/futureEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -366,6 +370,34 @@ function selectFutureTeamEvent(teamIndex, eventId) {
   futureTeamEvents.value[idx] = { eventId: eventId ? Number(eventId) : null }
   updateDerivedFutureEventId()
 }
+
+const futureOrderGroupPriceEur = computed(() => {
+  const p = Number(futurePupils.value)
+  const a = FUTURE_GROUP_PRICE_EUR[p]
+  return Number.isFinite(a) ? a : 0
+})
+
+const futureOrderSeasonSetsPriceEur = computed(() => {
+  const n = Number(effectiveSeasonSetCount.value)
+  if (!Number.isFinite(n) || n < 0) return 0
+  return n * FUTURE_SEASON_SET_UNIT_EUR
+})
+
+const futureOrderEventTeamsCount = computed(() => {
+  if (futureOnSiteEvent.value !== 'yes') return 0
+  return normalizeFutureEventTeamCount()
+})
+
+const futureOrderEventTeamsPriceEur = computed(
+  () => futureOrderEventTeamsCount.value * FUTURE_TEAM_EVENT_UNIT_EUR,
+)
+
+const futureOrderTotalEur = computed(
+  () =>
+    futureOrderGroupPriceEur.value +
+    futureOrderSeasonSetsPriceEur.value +
+    futureOrderEventTeamsPriceEur.value,
+)
 
 const summaryItems = computed(() => {
   const items = []
@@ -1734,13 +1766,15 @@ watch(
                 </button>
                 <div v-if="futureOnSiteEvent === 'yes'" class="wizard-event-select-wrap">
                   <p class="wizard-hint wizard-event-team-hint">
-                    <I18nText k="wizard.onSiteEventTeamsHint" />
-                    <strong>{{ maxFutureEventTeamsByPupils }}</strong>
+                    <I18nText
+                      k="wizard.onSiteEventTeamsSummary"
+                      :values="{ pupils: futurePupils, maxTeams: maxFutureEventTeamsByPupils }"
+                    />
                   </p>
                   <p class="wizard-event-label wizard-event-team-count-label">
-                    {{ t('groupDetail.eventTeamsLabel') }}
+                    <I18nText k="wizard.onSiteEventTeamCountLabel" />
                   </p>
-                  <div class="wizard-event-team-count-row" role="group" :aria-label="t('groupDetail.eventTeamsLabel')">
+                  <div class="wizard-event-team-count-row" role="group" :aria-label="t('wizard.onSiteEventTeamCountLabel')">
                     <button
                       v-for="count in futureTeamOptionCounts"
                       :key="'future-event-team-' + count"
@@ -1756,12 +1790,9 @@ watch(
                       <span class="wizard-event-team-count-pill-main">
                         {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
                       </span>
-                      <span class="wizard-event-team-count-pill-meta">
-                        {{ count * FUTURE_EVENT_TEAM_SIZE }} <I18nText k="enrollFuture.pupils" />
-                      </span>
                     </button>
                   </div>
-                  <p class="wizard-event-label wizard-event-per-team-label">
+                  <p v-if="futureEventTeamCount > 1" class="wizard-event-label wizard-event-per-team-label">
                     <I18nText k="wizard.onSiteEventPerTeam" />
                   </p>
                   <div v-if="futureEventTeamCount > 0" class="wizard-event-team-rows">
@@ -1770,20 +1801,20 @@ watch(
                       :key="'future-event-select-' + idx"
                       class="wizard-event-team-combined-card"
                     >
-                      <div class="wizard-event-team-combined-grid">
-                        <div class="wizard-event-team-combined-meta">
+                      <div
+                        class="wizard-event-team-combined-grid"
+                        :class="{ 'wizard-event-team-combined-grid--solo': futureEventTeamCount === 1 }"
+                      >
+                        <div v-if="futureEventTeamCount > 1" class="wizard-event-team-combined-meta">
                           <span class="wizard-event-team-name">{{ t('wizard.teamSingular') }} {{ idx + 1 }}</span>
-                          <span class="wizard-event-team-pupils">
-                            {{ FUTURE_EVENT_TEAM_SIZE }} <I18nText k="enrollFuture.pupils" />
-                          </span>
                         </div>
                         <div class="wizard-event-team-combined-dropdown">
                           <EventSelectDropdown
-                            :title="t('wizard.eventSelectSimple')"
+                            :title="futureEventTeamCount > 1 ? t('wizard.onSiteEventDropdownTitleTeam', { team: idx + 1 }) : ''"
                             :events="futureEventsNearest"
                             :loading="futureEventsNearestLoading"
                             :model-value="entry.eventId"
-                            :placeholder="t('wizard.onSiteEventSelectPlaceholder')"
+                            :placeholder="t('wizard.onSiteEventPlaceholder')"
                             :event-label-fn="futureEventOptionLabel"
                             @update:model-value="selectFutureTeamEvent(idx, $event)"
                           />
@@ -1861,13 +1892,44 @@ watch(
                   <I18nText v-else k="enrollFuture.seasonTwo" tag="span" />
                 </strong>
               </div>
-              <div v-if="formData.organization?.trim()" class="wizard-cart-row">
-                <span><I18nText k="wizard.orderSchool" /></span>
-                <strong>{{ formData.organization.trim() }}</strong>
-              </div>
               <div v-if="futureOnSiteEvent === 'yes' && futureTeamEventSummaries.length" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderOnSiteEvent" /></span>
                 <strong class="wizard-cart-multi-lines">{{ futureTeamEventSummaries.join(' · ') }}</strong>
+              </div>
+              <div class="wizard-cart-divider" role="presentation" />
+              <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
+              <div class="wizard-cart-row wizard-cart-row--price">
+                <span>
+                  <I18nText k="wizard.orderPriceGroup" />
+                  <span v-if="futurePupils != null" class="wizard-cart-muted">
+                    ({{ futurePupils }} <I18nText k="enrollFuture.pupils" />)
+                  </span>
+                </span>
+                <strong>{{ formatWizardEur(futureOrderGroupPriceEur) }}</strong>
+              </div>
+              <div class="wizard-cart-row wizard-cart-row--price">
+                <span>
+                  <I18nText k="wizard.orderPriceSeasonSets" />
+                  <span class="wizard-cart-muted"> ({{ effectiveSeasonSetCount }}×)</span>
+                </span>
+                <strong>{{ formatWizardEur(futureOrderSeasonSetsPriceEur) }}</strong>
+              </div>
+              <div v-if="futureOnSiteEvent === 'yes'" class="wizard-cart-row wizard-cart-row--price">
+                <span>
+                  <I18nText k="wizard.orderPriceEventTeams" />
+                  <span class="wizard-cart-muted">
+                    ({{ futureOrderEventTeamsCount }}× {{ formatWizardEur(FUTURE_TEAM_EVENT_UNIT_EUR) }})
+                  </span>
+                </span>
+                <strong>{{ formatWizardEur(futureOrderEventTeamsPriceEur) }}</strong>
+              </div>
+              <div v-else class="wizard-cart-row wizard-cart-row--price">
+                <span><I18nText k="wizard.orderPriceEventLater" /></span>
+                <strong>{{ formatWizardEur(0) }}</strong>
+              </div>
+              <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
+                <span><I18nText k="wizard.orderPriceTotal" /></span>
+                <strong>{{ formatWizardEur(futureOrderTotalEur) }}</strong>
               </div>
             </div>
             <EnrollConsentCheckboxes
@@ -1944,10 +2006,6 @@ watch(
                 <span><I18nText k="enrollTeam.teamName" /></span>
                 <strong>{{ formData.name?.trim() || '—' }}</strong>
               </div>
-              <div v-else-if="formData.organization?.trim()" class="wizard-cart-row">
-                <span><I18nText k="enroll.schoolName" /></span>
-                <strong>{{ formData.organization.trim() }}</strong>
-              </div>
               <div v-if="foundersType === 'team' && founderTeamEventId" class="wizard-cart-row">
                 <span><I18nText k="wizard.stepEvent" /></span>
                 <strong>{{ selectedFounderEventLabel || founderTeamEventId }}</strong>
@@ -2012,10 +2070,11 @@ watch(
 .wizard-backdrop {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.2), transparent 55%),
-    radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.18), transparent 50%),
-    rgba(10, 10, 12, 0.7);
-  backdrop-filter: blur(10px);
+  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.08), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.06), transparent 50%),
+    var(--liquid-modal-scrim-bg, rgba(6, 6, 8, 0.78));
+  backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.92));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.92));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2029,20 +2088,23 @@ watch(
   max-height: 100%;
   display: grid;
   grid-template-columns: minmax(18rem, 38%) 1fr;
-  background: var(--color-bg);
-  box-shadow: var(--shadow);
+  background: var(--wizard-shell-fill);
+  box-shadow: var(--liquid-shadow);
   overflow: hidden;
   animation: wizardFadeIn 0.35s ease;
 }
 .wizard-header {
   flex-shrink: 0;
   padding: 1rem 2rem 0.5rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--liquid-border);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 1rem;
+  background: color-mix(in srgb, var(--wizard-shell-fill) 70%, transparent);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(1.1);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(1.1);
 }
 .wizard-panel-title {
   font-size: var(--text-lg);
@@ -2069,7 +2131,7 @@ watch(
   justify-content: center;
 }
 .wizard-close:hover {
-  background: var(--color-bg-elevated);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
 }
 .wizard-close i {
@@ -2169,20 +2231,42 @@ watch(
   color: var(--color-text-muted);
   text-transform: none;
 }
-.wizard-participant-input,
-.wizard-participant-select {
+.wizard-participant-input {
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--liquid-border);
   border-radius: var(--radius);
-  background: var(--color-bg);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
   font-size: 0.95rem;
+  box-shadow: var(--liquid-shadow-inset);
+}
+.wizard-participant-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 0.5rem 1.85rem 0.5rem 0.6rem;
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius);
+  background-color: var(--liquid-tile-bg-inner);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.45rem center;
+  background-size: 0.95rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  box-shadow: var(--liquid-shadow-inset);
+  cursor: pointer;
+}
+html[data-theme='dark'] .wizard-participant-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.wizard-participant-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft), var(--liquid-shadow-inset);
 }
 .wizard-participant-input.wizard-participant-dob {
   min-width: 0;
-}
-.wizard-participant-select {
-  cursor: pointer;
 }
 .wizard-participant-remove {
   padding: 0.5rem;
@@ -2196,7 +2280,7 @@ watch(
   justify-content: center;
 }
 .wizard-participant-remove:hover {
-  background: var(--color-bg-elevated);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-error, #dc2626);
 }
 .wizard-btn-add-participant {
@@ -2270,10 +2354,12 @@ watch(
 .wizard-voucher-code-form .field input {
   width: 100%;
   padding: 0.85rem 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: 0.75rem;
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
   font-size: 1.05rem;
   box-sizing: border-box;
+  background: var(--liquid-tile-bg-inner);
+  box-shadow: var(--liquid-shadow-inset);
 }
 .wizard-voucher-code-form .field input:focus {
   border-color: var(--color-accent);
@@ -2293,13 +2379,18 @@ watch(
 .wizard-event-select-wrap {
   margin-top: 0.5rem;
   padding: 1rem;
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-tile-bg-inner);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.38)) saturate(1.08);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.38)) saturate(1.08);
 }
 .wizard-event-team-hint {
   margin-top: 0.9rem;
   margin-bottom: 0.65rem;
+  line-height: 1.45;
+  max-width: 40rem;
 }
 .wizard-event-team-count-label {
   margin-top: 0.35rem;
@@ -2320,20 +2411,25 @@ watch(
   gap: 0.15rem;
   min-height: 3.1rem;
   padding: 0.5rem 0.65rem;
-  border: 2px solid var(--color-border);
-  border-radius: 0.7rem;
-  background: var(--color-bg);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 .wizard-event-team-count-pill:hover:not(.is-disabled) {
-  border-color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 28%, var(--liquid-border));
+  background: var(--liquid-tile-bg);
 }
 .wizard-event-team-count-pill.active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--liquid-border));
+  background: var(--liquid-tile-bg-strong);
+  box-shadow: var(--liquid-shadow), var(--liquid-shadow-inset);
 }
 .wizard-event-team-count-pill.is-disabled {
   opacity: 0.45;
@@ -2342,11 +2438,6 @@ watch(
 .wizard-event-team-count-pill-main {
   font-weight: 600;
   font-size: 0.98rem;
-}
-.wizard-event-team-count-pill-meta {
-  font-size: 0.82rem;
-  color: var(--color-text-muted, var(--color-text));
-  opacity: 0.92;
 }
 .wizard-event-per-team-label {
   margin-bottom: 0.5rem;
@@ -2358,9 +2449,12 @@ watch(
 }
 .wizard-event-team-combined-card {
   padding: 0.75rem 0.85rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg-inner);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
 }
 .wizard-event-team-combined-grid {
   display: grid;
@@ -2372,6 +2466,14 @@ watch(
     grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
     align-items: center;
     gap: 0.85rem;
+  }
+}
+.wizard-event-team-combined-grid--solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 36rem) {
+  .wizard-event-team-combined-grid--solo {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .wizard-event-team-combined-meta {
@@ -2394,9 +2496,11 @@ watch(
 .wizard-event-team-upgrade {
   margin-top: 0.85rem;
   padding: 0.8rem 0.9rem;
-  border-radius: 0.85rem;
-  border: 1px solid var(--color-accent);
-  background: var(--color-accent-soft);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--liquid-border));
+  background: color-mix(in srgb, var(--liquid-tile-bg) 88%, var(--color-accent-soft));
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.3)) saturate(1.05);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.3)) saturate(1.05);
 }
 .wizard-event-team-upgrade p {
   margin: 0 0 0.55rem;
@@ -2453,10 +2557,13 @@ watch(
   width: 100%;
   padding: 0.75rem 1rem;
   font-size: 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: 0.5rem;
-  background: var(--color-bg);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
+  box-shadow: var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.28)) saturate(1.04);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.28)) saturate(1.04);
 }
 .wizard-event-select:focus {
   border-color: var(--color-accent);
@@ -2508,8 +2615,11 @@ watch(
   gap: 1rem;
   padding: 0.6rem 1rem;
   border-radius: 999px;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-tile-bg);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
 }
 .wizard-counter-btn {
   width: 2.5rem;
@@ -2559,12 +2669,19 @@ watch(
   font-size: 1.15rem;
   font-weight: 500;
   color: var(--color-text);
-  background: var(--color-bg-elevated);
-  border: 2px solid var(--color-border);
-  border-radius: 1.25rem;
+  background: var(--liquid-tile-bg);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2607,16 +2724,22 @@ watch(
   object-fit: contain;
 }
 .wizard-option:hover {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 32%, var(--liquid-border));
+  background: var(--liquid-tile-bg-strong);
   transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--liquid-shadow), var(--liquid-shadow-inset);
 }
 .wizard-option.active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  box-shadow: 0 8px 18px rgba(59, 130, 246, 0.18);
+  border-color: color-mix(in srgb, var(--color-accent) 48%, var(--liquid-border));
+  background: var(--liquid-tile-bg-strong);
+  color: var(--color-text);
+  box-shadow: var(--liquid-shadow), 0 0 0 1px color-mix(in srgb, var(--color-accent) 22%, transparent), var(--liquid-shadow-inset);
+}
+.wizard-option.active .wizard-option-main {
+  color: var(--color-text);
+}
+.wizard-option.active .wizard-option-desc {
+  color: var(--color-text-muted);
 }
 .wizard-option:disabled,
 .wizard-option.is-disabled {
@@ -2661,8 +2784,8 @@ watch(
 .wizard-step-form select:focus {
   border-color: var(--color-accent);
   outline: none;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07), var(--liquid-shadow-inset);
+  background: var(--liquid-tile-bg-inner);
 }
 .wizard-step-form .field input:disabled {
   opacity: 0.72;
@@ -2706,21 +2829,71 @@ watch(
   margin-bottom: 0.5rem;
 }
 .wizard-step-form .field-select select {
-  padding-top: 0.95rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding: 0.95rem 2.65rem 0.95rem 1.05rem;
+  border: 1px solid var(--liquid-border, var(--color-border));
+  border-radius: var(--radius);
+  border-bottom: 1px solid var(--liquid-border, var(--color-border));
+  background-color: var(--liquid-tile-bg-inner);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1.15rem;
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  min-height: var(--touch-lg);
+  font-size: 1.05rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+html[data-theme='dark'] .wizard-step-form .field-select select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.wizard-step-form .field-select select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft), var(--shadow-sm), var(--liquid-shadow-inset);
+  outline: none;
+  background-color: var(--liquid-tile-bg-inner);
+}
+.wizard-step-form .field.field-select.invalid select {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12), var(--shadow-sm), var(--liquid-shadow-inset);
 }
 .wizard-cart {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: 1rem;
+  background: var(--liquid-tile-bg);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.4)) saturate(1.05);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.4)) saturate(1.05);
 }
 .wizard-cart-title {
   margin: 0 0 0.75rem;
   font-size: 1rem;
   font-weight: 700;
   color: var(--color-text);
+}
+.wizard-cart-divider {
+  height: 1px;
+  margin: 0.75rem 0 0.65rem;
+  background: var(--color-border);
+  opacity: 0.85;
+}
+.wizard-cart-subtitle {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle, var(--color-text-muted));
+}
+.wizard-cart-muted {
+  font-weight: 500;
+  color: var(--color-text-muted);
+  font-size: 0.85em;
 }
 .wizard-cart-row {
   display: flex;
@@ -2735,15 +2908,35 @@ watch(
   color: var(--color-text);
   font-weight: 600;
 }
+.wizard-cart-row--price {
+  font-size: 0.9rem;
+}
+.wizard-cart-row--total {
+  margin-top: 0.35rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 1rem;
+}
+.wizard-cart-row--total span {
+  color: var(--color-text);
+  font-weight: 700;
+}
+.wizard-cart-row--total strong {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
 .wizard-cart-multi-lines {
   line-height: 1.45;
 }
 .wizard-next-steps {
   margin-top: 0.75rem;
   padding: 0.8rem 1rem;
-  border-radius: 0.75rem;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg-inner);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.04);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.04);
 }
 .wizard-next-steps h4 {
   margin: 0 0 0.45rem;
@@ -2811,20 +3004,18 @@ watch(
   flex-shrink: 0;
   padding: 0.85rem 2rem max(1rem, env(safe-area-inset-bottom, 0px));
   padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--liquid-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  background: var(--color-bg);
-  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--wizard-shell-fill) 82%, transparent);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.06), var(--liquid-shadow-inset);
 }
-@supports (backdrop-filter: blur(8px)) {
-  .wizard-footer {
-    background: color-mix(in srgb, var(--color-bg) 90%, transparent);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-  }
+html[data-theme='dark'] .wizard-footer {
+  box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.35), var(--liquid-shadow-inset);
 }
 .wizard-footer .btn {
   padding: 0.9rem 1.4rem;
@@ -2966,7 +3157,9 @@ watch(
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--color-bg);
+  background: var(--wizard-shell-fill);
+  backdrop-filter: blur(calc(var(--liquid-popover-blur) * 0.42)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-popover-blur) * 0.42)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
 }
 .wizard-path {
   display: flex;
@@ -2979,10 +3172,11 @@ watch(
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0.75rem;
-  border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(4px);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--liquid-border-soft);
+  backdrop-filter: blur(10px) saturate(1.15);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
   animation: wizardPopIn 0.4s ease;
 }
 .wizard-path-icon {
@@ -3045,7 +3239,9 @@ watch(
     position: sticky;
     top: 0;
     z-index: 35;
-    background: var(--color-bg);
+    background: color-mix(in srgb, var(--wizard-shell-fill) 78%, transparent);
+    backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.1);
+    -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.1);
     padding: 0.6rem 1rem 0.45rem;
   }
   .wizard-close {
@@ -3137,9 +3333,10 @@ watch(
     grid-template-columns: 1fr;
     gap: 0.45rem;
     padding: 0.6rem 0.7rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--liquid-border);
     border-radius: var(--radius);
-    background: var(--color-bg-elevated);
+    background: var(--liquid-tile-bg-inner);
+    box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
   }
   .wizard-participant-remove {
     justify-self: end;

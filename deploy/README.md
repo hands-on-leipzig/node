@@ -23,6 +23,17 @@ Handled entirely by **DRAHT** — no separate Node API.
 
 Deploy **DRAHT** with the `getNodeDocumentsConfig` / `putNodeDocumentsConfig` methods in `api_handson.class.php`. The Vue admin screen (`/dashboard/admin/documents`) calls these endpoints via the existing `handson/node` API client.
 
+### Dashboard calendar (Microsoft 365)
+
+Also in **`api_handson.class.php`**: `GET/PUT node/dashboard-calendar-config`, `GET node/dashboard-calendar-test`, `GET node/dashboard-calendar-events`. Config file: `DOL_DATA_ROOT/handson/node_dashboard_calendar_config.json` (same write permissions as documents config).
+
+- **GET** `node/dashboard-calendar-events` — coaches (same identification as documents). Returns `{ enabled, events[], meta }`. When `enabled` is false, the SPA keeps the demo list.
+- Non-default calendars: optional `calendarUrlOrId` in the JSON config (admin UI) must resolve to a Graph calendar **GUID**; the server then calls `GET /users/{upn}/calendars/{id}/calendarView` instead of `/calendar/calendarView` on the default calendar. Same **`Calendars.Read`** application permission.
+- **Entra ID:** add **Application** permission **`Calendars.Read`** (read calendars in all mailboxes the app can access) and **admin consent**, in addition to SharePoint permissions you already use.
+- Optional: set **`HANDSON_NODE_CALENDAR_DISABLE_GRAPH`** in Dolibarr to skip calendar Graph calls (same idea as `HANDSON_NODE_DOCUMENTS_DISABLE_GRAPH`).
+
+The Vue admin page is **`/dashboard/admin/calendar`**.
+
 Optional fallback: edit `public/documents-config.json` before build if the API is empty.
 
 ### Microsoft Graph still returns **403** after adding Files.Read.All

@@ -17,6 +17,7 @@ import {
   venueCapacityLabel,
   formatVenueDate,
   OFFER_COLORS,
+  isFutureEditionVenue,
 } from '@/utils/venueFilters'
 
 const route = useRoute()
@@ -73,7 +74,7 @@ function regioByProgram(program) {
 
 const futureEvents = computed(() =>
   filteredVenues.value
-    .filter((v) => v.offerCategory === 'future' || v.program === 'future5' || v.program === 'future8')
+    .filter((v) => isFutureEditionVenue(v))
     .slice()
     .sort((a, b) => venueDisplayName(a, locale.value).localeCompare(venueDisplayName(b, locale.value), locale.value))
 )
@@ -171,18 +172,34 @@ onMounted(() => {
             <h2 class="venues-filters-title"><I18nText k="venues.filters" /></h2>
             <fieldset class="venues-filter-group">
               <legend><I18nText k="venues.filterCountries" /></legend>
-              <label v-for="c in COUNTRY_KEYS" :key="c" class="venues-check">
-                <input v-model="countries[c]" type="checkbox" />
-                <I18nText :k="`venues.country.${c}`" />
-              </label>
+              <div class="venues-filter-chips" role="group" :aria-label="t('venues.filterCountries')">
+                <label v-for="c in COUNTRY_KEYS" :key="c" class="venues-filter-chip venues-filter-chip--country">
+                  <input v-model="countries[c]" type="checkbox" class="venues-filter-input" />
+                  <span class="venues-filter-chip-bg">
+                    <span class="venues-filter-code" aria-hidden="true">{{ c.toUpperCase() }}</span>
+                    <span class="venues-filter-chip-text"><I18nText :k="`venues.country.${c}`" /></span>
+                    <i class="bi bi-check-lg venues-filter-check" aria-hidden="true"></i>
+                  </span>
+                </label>
+              </div>
             </fieldset>
             <fieldset class="venues-filter-group">
               <legend><I18nText k="venues.filterOffers" /></legend>
-              <label v-for="o in OFFER_KEYS" :key="o" class="venues-check venues-check-offer" :style="offerStyle(o)">
-                <input v-model="offers[o]" type="checkbox" />
-                <span class="venues-offer-dot" aria-hidden="true"></span>
-                <I18nText :k="`venues.offer.${o}`" />
-              </label>
+              <div class="venues-filter-chips" role="group" :aria-label="t('venues.filterOffers')">
+                <label
+                  v-for="o in OFFER_KEYS"
+                  :key="o"
+                  class="venues-filter-chip venues-filter-chip--offer"
+                  :style="offerStyle(o)"
+                >
+                  <input v-model="offers[o]" type="checkbox" class="venues-filter-input" />
+                  <span class="venues-filter-chip-bg">
+                    <span class="venues-filter-offer-dot" aria-hidden="true"></span>
+                    <span class="venues-filter-chip-text"><I18nText :k="`venues.offer.${o}`" /></span>
+                    <i class="bi bi-check-lg venues-filter-check" aria-hidden="true"></i>
+                  </span>
+                </label>
+              </div>
             </fieldset>
             <p class="venues-filter-hint">
               <I18nText k="venues.resultsCount" :values="{ count: filteredVenues.length }" />
@@ -209,8 +226,8 @@ onMounted(() => {
                 <span class="venues-event-meta">
                   <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
                   <template v-if="venueCapacityLabel(ev, t)"> · {{ venueCapacityLabel(ev, t) }}</template>
-                  <template v-if="ev.program === 'future5' || ev.program === 'future8'">
-                    · <I18nText :k="ev.program === 'future5' ? 'venues.futureTrack5' : 'venues.futureTrack8'" />
+                  <template v-if="ev.program === 'future5'">
+                    · <I18nText k="venues.futureTrack5" />
                   </template>
                 </span>
               </li>
@@ -344,15 +361,25 @@ onMounted(() => {
 .venues-forbidden {
   margin-bottom: 1rem;
   padding: 1rem;
-  background: var(--color-bg-elevated);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--liquid-shadow);
 }
 .venues-forbidden p {
   margin: 0 0 0.75rem;
 }
 .venues-hero {
   margin-bottom: 2rem;
+  padding: 1.5rem 1.35rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .venues-title {
   font-size: var(--text-3xl);
@@ -386,6 +413,12 @@ onMounted(() => {
   padding: 2rem;
   justify-content: center;
   color: var(--color-text-muted);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .venues-status-error {
   flex-direction: column;
@@ -397,12 +430,15 @@ onMounted(() => {
   gap: 0.5rem;
   padding: 0.85rem 1rem;
   margin: 0 0 1.25rem;
-  border-radius: var(--radius);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
+  border: 1px solid var(--liquid-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   line-height: 1.5;
+  box-shadow: var(--shadow-sm);
 }
 .venues-hint-warn {
   border-color: rgba(255, 122, 0, 0.35);
@@ -425,16 +461,25 @@ onMounted(() => {
 }
 .venues-map-col {
   min-height: 320px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  overflow: hidden;
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .venues-filters {
-  background: #e8f4fc;
-  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.95));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.95));
+  border-radius: var(--radius-xl);
   padding: 1.25rem;
-  border: 1px solid rgba(21, 101, 192, 0.12);
+  border: 1px solid rgba(21, 101, 192, 0.14);
+  box-shadow: var(--liquid-shadow);
 }
 html[data-theme='dark'] .venues-filters {
-  background: rgba(21, 101, 192, 0.12);
-  border-color: rgba(100, 181, 246, 0.2);
+  border-color: rgba(100, 181, 246, 0.18);
 }
 .venues-filters-title {
   font-size: var(--text-lg);
@@ -443,29 +488,155 @@ html[data-theme='dark'] .venues-filters {
 }
 .venues-filter-group {
   border: none;
-  margin: 0 0 1rem;
+  margin: 0 0 1.1rem;
   padding: 0;
+}
+.venues-filter-group:last-of-type {
+  margin-bottom: 0.65rem;
 }
 .venues-filter-group legend {
   font-weight: 600;
-  font-size: var(--text-sm);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   margin-bottom: 0.5rem;
   padding: 0;
+  color: var(--color-text-muted);
+  opacity: 0.92;
 }
-.venues-check {
+.venues-filter-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.venues-filter-chip {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+}
+.venues-filter-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.venues-filter-chip-bg {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.35rem;
-  cursor: pointer;
-  font-size: var(--text-sm);
+  min-height: 2.5rem;
+  padding: 0.45rem 0.6rem 0.45rem 0.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.42)) saturate(calc(var(--liquid-saturate) * 0.9));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.42)) saturate(calc(var(--liquid-saturate) * 0.9));
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    box-shadow 0.22s ease;
 }
-.venues-check-offer .venues-offer-dot {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  background: var(--offer-color);
+html[data-theme='dark'] .venues-filter-chip-bg {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.venues-filter-chip:hover .venues-filter-chip-bg {
+  border-color: color-mix(in srgb, var(--liquid-border) 65%, var(--color-text-muted));
+  box-shadow: var(--shadow-sm), 0 0 0 1px color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.venues-filter-chip:has(.venues-filter-input:checked) .venues-filter-chip-bg {
+  border-color: color-mix(in srgb, var(--color-accent) 18%, var(--liquid-border));
+  background: color-mix(in srgb, var(--liquid-tile-bg) 92%, var(--color-accent) 8%);
+  box-shadow: var(--shadow-sm);
+}
+html[data-theme='dark'] .venues-filter-chip:has(.venues-filter-input:checked) .venues-filter-chip-bg {
+  border-color: color-mix(in srgb, var(--color-accent) 22%, var(--liquid-border));
+  background: color-mix(in srgb, var(--liquid-tile-bg) 88%, var(--color-accent) 12%);
+}
+.venues-filter-chip:has(.venues-filter-input:focus-visible) .venues-filter-chip-bg {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  outline-offset: 1px;
+}
+.venues-filter-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
   flex-shrink: 0;
+  border-radius: var(--radius);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 14%, transparent);
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.venues-filter-chip:has(.venues-filter-input:checked) .venues-filter-code {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  box-shadow: none;
+}
+.venues-filter-chip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--color-text);
+  opacity: 0.95;
+}
+.venues-filter-check {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.2s ease;
+}
+.venues-filter-chip:has(.venues-filter-input:checked) .venues-filter-check {
+  opacity: 0.55;
+}
+.venues-filter-chip--offer .venues-filter-offer-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--offer-color) 82%, var(--color-text-muted));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  transition: opacity 0.2s ease;
+  opacity: 0.88;
+}
+.venues-filter-chip--offer:hover .venues-filter-offer-dot {
+  opacity: 1;
+}
+.venues-filter-chip--offer:has(.venues-filter-input:checked) .venues-filter-chip-bg {
+  border-color: color-mix(in srgb, var(--offer-color) 16%, var(--liquid-border));
+  background: color-mix(in srgb, var(--liquid-tile-bg) 90%, var(--offer-color) 10%);
+  box-shadow: var(--shadow-sm);
+}
+html[data-theme='dark'] .venues-filter-chip--offer:has(.venues-filter-input:checked) .venues-filter-chip-bg {
+  border-color: color-mix(in srgb, var(--offer-color) 22%, var(--liquid-border));
+  background: color-mix(in srgb, var(--liquid-tile-bg) 84%, var(--offer-color) 16%);
+}
+.venues-filter-chip--offer:has(.venues-filter-input:checked) .venues-filter-check {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+.venues-filter-chip--offer:has(.venues-filter-input:checked) .venues-filter-offer-dot {
+  opacity: 1;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18);
+}
+html[data-theme='dark'] .venues-filter-chip--offer:has(.venues-filter-input:checked) .venues-filter-offer-dot {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .venues-filter-hint {
   margin: 0.5rem 0 0;
@@ -481,11 +652,14 @@ html[data-theme='dark'] .venues-filters {
   margin: 0 0 1rem;
 }
 .venues-accordion {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
   margin-bottom: 0.5rem;
   overflow: hidden;
-  background: var(--color-bg-elevated);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
+  box-shadow: var(--shadow-sm);
 }
 .venues-accordion-head {
   width: 100%;
@@ -540,9 +714,12 @@ html[data-theme='dark'] .venues-filters {
 }
 .venues-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .venues-table {
   width: 100%;

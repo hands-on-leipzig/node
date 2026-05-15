@@ -843,12 +843,6 @@ const stepIndex = computed(() => {
 }
 .select-input {
   width: 100%;
-  padding: 0.65rem 0.75rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: var(--text-base);
 }
 .team-block {
   margin: 1rem 0;
@@ -916,8 +910,7 @@ const stepIndex = computed(() => {
   color: #dc2626;
 }
 .form input,
-.form textarea,
-.form select {
+.form textarea {
   width: 100%;
   padding: 0.75rem 0.875rem;
   min-height: var(--touch-lg);
@@ -928,6 +921,11 @@ const stepIndex = computed(() => {
   background: var(--color-bg-elevated);
   color: var(--color-text);
   box-sizing: border-box;
+}
+.form select {
+  font-size: var(--text-base);
+  min-height: var(--touch-lg);
+  padding: 0.75rem 2.6rem 0.75rem 0.875rem;
 }
 .field-hint {
   margin: 0.35rem 0 0;

@@ -69,8 +69,7 @@ watch(
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+  background: var(--liquid-modal-scrim-bg);
 }
 
 .pdf-modal-box {
@@ -79,10 +78,13 @@ watch(
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-elevated);
+  background: var(--liquid-popover-fill);
+  border: 1px solid var(--liquid-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
 }
 
 .pdf-modal-header {

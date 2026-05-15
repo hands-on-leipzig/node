@@ -389,8 +389,7 @@ function onFormFieldFocus(e) {
   color: #dc2626;
 }
 .form input,
-.form textarea,
-.form select {
+.form textarea {
   width: 100%;
   padding: 0.875rem 1rem;
   min-height: var(--touch-lg);

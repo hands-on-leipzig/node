@@ -44,6 +44,12 @@ const navItems = computed(() => {
       icon: 'bi-folder2-open',
     })
     items.push({
+      path: '/dashboard/admin/calendar',
+      nameKey: 'nav.adminCalendar',
+      exact: true,
+      icon: 'bi-calendar3',
+    })
+    items.push({
       path: '/dashboard/admin/translations',
       nameKey: 'nav.adminTranslations',
       exact: true,
@@ -527,46 +533,58 @@ const { canInstall, promptInstall } = usePwaInstall()
 <style scoped>
 .dashboard-layout {
   display: flex;
+  min-height: 100dvh;
   height: 100dvh;
   overflow: hidden;
-  background: var(--color-bg);
+  background: transparent;
   position: relative;
+  gap: 1rem;
+  padding: 0.85rem 1rem 1rem;
+  box-sizing: border-box;
 }
 .menu-toggle {
   display: none;
   position: fixed;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: max(0.75rem, env(safe-area-inset-top, 0px));
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
   z-index: 102;
   width: var(--touch-lg);
   height: var(--touch-lg);
   padding: 0;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-bg-elevated);
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
   color: var(--color-text);
   cursor: pointer;
   align-items: center;
   justify-content: center;
   font-size: 1.35rem;
-  box-shadow: var(--shadow);
+  box-shadow: var(--liquid-shadow);
 }
 .sidebar-backdrop {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .sidebar {
   --sidebar-width: 16.75rem;
   width: var(--sidebar-width);
-  height: 100vh;
+  align-self: stretch;
+  min-height: 0;
   flex-shrink: 0;
-  background: var(--color-sidebar);
-  border-right: 1px solid var(--color-sidebar-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--liquid-shadow);
   padding: 1rem 0;
   display: flex;
   flex-direction: column;
@@ -577,7 +595,7 @@ const { canInstall, promptInstall } = usePwaInstall()
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 0.5rem;
+  margin: 0 0.75rem;
   padding: 0.25rem 0.2rem 0.85rem;
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
@@ -791,6 +809,9 @@ const { canInstall, promptInstall } = usePwaInstall()
   padding: 0.5rem 0.75rem 0;
   border-top: 1px solid var(--color-border);
   margin-top: auto;
+  background: var(--liquid-bg-subtle);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .sidebar-profile-wrap {
   position: relative;
@@ -848,8 +869,10 @@ const { canInstall, promptInstall } = usePwaInstall()
   bottom: calc(100% + 0.5rem);
   left: 0;
   min-width: 12rem;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-popover-fill);
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  border: 1px solid var(--liquid-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 0.5rem 0;
@@ -953,9 +976,16 @@ const { canInstall, promptInstall } = usePwaInstall()
   flex: 1;
   min-height: 0;
   min-width: 0;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg-strong);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 .content-actions {
   display: inline-flex;
@@ -988,10 +1018,15 @@ const { canInstall, promptInstall } = usePwaInstall()
   padding: 1.25rem;
   overflow: auto;
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  border-radius: calc(var(--radius-xl) - 3px);
 }
 
 /* Mobile: drawer overlay */
 @media (max-width: 768px) {
+  .dashboard-layout {
+    gap: 0;
+    padding: 0.5rem 0.65rem 0.65rem;
+  }
   .menu-toggle {
     display: flex;
   }
@@ -1011,9 +1046,13 @@ const { canInstall, promptInstall } = usePwaInstall()
     bottom: 0;
     z-index: 101;
     width: min(var(--sidebar-width), 86vw);
+    height: 100dvh;
+    max-height: none;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: var(--shadow-lg);
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    border-left: none;
   }
   .sidebar.open {
     transform: translateX(0);

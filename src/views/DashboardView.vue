@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
-import { listTeams, listClasses, listGroups, getOpenTasks, inviteCoCoach, checkCoCoachEmail } from '@/services/draht'
+import { listTeams, listClasses, listGroups, getOpenTasks, inviteCoCoach, checkCoCoachEmail, getDashboardCalendarEvents } from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
@@ -223,12 +223,68 @@ const isMobileDashboard = ref(false)
 let mobileMediaQuery = null
 let detachMobileListener = null
 
-/** Mock upcoming events – replace with API feed later. */
-const upcomingEvents = ref([
+const MOCK_UPCOMING = Object.freeze([
   { titleKey: 'dashboard.mockEventStammtisch', dateKey: 'dashboard.mockEventStammtischDate', locationKey: 'dashboard.mockEventStammtischLocation' },
   { titleKey: 'dashboard.mockEventRegional', dateKey: 'dashboard.mockEventRegionalDate', locationKey: 'dashboard.mockEventRegionalLocation' },
   { titleKey: 'dashboard.mockEventLandesfinale', dateKey: 'dashboard.mockEventLandesfinaleDate', locationKey: 'dashboard.mockEventLandesfinaleLocation' },
 ])
+
+/** 'mock' | 'graph' | 'graph_empty' | 'graph_error' */
+const calendarFeedKind = ref('mock')
+const calendarEvents = ref([])
+const calendarLoading = ref(false)
+
+const upcomingDisplayList = computed(() => {
+  if (calendarFeedKind.value === 'graph') {
+    return calendarEvents.value.map((ev) => ({ ...ev, _from: 'graph' }))
+  }
+  if (calendarFeedKind.value === 'graph_empty' || calendarFeedKind.value === 'graph_error') {
+    return []
+  }
+  return MOCK_UPCOMING.map((ev) => ({ ...ev, _from: 'mock' }))
+})
+
+function formatGraphStart(dateTime, tz) {
+  if (!dateTime) return ''
+  const s = String(dateTime).replace(/\.\d+$/, '').replace('T', ' ')
+  return tz && tz !== 'UTC' ? `${s} (${tz})` : s
+}
+
+function graphLocationLine(ev) {
+  if (ev.isOnline === true || ev.isOnline === 1 || ev.isOnline === '1') return t('dashboard.calendarOnline')
+  return ev.location || '—'
+}
+
+async function loadUpcomingCalendar() {
+  calendarLoading.value = true
+  calendarFeedKind.value = 'mock'
+  calendarEvents.value = []
+  try {
+    const res = await getDashboardCalendarEvents()
+    const inner = res?.data?.data ?? res?.data
+    if (!inner?.enabled) {
+      calendarFeedKind.value = 'mock'
+      return
+    }
+    const meta = inner.meta && typeof inner.meta === 'object' ? inner.meta : {}
+    const code = String(meta.code ?? '')
+    const evs = Array.isArray(inner.events) ? inner.events : []
+    if (code === 'ok' && evs.length > 0) {
+      calendarEvents.value = evs
+      calendarFeedKind.value = 'graph'
+      return
+    }
+    if (code === 'ok') {
+      calendarFeedKind.value = 'graph_empty'
+      return
+    }
+    calendarFeedKind.value = 'graph_error'
+  } catch (_) {
+    calendarFeedKind.value = 'mock'
+  } finally {
+    calendarLoading.value = false
+  }
+}
 
 /** Map API action string to UI { label, icon }. */
 function actionFromApi(apiAction) {
@@ -304,6 +360,7 @@ function goToTask(item) {
 
 onMounted(async () => {
   loadLists()
+  loadUpcomingCalendar()
   if (route.query?.wizard === '1') {
     wizardOpen.value = true
   }
@@ -569,20 +626,51 @@ const hasDocumentTreeContent = computed(() => {
           </template>
         </section>
 
-        <!-- Section: Upcoming events (mock – replace with API later) -->
+        <!-- Upcoming events: Microsoft 365 when configured, else demo list -->
         <section class="dashboard-card dashboard-card-events">
           <h2 class="dashboard-card-title">
             <i class="bi bi-calendar-event"></i>
             <I18nText k="dashboard.upcomingEvents" />
           </h2>
-          <ul class="dashboard-events-list">
-            <li v-for="(ev, idx) in upcomingEvents" :key="idx" class="dashboard-event-item">
-              <span class="dashboard-event-title"><I18nText :k="ev.titleKey" /></span>
-              <span class="dashboard-event-meta">
-                <I18nText :k="ev.dateKey" /> · <I18nText :k="ev.locationKey" />
-              </span>
-            </li>
-          </ul>
+          <div v-if="calendarLoading" class="dashboard-documents-loading">
+            <i class="bi bi-arrow-repeat spin"></i>
+            <I18nText k="dashboard.calendarLoading" />
+          </div>
+          <template v-else>
+            <ul v-if="upcomingDisplayList.length" class="dashboard-events-list">
+              <li v-for="(ev, idx) in upcomingDisplayList" :key="ev.id || ev.titleKey || idx" class="dashboard-event-item">
+                <template v-if="ev._from === 'graph'">
+                  <a
+                    v-if="ev.webLink"
+                    :href="ev.webLink"
+                    class="dashboard-event-title dashboard-event-link"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >{{ ev.title }}</a>
+                  <span v-else class="dashboard-event-title">{{ ev.title }}</span>
+                  <span class="dashboard-event-meta">{{ formatGraphStart(ev.start, ev.startTimeZone) }} · {{ graphLocationLine(ev) }}</span>
+                </template>
+                <template v-else>
+                  <span class="dashboard-event-title"><I18nText :k="ev.titleKey" /></span>
+                  <span class="dashboard-event-meta">
+                    <I18nText :k="ev.dateKey" /> · <I18nText :k="ev.locationKey" />
+                  </span>
+                </template>
+              </li>
+            </ul>
+            <p v-if="calendarFeedKind === 'graph_empty'" class="dashboard-events-hint">
+              <I18nText k="dashboard.calendarEmpty" />
+            </p>
+            <p v-else-if="calendarFeedKind === 'graph_error'" class="dashboard-events-hint dashboard-events-hint-warn">
+              <I18nText k="dashboard.calendarLoadError" />
+            </p>
+            <p v-if="calendarFeedKind === 'graph_error' && hasAdminRole()" class="dashboard-events-hint">
+              <RouterLink to="/dashboard/admin/calendar" class="dashboard-documents-link-secondary dashboard-events-admin-link">
+                <i class="bi bi-gear"></i>
+                <I18nText k="dashboard.calendarConfigureAdmin" />
+              </RouterLink>
+            </p>
+          </template>
         </section>
       </div>
     </template>
@@ -777,6 +865,48 @@ const hasDocumentTreeContent = computed(() => {
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 2rem;
+
+  /* Mehr „Liquid“ nur auf dieser Seite (Teleport-Dialoge hängen am body → globale Tokens) */
+  --liquid-blur: 58px;
+  --liquid-saturate: 1.92;
+  --liquid-tile-bg: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.44) 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --liquid-tile-bg-inner: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  --liquid-border: rgba(255, 255, 255, 0.9);
+  --liquid-border-soft: rgba(255, 255, 255, 0.46);
+  --liquid-shadow: 0 24px 62px rgba(0, 0, 0, 0.09), 0 9px 26px rgba(0, 0, 0, 0.055),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98), inset 0 -1.5px 0 rgba(0, 0, 0, 0.036);
+  --shadow-lg: 0 30px 72px rgba(0, 0, 0, 0.11), 0 12px 28px rgba(0, 0, 0, 0.062),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.82);
+}
+
+:global(html[data-theme='dark']) .dashboard-view {
+  --liquid-blur: 66px;
+  --liquid-saturate: 1.82;
+  --liquid-tile-bg: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(56, 50, 48, 0.38) 48%,
+    rgba(26, 24, 22, 0.52) 100%
+  );
+  --liquid-tile-bg-inner: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(48, 44, 42, 0.34) 100%
+  );
+  --liquid-border: rgba(255, 255, 255, 0.26);
+  --liquid-border-soft: rgba(255, 255, 255, 0.13);
+  --liquid-shadow: 0 26px 64px rgba(0, 0, 0, 0.52), 0 10px 24px rgba(0, 0, 0, 0.34),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.17), inset 0 -1.5px 0 rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 32px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.13);
 }
 
 .dashboard-loading,
@@ -788,6 +918,12 @@ const hasDocumentTreeContent = computed(() => {
   min-height: 14rem;
   font-size: 1.25rem;
   color: var(--color-text-muted);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-error {
@@ -796,6 +932,13 @@ const hasDocumentTreeContent = computed(() => {
 
 .dashboard-header {
   margin-bottom: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-title {
@@ -819,11 +962,13 @@ const hasDocumentTreeContent = computed(() => {
 }
 
 .dashboard-card {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
   padding: 1.25rem 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-card-title {
@@ -938,7 +1083,7 @@ const hasDocumentTreeContent = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 10030;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--liquid-modal-scrim-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -948,9 +1093,11 @@ const hasDocumentTreeContent = computed(() => {
   width: min(100%, 44rem);
   max-height: min(88vh, 780px);
   overflow: auto;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--liquid-popover-fill);
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 .dashboard-documents-modal-head {
@@ -963,7 +1110,9 @@ const hasDocumentTreeContent = computed(() => {
   gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
+  background: var(--liquid-popover-fill);
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
 }
 .dashboard-documents-modal-title {
   margin: 0;
@@ -999,20 +1148,24 @@ const hasDocumentTreeContent = computed(() => {
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.6rem 0.75rem;
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-bg);
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--liquid-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg-inner);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.62)) saturate(calc(var(--liquid-saturate) * 0.94));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.62)) saturate(calc(var(--liquid-saturate) * 0.94));
   font-family: inherit;
   font-size: 0.9375rem;
   color: var(--color-text);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .dashboard-task-item:hover {
-  background: rgba(180, 83, 9, 0.08);
+  background: var(--liquid-tile-bg);
+  border-color: var(--liquid-border);
 }
 
 .dashboard-task-name {
@@ -1123,8 +1276,7 @@ const hasDocumentTreeContent = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 10040;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
+  background: var(--liquid-modal-scrim-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1137,10 +1289,12 @@ const hasDocumentTreeContent = computed(() => {
   max-width: 28rem;
   max-height: min(92vh, 720px);
   overflow: auto;
-  background: var(--color-bg-elevated);
+  background: var(--liquid-popover-fill);
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
   color: var(--color-text);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
   box-shadow: var(--shadow-lg);
 }
 
@@ -1200,16 +1354,6 @@ const hasDocumentTreeContent = computed(() => {
   margin-bottom: 0.75rem;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--color-text);
-}
-
-.co-coach-modal-select {
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  font-size: var(--text-sm);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
   color: var(--color-text);
 }
 
@@ -1335,9 +1479,11 @@ const hasDocumentTreeContent = computed(() => {
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.65rem 0.85rem;
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  background: var(--liquid-tile-bg-inner);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.6)) saturate(calc(var(--liquid-saturate) * 0.93));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.6)) saturate(calc(var(--liquid-saturate) * 0.93));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--liquid-border-soft);
 }
 
 .dashboard-event-title {
@@ -1349,6 +1495,30 @@ const hasDocumentTreeContent = computed(() => {
 .dashboard-event-meta {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+}
+
+.dashboard-event-link {
+  text-decoration: none;
+  color: var(--color-accent);
+}
+.dashboard-event-link:hover {
+  text-decoration: underline;
+}
+
+.dashboard-events-hint {
+  margin: 0.35rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+.dashboard-events-hint-warn {
+  color: var(--color-text);
+}
+.dashboard-events-admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
 }
 
 @keyframes spin {
