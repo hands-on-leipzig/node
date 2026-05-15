@@ -6,8 +6,9 @@ Vue 3 frontend for coaches: SSO login via Keycloak and enrollment of teams and c
 
 ## Features
 
+- **Public venues page** (`/`) – map and list of tournament locations (no login); data from `node_public_venues.php` on DRAHT
 - **SSO login** via Keycloak
-- **Dashboard** with quick actions to enroll a team or a class
+- **Dashboard** with quick actions to enroll a team or a class (after coach login)
 - **Enroll team** – name, school/club, category, notes → created in DRAHT
 - **Enroll class** – name, school, grade, teacher, notes → created in DRAHT
 - **Admin: translations** – edit `en.js` / `de.js` strings and open a **GitHub pull request** via DRAHT (`HANDSON_GITHUB_*` in Dolibarr; see `deploy/README.md`)
@@ -56,7 +57,17 @@ Copy `.env.example` to `.env` and set:
 - **Keycloak**: `VITE_KEYCLOAK_URL`, `VITE_KEYCLOAK_REALM`, `VITE_KEYCLOAK_CLIENT_ID`
 - **DRAHT API**: `VITE_DRAHT_API_URL` – base URL of your DRAHT/Dolibarr backend that exposes `POST /teams` and `POST /classes` (and optionally `GET /teams`, `GET /classes`).
 
-Without a running Keycloak, the app still loads; accessing the dashboard will trigger login (redirect to Keycloak). Without DRAHT, enrollment requests will fail until the backend is available.
+Without a running Keycloak, the app still loads; the venues page works if `node_public_venues.php` is reachable. Accessing the dashboard triggers login (redirect to Keycloak). Without DRAHT, enrollment requests will fail until the backend is available.
+
+### Public venues API (mod-handson)
+
+Deploy `lib/handson_public_venues.lib.php` and update `api_proxy.php` on DRAHT. The SPA calls:
+
+`GET {VITE_DRAHT_API_URL}/handson/node/public/venues`
+
+Example: `…/custom/handson/api_proxy.php/handson/node/public/venues`
+
+That route is answered by the proxy without Bearer/API key (read-only). Fallback script: `custom/handson/node_public_venues.php`.
 
 ### Keycloak client setup (node)
 

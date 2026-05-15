@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
         background_color: '#fafaf9',
         display: 'standalone',
         scope: '/',
-        start_url: '/dashboard',
+        start_url: '/',
         icons: [
           {
             src: '/favicon.ico',

@@ -2,7 +2,7 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getUserProfile, logout, hasAdminRole } from '@/auth/keycloak'
+import { getUserProfile, logout, hasAdminRole, isAuthenticated, hasCoachRole, login } from '@/auth/keycloak'
 import {
   setLocale,
   showTranslationKeys,
@@ -18,6 +18,9 @@ const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
 const user = computed(() => getUserProfile())
+const isCoachApp = computed(() => isAuthenticated() && hasCoachRole())
+/** Logged-out (or non-coach) on public venues: minimal sidebar + login */
+const isGuestShell = computed(() => route.name === 'venues' && !isCoachApp.value)
 const sidebarOpen = ref(false)
 const profileMenuOpen = ref(false)
 const teams = ref([])
@@ -26,7 +29,13 @@ const groups = ref([])
 const sidebarLoading = ref(false)
 
 const navItems = computed(() => {
-  const items = [{ path: '/dashboard', nameKey: 'nav.dashboard', exact: true, icon: 'bi-grid-1x2-fill' }]
+  if (isGuestShell.value) {
+    return [{ path: '/', nameKey: 'nav.venues', exact: true, icon: 'bi-geo-alt' }]
+  }
+  const items = [
+    { path: '/dashboard', nameKey: 'nav.dashboard', exact: true, icon: 'bi-grid-1x2-fill' },
+    { path: '/', nameKey: 'nav.venues', exact: true, icon: 'bi-geo-alt' },
+  ]
   if (hasAdminRole()) {
     items.push({
       path: '/dashboard/admin/documents',
@@ -44,7 +53,17 @@ const navItems = computed(() => {
   return items
 })
 
+function doLogin() {
+  login()
+}
+
 async function loadSidebarLists() {
+  if (!isCoachApp.value) {
+    teams.value = []
+    classes.value = []
+    groups.value = []
+    return
+  }
   sidebarLoading.value = true
   try {
     const [teamsRes, classesRes, groupsRes] = await Promise.allSettled([
@@ -178,10 +197,15 @@ onUnmounted(() => {
 watch(
   () => route.path,
   (path) => {
-    if (path === '/dashboard' || path === '/dashboard/') loadSidebarLists()
+    if (path === '/dashboard' || path === '/dashboard/' || path === '/' || path === '') {
+      loadSidebarLists()
+    }
     pushBackTrapState()
   }
 )
+watch(isCoachApp, (coach) => {
+  if (coach) loadSidebarLists()
+})
 
 function switchToDe() {
   setLocale('de')
@@ -230,13 +254,13 @@ const { canInstall, promptInstall } = usePwaInstall()
       @click="closeSidebar"
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
-      <RouterLink to="/dashboard" class="sidebar-brand" @click="closeSidebar">
+      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="sidebar-brand" @click="closeSidebar">
         <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-brand-logo" />
       </RouterLink>
       <nav class="sidebar-nav">
         <RouterLink
           v-for="item in navItems"
-          :key="item.path"
+          :key="item.nameKey"
           :to="item.path"
           class="nav-link sidebar-item"
           :class="{ active: isActive(item) }"
@@ -247,77 +271,121 @@ const { canInstall, promptInstall } = usePwaInstall()
           </span>
           <span class="sidebar-item-label"><I18nText :k="item.nameKey" /></span>
         </RouterLink>
-        <div v-if="sidebarLoading" class="sidebar-list-loading">
-          <i class="bi bi-arrow-repeat spin"></i>
-        </div>
-        <template v-else>
-          <p v-if="hasFoundersEnrollments" class="sidebar-section-title">
-            <I18nText k="nav.sidebarSectionFounders" />
-          </p>
-          <button
-            v-for="team in teams"
-            :key="'team-' + team.id"
-            type="button"
-            class="sidebar-item sidebar-entry"
-            :class="{ active: isTeamActive(team.id) }"
-            :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-            :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-            @click="goTeam(team.id)"
-          >
-            <span class="sidebar-item-icon">
-              <i class="bi bi-person-fill" aria-hidden="true"></i>
-            </span>
-            <span class="sidebar-item-text">
-              <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
-              <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
-            </span>
-          </button>
-          <button
-            v-for="cls in classes"
-            :key="'class-' + cls.id"
-            type="button"
-            class="sidebar-item sidebar-entry"
-            :class="{ active: isClassActive(cls.id) }"
-            :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
-            :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
-            @click="goClass(cls.id)"
-          >
-            <span class="sidebar-item-icon">
-              <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
-            </span>
-            <span class="sidebar-item-text">
-              <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
-              <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
-            </span>
-          </button>
-          <p
-            v-if="hasFutureEnrollments"
-            class="sidebar-section-title"
-            :class="{ 'sidebar-section-title--after-founders': hasFoundersEnrollments }"
-          >
-            <I18nText k="nav.sidebarSectionFuture" />
-          </p>
-          <button
-            v-for="group in groups"
-            :key="'group-' + group.id"
-            type="button"
-            class="sidebar-item sidebar-entry"
-            :class="{ active: isGroupActive(group.id) }"
-            :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
-            :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
-            @click="goGroup(group.id)"
-          >
-            <span class="sidebar-item-icon">
-              <i class="bi bi-stars" aria-hidden="true"></i>
-            </span>
-            <span class="sidebar-item-text">
-              <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
-              <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
-            </span>
-          </button>
+        <template v-if="isCoachApp">
+          <div v-if="sidebarLoading" class="sidebar-list-loading">
+            <i class="bi bi-arrow-repeat spin"></i>
+          </div>
+          <template v-else>
+            <p v-if="hasFoundersEnrollments" class="sidebar-section-title">
+              <I18nText k="nav.sidebarSectionFounders" />
+            </p>
+            <button
+              v-for="team in teams"
+              :key="'team-' + team.id"
+              type="button"
+              class="sidebar-item sidebar-entry"
+              :class="{ active: isTeamActive(team.id) }"
+              :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+              :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+              @click="goTeam(team.id)"
+            >
+              <span class="sidebar-item-icon">
+                <i class="bi bi-person-fill" aria-hidden="true"></i>
+              </span>
+              <span class="sidebar-item-text">
+                <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
+                <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
+              </span>
+            </button>
+            <button
+              v-for="cls in classes"
+              :key="'class-' + cls.id"
+              type="button"
+              class="sidebar-item sidebar-entry"
+              :class="{ active: isClassActive(cls.id) }"
+              :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+              :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+              @click="goClass(cls.id)"
+            >
+              <span class="sidebar-item-icon">
+                <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+              </span>
+              <span class="sidebar-item-text">
+                <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
+                <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
+              </span>
+            </button>
+            <p
+              v-if="hasFutureEnrollments"
+              class="sidebar-section-title"
+              :class="{ 'sidebar-section-title--after-founders': hasFoundersEnrollments }"
+            >
+              <I18nText k="nav.sidebarSectionFuture" />
+            </p>
+            <button
+              v-for="group in groups"
+              :key="'group-' + group.id"
+              type="button"
+              class="sidebar-item sidebar-entry"
+              :class="{ active: isGroupActive(group.id) }"
+              :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+              :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+              @click="goGroup(group.id)"
+            >
+              <span class="sidebar-item-icon">
+                <i class="bi bi-stars" aria-hidden="true"></i>
+              </span>
+              <span class="sidebar-item-text">
+                <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
+                <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
+              </span>
+            </button>
+          </template>
         </template>
       </nav>
-      <div class="sidebar-bottom">
+      <div v-if="isGuestShell" class="sidebar-bottom sidebar-bottom-guest">
+        <div class="sidebar-guest-tools">
+          <button
+            type="button"
+            class="profile-pill"
+            :class="{ active: theme === 'light' }"
+            :title="t('common.light')"
+            @click="setTheme('light')"
+          >
+            <i class="bi bi-sun-fill"></i>
+          </button>
+          <button
+            type="button"
+            class="profile-pill"
+            :class="{ active: theme === 'dark' }"
+            :title="t('common.dark')"
+            @click="setTheme('dark')"
+          >
+            <i class="bi bi-moon-fill"></i>
+          </button>
+          <button type="button" class="profile-pill" :class="{ active: locale === 'de' }" @click="switchToDe">DE</button>
+          <button type="button" class="profile-pill" :class="{ active: locale === 'en' }" @click="switchToEn">EN</button>
+        </div>
+        <button
+          v-if="!isAuthenticated()"
+          type="button"
+          class="sidebar-login-btn sidebar-item"
+          @click="doLogin(); closeSidebar()"
+        >
+          <span class="sidebar-item-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
+          <span class="sidebar-item-label"><I18nText k="nav.login" /></span>
+        </button>
+        <button
+          v-else
+          type="button"
+          class="sidebar-login-btn sidebar-item"
+          @click="doLogout(); closeSidebar()"
+        >
+          <span class="sidebar-item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
+          <span class="sidebar-item-label"><I18nText k="auth.logout" /></span>
+        </button>
+      </div>
+      <div v-else class="sidebar-bottom">
         <div class="sidebar-profile-wrap">
           <button
             type="button"
@@ -682,6 +750,41 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.sidebar-bottom-guest {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.sidebar-guest-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-start;
+}
+.sidebar-login-btn {
+  width: calc(100% - 1rem);
+  max-width: 100%;
+  margin: 0 0.5rem;
+  justify-content: flex-start;
+  border: 1px solid var(--color-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.65rem;
+  min-height: var(--touch);
+}
+.sidebar-login-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+}
+.sidebar-login-btn .sidebar-item-icon .bi {
+  font-size: 1.2rem;
 }
 
 .sidebar-bottom {

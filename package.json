@@ -12,6 +12,7 @@
     "axios": "^1.13.4",
     "bootstrap-icons": "^1.13.1",
     "keycloak-js": "^26.2.2",
+    "leaflet": "^1.9.4",
     "vue": "^3.5.27",
     "vue-i18n": "^11.2.8",
     "vue-router": "^5.0.2"

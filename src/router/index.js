@@ -4,6 +4,19 @@ import { initKeycloak, isAuthenticated, hasCoachRole, hasAdminRole, login } from
 const routes = [
   {
     path: '/',
+    component: () => import('@/layouts/DashboardLayout.vue'),
+    meta: { public: true },
+    children: [
+      {
+        path: '',
+        name: 'venues',
+        component: () => import('@/views/VenuesView.vue'),
+        meta: { public: true, titleKey: 'venues.title' },
+      },
+    ],
+  },
+  {
+    path: '/home',
     name: 'home',
     component: () => import('@/views/HomeView.vue'),
     meta: { public: true },
@@ -102,7 +115,7 @@ router.beforeEach(async (to) => {
     }
     // Only users with realm role "coach" may access the app
     if (!hasCoachRole()) {
-      return { name: 'home', query: { forbidden: '1' } }
+      return { name: 'venues', query: { forbidden: '1' } }
     }
     if (to.meta.requiresAdmin && !hasAdminRole()) {
       return { name: 'dashboard' }
