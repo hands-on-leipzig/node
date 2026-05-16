@@ -97,6 +97,7 @@ export default {
         "sidebarOpenGroup": "Open group: {name}",
         "sidebarSectionFounders": "Founders enrollments",
         "sidebarSectionFuture": "Future enrollments",
+        "sidebarGroupsLoadFailed": "Could not load Future enrollments.",
         "logOut": "Log out"
     },
     "admin": {
@@ -298,6 +299,8 @@ export default {
         "checkingTasks": "Checking tasks…",
         "noPendingTasks": "No pending tasks.",
         "registerNew": "New registration",
+        "registrationOpensAt": "Registration opens on {date} at {hour}:00 a.m.",
+        "registrationClosedHint": "The registration period has not started yet.",
         "addCoCoachButton": "Add co-coach",
         "addCoCoachModalTitle": "Co-coach",
         "addCoCoachModalLead": "Pick a registration and enter the co-coach’s email address. There is no autocomplete — you first check whether a coach account exists for that email.",
@@ -388,7 +391,7 @@ export default {
         "stepVoucherLead": "If you have a voucher code, enter it here. A valid voucher can restrict options and funding. You can continue without a voucher.",
         "stepGroupSize": "Step 1 — Group size",
         "stepGroupSizeLead": "Choose how many participants you are registering. One group is created in the system (commercial unit); material and invoicing attach to this group.",
-        "stepSeasonSets": "Step 2 — Season sets",
+        "stepSeasonSets": "Season sets",
         "stepSeasonSetsLead": "One season set is sufficient for up to 24 students. Optionally, a second set can be ordered. If your group shares a season set with another group, no order is required.",
         "seasonNone": "No season set",
         "seasonOne": "1 season set",

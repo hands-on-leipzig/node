@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition'
 
 const { t } = useI18n()
 
@@ -23,6 +24,9 @@ const open = ref(false)
 const triggerRef = ref(null)
 const panelRef = ref(null)
 const highlightedIndex = ref(-1)
+const { panelStyle, updatePanelPosition } = useDropdownPanelPosition(open, triggerRef, {
+  maxHeight: '280px',
+})
 
 const selectedEvent = computed(() => {
   if (props.modelValue === '' || props.modelValue === null || props.modelValue === undefined) return null
@@ -44,6 +48,7 @@ function toggle() {
   if (open.value) {
     highlightedIndex.value = props.events.findIndex((e) => String(e.id) === String(props.modelValue))
     if (highlightedIndex.value < 0) highlightedIndex.value = 0
+    updatePanelPosition()
   }
 }
 
@@ -85,13 +90,18 @@ function onKeydown(e) {
 }
 
 function onClickOutside(e) {
-  if (open.value && triggerRef.value && panelRef.value && !triggerRef.value.contains(e.target) && !panelRef.value.contains(e.target)) {
-    open.value = false
-  }
+  if (!open.value || !triggerRef.value) return
+  if (triggerRef.value.contains(e.target)) return
+  if (panelRef.value?.contains(e.target)) return
+  open.value = false
 }
 
-onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
+onMounted(() => {
+  document.addEventListener('click', onClickOutside, true)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutside, true)
+})
 
 watch(() => props.events.length, () => {
   if (highlightedIndex.value >= props.events.length) highlightedIndex.value = Math.max(0, props.events.length - 1)
@@ -109,7 +119,7 @@ watch(() => props.events.length, () => {
         :disabled="disabled || loading"
         :aria-expanded="open"
         aria-haspopup="listbox"
-        @click="toggle"
+        @click.stop="toggle"
         @keydown="onKeydown"
       >
         <span class="event-select-value">{{ displayText }}</span>
@@ -118,33 +128,36 @@ watch(() => props.events.length, () => {
           <i v-else class="bi bi-chevron-down"></i>
         </span>
       </button>
-      <Transition name="event-select-drop">
-        <div
-          v-show="open"
-          ref="panelRef"
-          class="event-select-panel"
-          role="listbox"
-          tabindex="-1"
-        >
-          <button
-            v-for="(ev, idx) in events"
-            :key="ev.id"
-            type="button"
-            role="option"
-            class="event-select-option"
-            :class="{
-              selected: String(ev.id) === String(modelValue),
-              highlighted: idx === highlightedIndex,
-            }"
-            :aria-selected="String(ev.id) === String(modelValue)"
-            @click="select(ev)"
-            @mouseenter="highlightedIndex = idx"
+      <Teleport to="body">
+        <Transition name="event-select-drop">
+          <div
+            v-if="open"
+            ref="panelRef"
+            class="event-select-panel event-select-panel--floating"
+            :style="panelStyle"
+            role="listbox"
+            tabindex="-1"
           >
-            <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
-          </button>
-          <p v-if="!loading && events.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
-        </div>
-      </Transition>
+            <button
+              v-for="(ev, idx) in events"
+              :key="ev.id"
+              type="button"
+              role="option"
+              class="event-select-option"
+              :class="{
+                selected: String(ev.id) === String(modelValue),
+                highlighted: idx === highlightedIndex,
+              }"
+              :aria-selected="String(ev.id) === String(modelValue)"
+              @click="select(ev)"
+              @mouseenter="highlightedIndex = idx"
+            >
+              <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+            </button>
+            <p v-if="!loading && events.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
+          </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -233,21 +246,16 @@ watch(() => props.events.length, () => {
   to { transform: rotate(360deg); }
 }
 .event-select-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% - 2px);
-  z-index: 100;
-  max-height: 280px;
   overflow-y: auto;
   background: var(--liquid-popover-fill);
   border: 2px solid var(--color-accent);
-  border-top: none;
-  border-radius: 0 0 12px 12px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
   padding: 0.35rem;
   backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
   -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+}
+.event-select-panel--floating {
+  border-radius: 12px;
 }
 .event-select-option {
   display: flex;

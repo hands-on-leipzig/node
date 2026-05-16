@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, getAddresses, validateVoucher, extractAddressesFromResponse, isDolibarrRowId } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 
 const router = useRouter()
@@ -70,6 +71,15 @@ const countryOptions = computed(() => {
     top: top.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
     rest: rest.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
   }
+})
+
+const teamCountrySelectOptions = computed(() => {
+  const out = []
+  out.push({ heading: true, label: t('enroll.countriesTop') })
+  out.push(...countryOptions.value.top)
+  out.push({ heading: true, label: t('enroll.countriesOther') })
+  out.push(...countryOptions.value.rest)
+  return out
 })
 
 let zipLookupTimer = null
@@ -286,15 +296,12 @@ function onFormFieldFocus(e) {
       </div>
       <div class="field field-select">
         <label for="team-country"><I18nText k="enroll.schoolCountry" /></label>
-        <select id="team-country" v-model="form.country">
-          <option value=""><I18nText k="enroll.selectCountry" /></option>
-          <optgroup :label="t('enroll.countriesTop')">
-            <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </optgroup>
-          <optgroup :label="t('enroll.countriesOther')">
-            <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </optgroup>
-        </select>
+        <CustomSelect
+          id="team-country"
+          v-model="form.country"
+          :options="teamCountrySelectOptions"
+          :placeholder="t('enroll.selectCountry')"
+        />
       </div>
       <div class="field">
         <label for="team-zip"><I18nText k="enroll.schoolZip" /></label>

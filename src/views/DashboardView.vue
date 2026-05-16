@@ -3,15 +3,26 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
-import { listTeams, listClasses, listGroups, getOpenTasks, inviteCoCoach, checkCoCoachEmail, getDashboardCalendarEvents } from '@/services/draht'
+import {
+  listTeams,
+  listClasses,
+  listGroups,
+  parseNodeListPayload,
+  getOpenTasks,
+  inviteCoCoach,
+  checkCoCoachEmail,
+  getDashboardCalendarEvents,
+  getRegistrationWindow,
+} from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
@@ -35,7 +46,55 @@ function resetCoCoachInviteForm() {
   coCoachChecking.value = false
 }
 
+const registrationWindow = ref({
+  loading: true,
+  allowed: true,
+  opensAt: null,
+  openHour: 10,
+  timezone: 'Europe/Berlin',
+})
+
+const registrationAllowed = computed(() => !registrationWindow.value.loading && registrationWindow.value.allowed !== false)
+
+const registrationOpensMessage = computed(() => {
+  if (registrationAllowed.value || !registrationWindow.value.opensAt) return ''
+  const d = new Date(registrationWindow.value.opensAt)
+  if (Number.isNaN(d.getTime())) return ''
+  const dateStr = new Intl.DateTimeFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(d)
+  const hour = registrationWindow.value.openHour ?? 10
+  return t('dashboard.registrationOpensAt', { date: dateStr, hour })
+})
+
+async function loadRegistrationWindow() {
+  registrationWindow.value = { ...registrationWindow.value, loading: true }
+  try {
+    const res = await getRegistrationWindow()
+    const data = res?.data?.data ?? res?.data ?? {}
+    registrationWindow.value = {
+      loading: false,
+      allowed: data.allowed !== false,
+      opensAt: data.opensAt || null,
+      openHour: Number.isFinite(Number(data.openHour)) ? Number(data.openHour) : 10,
+      timezone: data.timezone || 'Europe/Berlin',
+    }
+  } catch {
+    registrationWindow.value = {
+      loading: false,
+      allowed: true,
+      opensAt: null,
+      openHour: 10,
+      timezone: 'Europe/Berlin',
+    }
+  }
+}
+
 function openWizard() {
+  if (!registrationAllowed.value) return
   wizardOpen.value = true
 }
 function clearWizardQuery() {
@@ -201,6 +260,13 @@ const coCoachTargets = computed(() => {
   return [...teamTargets, ...classTargets, ...groupTargets]
 })
 
+const coCoachSelectOptions = computed(() =>
+  coCoachTargets.value.map((item) => ({
+    value: item.value,
+    label: coCoachTargetLabel(item),
+  })),
+)
+
 
 /** Tasks to do: built from getTeam/getClass detail responses (same data as team detail page). */
 const taskItems = ref([])
@@ -223,26 +289,16 @@ const isMobileDashboard = ref(false)
 let mobileMediaQuery = null
 let detachMobileListener = null
 
-const MOCK_UPCOMING = Object.freeze([
-  { titleKey: 'dashboard.mockEventStammtisch', dateKey: 'dashboard.mockEventStammtischDate', locationKey: 'dashboard.mockEventStammtischLocation' },
-  { titleKey: 'dashboard.mockEventRegional', dateKey: 'dashboard.mockEventRegionalDate', locationKey: 'dashboard.mockEventRegionalLocation' },
-  { titleKey: 'dashboard.mockEventLandesfinale', dateKey: 'dashboard.mockEventLandesfinaleDate', locationKey: 'dashboard.mockEventLandesfinaleLocation' },
-])
-
-/** 'mock' | 'graph' | 'graph_empty' | 'graph_error' */
-const calendarFeedKind = ref('mock')
+/** 'graph' | 'graph_empty' | 'graph_error' */
+const calendarFeedKind = ref('graph_empty')
 const calendarEvents = ref([])
 const calendarLoading = ref(false)
+/** False when admin disabled the calendar feed or events could not be loaded. */
+const calendarTileVisible = ref(false)
 
-const upcomingDisplayList = computed(() => {
-  if (calendarFeedKind.value === 'graph') {
-    return calendarEvents.value.map((ev) => ({ ...ev, _from: 'graph' }))
-  }
-  if (calendarFeedKind.value === 'graph_empty' || calendarFeedKind.value === 'graph_error') {
-    return []
-  }
-  return MOCK_UPCOMING.map((ev) => ({ ...ev, _from: 'mock' }))
-})
+const upcomingDisplayList = computed(() =>
+  calendarEvents.value.map((ev) => ({ ...ev, _from: 'graph' })),
+)
 
 function formatGraphStart(dateTime, tz) {
   if (!dateTime) return ''
@@ -257,15 +313,16 @@ function graphLocationLine(ev) {
 
 async function loadUpcomingCalendar() {
   calendarLoading.value = true
-  calendarFeedKind.value = 'mock'
+  calendarTileVisible.value = false
+  calendarFeedKind.value = 'graph_empty'
   calendarEvents.value = []
   try {
     const res = await getDashboardCalendarEvents()
     const inner = res?.data?.data ?? res?.data
     if (!inner?.enabled) {
-      calendarFeedKind.value = 'mock'
       return
     }
+    calendarTileVisible.value = true
     const meta = inner.meta && typeof inner.meta === 'object' ? inner.meta : {}
     const code = String(meta.code ?? '')
     const evs = Array.isArray(inner.events) ? inner.events : []
@@ -280,7 +337,7 @@ async function loadUpcomingCalendar() {
     }
     calendarFeedKind.value = 'graph_error'
   } catch (_) {
-    calendarFeedKind.value = 'mock'
+    calendarTileVisible.value = false
   } finally {
     calendarLoading.value = false
   }
@@ -303,22 +360,12 @@ async function loadLists() {
       listClasses(),
       listGroups(),
     ])
-    let teamList = []
-    let classList = []
-    let groupList = []
-    if (teamsRes.status === 'fulfilled' && teamsRes.value?.data != null) {
-      const d = teamsRes.value.data
-      teamList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    const teamList = teamsRes.status === 'fulfilled' ? parseNodeListPayload(teamsRes.value) : []
+    const classList = classesRes.status === 'fulfilled' ? parseNodeListPayload(classesRes.value) : []
+    const groupList = groupsRes.status === 'fulfilled' ? parseNodeListPayload(groupsRes.value) : []
+    if (groupsRes.status === 'rejected') {
+      console.warn('[dashboard] listGroups failed', groupsRes.reason)
     }
-    if (classesRes.status === 'fulfilled' && classesRes.value?.data != null) {
-      const d = classesRes.value.data
-      classList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    }
-    if (groupsRes.status === 'fulfilled' && groupsRes.value?.data != null) {
-      const d = groupsRes.value.data
-      groupList = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    }
-    // Show list immediately so dashboard never hangs
     teams.value = [...teamList]
     classes.value = [...classList]
     groups.value = [...groupList]
@@ -361,8 +408,11 @@ function goToTask(item) {
 onMounted(async () => {
   loadLists()
   loadUpcomingCalendar()
-  if (route.query?.wizard === '1') {
+  await loadRegistrationWindow()
+  if (route.query?.wizard === '1' && registrationAllowed.value) {
     wizardOpen.value = true
+  } else if (route.query?.wizard === '1') {
+    clearWizardQuery()
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('hot-browser-back', handleBrowserBackRequest)
@@ -407,7 +457,11 @@ watch(
   () => route.query?.wizard,
   (wizardFlag) => {
     if (wizardFlag === '1') {
-      wizardOpen.value = true
+      if (registrationAllowed.value) {
+        wizardOpen.value = true
+      } else {
+        clearWizardQuery()
+      }
     }
   },
 )
@@ -524,8 +578,23 @@ const hasDocumentTreeContent = computed(() => {
             <I18nText k="dashboard.registerNew" />
           </h2>
           <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
+          <p
+            v-if="!registrationWindow.loading && !registrationAllowed && registrationOpensMessage"
+            class="dashboard-registration-hint"
+            role="status"
+          >
+            <i class="bi bi-info-circle" aria-hidden="true" />
+            {{ registrationOpensMessage }}
+          </p>
           <div class="dashboard-register-actions">
-            <button type="button" class="dashboard-cta" @click="openWizard" :title="t('wizard.ctaButton')">
+            <button
+              type="button"
+              class="dashboard-cta"
+              :class="{ 'dashboard-cta--disabled': !registrationAllowed }"
+              :disabled="!registrationAllowed"
+              @click="openWizard"
+              :title="registrationAllowed ? t('wizard.ctaButton') : registrationOpensMessage"
+            >
               <i class="bi bi-magic"></i>
               <span><I18nText k="wizard.ctaButton" /></span>
             </button>
@@ -626,8 +695,8 @@ const hasDocumentTreeContent = computed(() => {
           </template>
         </section>
 
-        <!-- Upcoming events: Microsoft 365 when configured, else demo list -->
-        <section class="dashboard-card dashboard-card-events">
+        <!-- Upcoming events (only when admin enabled calendar feed) -->
+        <section v-if="calendarTileVisible" class="dashboard-card dashboard-card-events">
           <h2 class="dashboard-card-title">
             <i class="bi bi-calendar-event"></i>
             <I18nText k="dashboard.upcomingEvents" />
@@ -638,24 +707,16 @@ const hasDocumentTreeContent = computed(() => {
           </div>
           <template v-else>
             <ul v-if="upcomingDisplayList.length" class="dashboard-events-list">
-              <li v-for="(ev, idx) in upcomingDisplayList" :key="ev.id || ev.titleKey || idx" class="dashboard-event-item">
-                <template v-if="ev._from === 'graph'">
-                  <a
-                    v-if="ev.webLink"
-                    :href="ev.webLink"
-                    class="dashboard-event-title dashboard-event-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >{{ ev.title }}</a>
-                  <span v-else class="dashboard-event-title">{{ ev.title }}</span>
-                  <span class="dashboard-event-meta">{{ formatGraphStart(ev.start, ev.startTimeZone) }} · {{ graphLocationLine(ev) }}</span>
-                </template>
-                <template v-else>
-                  <span class="dashboard-event-title"><I18nText :k="ev.titleKey" /></span>
-                  <span class="dashboard-event-meta">
-                    <I18nText :k="ev.dateKey" /> · <I18nText :k="ev.locationKey" />
-                  </span>
-                </template>
+              <li v-for="(ev, idx) in upcomingDisplayList" :key="ev.id || idx" class="dashboard-event-item">
+                <a
+                  v-if="ev.webLink"
+                  :href="ev.webLink"
+                  class="dashboard-event-title dashboard-event-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >{{ ev.title }}</a>
+                <span v-else class="dashboard-event-title">{{ ev.title }}</span>
+                <span class="dashboard-event-meta">{{ formatGraphStart(ev.start, ev.startTimeZone) }} · {{ graphLocationLine(ev) }}</span>
               </li>
             </ul>
             <p v-if="calendarFeedKind === 'graph_empty'" class="dashboard-events-hint">
@@ -762,11 +823,12 @@ const hasDocumentTreeContent = computed(() => {
               <p v-if="!coCoachInviteSuccess" class="co-coach-modal-text"><I18nText k="dashboard.addCoCoachModalLead" /></p>
               <label v-if="coCoachTargets.length > 1 && !coCoachInviteSuccess" class="co-coach-modal-label">
                 <span><I18nText k="dashboard.addCoCoachChooseRegistration" /></span>
-                <select v-model="selectedRegistrationTarget" class="co-coach-modal-select">
-                  <option v-for="item in coCoachTargets" :key="item.value" :value="item.value">
-                    {{ coCoachTargetLabel(item) }}
-                  </option>
-                </select>
+                <CustomSelect
+                  v-model="selectedRegistrationTarget"
+                  size="sm"
+                  :options="coCoachSelectOptions"
+                  :placeholder="t('dashboard.addCoCoachChooseRegistration')"
+                />
               </label>
               <template v-if="!coCoachInviteSuccess">
                 <label class="co-coach-modal-label co-coach-modal-span2">
@@ -1229,9 +1291,37 @@ const hasDocumentTreeContent = computed(() => {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.dashboard-cta:hover {
+.dashboard-cta:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+}
+
+.dashboard-cta--disabled,
+.dashboard-cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+  filter: grayscale(0.25);
+}
+
+.dashboard-registration-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+}
+
+.dashboard-registration-hint .bi {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  font-size: 1.1rem;
 }
 
 .dashboard-cta .bi {

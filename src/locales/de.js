@@ -97,6 +97,7 @@ export default {
         "sidebarOpenGroup": "Gruppe öffnen: {name}",
         "sidebarSectionFounders": "Founders Anmeldungen",
         "sidebarSectionFuture": "Future Anmeldungen",
+        "sidebarGroupsLoadFailed": "Future-Anmeldungen konnten nicht geladen werden.",
         "logOut": "Abmelden"
     },
     "admin": {
@@ -298,6 +299,8 @@ export default {
         "checkingTasks": "Aufgaben werden geprüft…",
         "noPendingTasks": "Keine offenen Aufgaben.",
         "registerNew": "Neue Anmeldung",
+        "registrationOpensAt": "Die Anmeldung ist ab {date} um {hour}:00 Uhr möglich.",
+        "registrationClosedHint": "Der Anmeldezeitraum hat noch nicht begonnen.",
         "documentsForDownload": "Coach:innen-Dokumente",
         "documentsLoadingList": "Dateien werden aus SharePoint geladen…",
         "documentsGraphNoFiles": "Der Ordner konnte nicht automatisch aufgelistet werden. Öffne den Ordner unten oder bitte einen Admin, Microsoft Graph (MS_CLIENT_*) und die Ordner-URL zu prüfen.",
@@ -388,7 +391,7 @@ export default {
         "stepVoucherLead": "Falls vorhanden, Gutscheincode eingeben. Ein gültiger Gutschein kann Optionen und Förderung steuern. Du kannst auch ohne Gutschein fortfahren.",
         "stepGroupSize": "Schritt 1 — Gruppengröße",
         "stepGroupSizeLead": "Wähle die Anzahl der Teilnehmenden. Es wird eine Gruppe im System angelegt (kaufmännische Einheit); Material und Rechnung hängen an der Gruppe.",
-        "stepSeasonSets": "Schritt 2 — Saisonset(s)",
+        "stepSeasonSets": "Saisonset(s)",
         "stepSeasonSetsLead": "Ein Saisonset reicht für bis zu 24 Schüler:innen. Optional kann ein zweites Set bestellt werden. Wenn ihr euch ein Saisonset mit einer anderen Gruppe teilt, ist keine Bestellung erforderlich.",
         "seasonNone": "Kein Saisonset",
         "seasonOne": "1 Saisonset",

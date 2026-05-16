@@ -11,7 +11,7 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
-import { listTeams, listClasses, listGroups } from '@/services/draht'
+import { listTeams, listClasses, listGroups, parseNodeListPayload } from '@/services/draht'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const route = useRoute()
@@ -27,6 +27,7 @@ const teams = ref([])
 const classes = ref([])
 const groups = ref([])
 const sidebarLoading = ref(false)
+const sidebarGroupsError = ref('')
 
 const navItems = computed(() => {
   if (isGuestShell.value) {
@@ -71,23 +72,26 @@ async function loadSidebarLists() {
     return
   }
   sidebarLoading.value = true
+  sidebarGroupsError.value = ''
   try {
     const [teamsRes, classesRes, groupsRes] = await Promise.allSettled([
       listTeams(),
       listClasses(),
       listGroups(),
     ])
-    if (teamsRes.status === 'fulfilled' && teamsRes.value?.data) {
-      const d = teamsRes.value.data
-      teams.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    }
-    if (classesRes.status === 'fulfilled' && classesRes.value?.data) {
-      const d = classesRes.value.data
-      classes.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
-    }
-    if (groupsRes.status === 'fulfilled' && groupsRes.value?.data) {
-      const d = groupsRes.value.data
-      groups.value = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])
+    teams.value = teamsRes.status === 'fulfilled' ? parseNodeListPayload(teamsRes.value) : []
+    classes.value = classesRes.status === 'fulfilled' ? parseNodeListPayload(classesRes.value) : []
+    if (groupsRes.status === 'fulfilled') {
+      groups.value = parseNodeListPayload(groupsRes.value)
+    } else {
+      groups.value = []
+      const err = groupsRes.reason
+      sidebarGroupsError.value =
+        err?.response?.data?.error?.message
+        || err?.response?.data?.message
+        || err?.message
+        || t('nav.sidebarGroupsLoadFailed')
+      console.warn('[sidebar] listGroups failed', err)
     }
   } finally {
     sidebarLoading.value = false
@@ -240,6 +244,47 @@ const userInitials = computed(() => {
 
 const hasFoundersEnrollments = computed(() => teams.value.length > 0 || classes.value.length > 0)
 const hasFutureEnrollments = computed(() => groups.value.length > 0)
+
+const SIDEBAR_SECTIONS_STORAGE_KEY = 'handson.sidebarSections'
+
+function readSidebarSectionOpen(section, defaultOpen = true) {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTIONS_STORAGE_KEY)
+    if (!raw) return defaultOpen
+    const parsed = JSON.parse(raw)
+    return typeof parsed?.[section] === 'boolean' ? parsed[section] : defaultOpen
+  } catch {
+    return defaultOpen
+  }
+}
+
+function persistSidebarSections() {
+  try {
+    localStorage.setItem(
+      SIDEBAR_SECTIONS_STORAGE_KEY,
+      JSON.stringify({
+        founders: foundersSectionOpen.value,
+        future: futureSectionOpen.value,
+      }),
+    )
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+const foundersSectionOpen = ref(readSidebarSectionOpen('founders', true))
+const futureSectionOpen = ref(readSidebarSectionOpen('future', true))
+
+function toggleFoundersSection() {
+  foundersSectionOpen.value = !foundersSectionOpen.value
+  persistSidebarSections()
+}
+
+function toggleFutureSection() {
+  futureSectionOpen.value = !futureSectionOpen.value
+  persistSidebarSections()
+}
+
 const { canInstall, promptInstall } = usePwaInstall()
 </script>
 
@@ -282,70 +327,93 @@ const { canInstall, promptInstall } = usePwaInstall()
             <i class="bi bi-arrow-repeat spin"></i>
           </div>
           <template v-else>
-            <p v-if="hasFoundersEnrollments" class="sidebar-section-title">
-              <I18nText k="nav.sidebarSectionFounders" />
+            <template v-if="hasFoundersEnrollments">
+              <button
+                type="button"
+                class="sidebar-section-toggle"
+                :aria-expanded="foundersSectionOpen"
+                :aria-controls="'sidebar-section-founders'"
+                @click="toggleFoundersSection"
+              >
+                <i class="bi sidebar-section-toggle-icon" :class="foundersSectionOpen ? 'bi-dash-lg' : 'bi-plus-lg'" aria-hidden="true"></i>
+                <span class="sidebar-section-toggle-label"><I18nText k="nav.sidebarSectionFounders" /></span>
+              </button>
+              <div v-show="foundersSectionOpen" id="sidebar-section-founders" class="sidebar-section-entries">
+                <button
+                  v-for="team in teams"
+                  :key="'team-' + team.id"
+                  type="button"
+                  class="sidebar-item sidebar-entry"
+                  :class="{ active: isTeamActive(team.id) }"
+                  :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  @click="goTeam(team.id)"
+                >
+                  <span class="sidebar-item-icon">
+                    <i class="bi bi-person-fill" aria-hidden="true"></i>
+                  </span>
+                  <span class="sidebar-item-text">
+                    <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
+                    <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
+                  </span>
+                </button>
+                <button
+                  v-for="cls in classes"
+                  :key="'class-' + cls.id"
+                  type="button"
+                  class="sidebar-item sidebar-entry"
+                  :class="{ active: isClassActive(cls.id) }"
+                  :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+                  :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+                  @click="goClass(cls.id)"
+                >
+                  <span class="sidebar-item-icon">
+                    <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+                  </span>
+                  <span class="sidebar-item-text">
+                    <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
+                    <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
+                  </span>
+                </button>
+              </div>
+            </template>
+            <p v-if="sidebarGroupsError" class="sidebar-section-hint sidebar-section-hint--error">
+              <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+              {{ sidebarGroupsError }}
             </p>
-            <button
-              v-for="team in teams"
-              :key="'team-' + team.id"
-              type="button"
-              class="sidebar-item sidebar-entry"
-              :class="{ active: isTeamActive(team.id) }"
-              :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-              :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-              @click="goTeam(team.id)"
-            >
-              <span class="sidebar-item-icon">
-                <i class="bi bi-person-fill" aria-hidden="true"></i>
-              </span>
-              <span class="sidebar-item-text">
-                <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
-                <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
-              </span>
-            </button>
-            <button
-              v-for="cls in classes"
-              :key="'class-' + cls.id"
-              type="button"
-              class="sidebar-item sidebar-entry"
-              :class="{ active: isClassActive(cls.id) }"
-              :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
-              :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
-              @click="goClass(cls.id)"
-            >
-              <span class="sidebar-item-icon">
-                <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
-              </span>
-              <span class="sidebar-item-text">
-                <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
-                <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
-              </span>
-            </button>
-            <p
-              v-if="hasFutureEnrollments"
-              class="sidebar-section-title"
-              :class="{ 'sidebar-section-title--after-founders': hasFoundersEnrollments }"
-            >
-              <I18nText k="nav.sidebarSectionFuture" />
-            </p>
-            <button
-              v-for="group in groups"
-              :key="'group-' + group.id"
-              type="button"
-              class="sidebar-item sidebar-entry"
-              :class="{ active: isGroupActive(group.id) }"
-              :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
-              :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
-              @click="goGroup(group.id)"
-            >
-              <span class="sidebar-item-icon">
-                <i class="bi bi-stars" aria-hidden="true"></i>
-              </span>
-              <span class="sidebar-item-text">
-                <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
-                <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
-              </span>
-            </button>
+            <template v-if="hasFutureEnrollments">
+              <button
+                type="button"
+                class="sidebar-section-toggle"
+                :class="{ 'sidebar-section-toggle--after-founders': hasFoundersEnrollments }"
+                :aria-expanded="futureSectionOpen"
+                :aria-controls="'sidebar-section-future'"
+                @click="toggleFutureSection"
+              >
+                <i class="bi sidebar-section-toggle-icon" :class="futureSectionOpen ? 'bi-dash-lg' : 'bi-plus-lg'" aria-hidden="true"></i>
+                <span class="sidebar-section-toggle-label"><I18nText k="nav.sidebarSectionFuture" /></span>
+              </button>
+              <div v-show="futureSectionOpen" id="sidebar-section-future" class="sidebar-section-entries">
+                <button
+                  v-for="group in groups"
+                  :key="'group-' + group.id"
+                  type="button"
+                  class="sidebar-item sidebar-entry"
+                  :class="{ active: isGroupActive(group.id) }"
+                  :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+                  :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+                  @click="goGroup(group.id)"
+                >
+                  <span class="sidebar-item-icon">
+                    <i class="bi bi-stars" aria-hidden="true"></i>
+                  </span>
+                  <span class="sidebar-item-text">
+                    <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
+                    <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
+                  </span>
+                </button>
+              </div>
+            </template>
           </template>
         </template>
       </nav>
@@ -683,19 +751,65 @@ const { canInstall, promptInstall } = usePwaInstall()
   min-height: 1.35rem;
   width: 100%;
 }
-.sidebar-section-title {
+.sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: calc(100% - 1rem);
   margin: 0.65rem 0.5rem 0.15rem;
-  padding: 0 0.5rem;
+  padding: 0.35rem 0.5rem;
   border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: inherit;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-subtle);
   line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.sidebar-section-title--after-founders {
+.sidebar-section-toggle--after-founders {
   margin-top: 0.95rem;
+}
+.sidebar-section-toggle:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+}
+.sidebar-section-toggle-icon {
+  flex-shrink: 0;
+  width: 0.85rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+.sidebar-section-toggle-label {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-section-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-section-hint {
+  margin: 0.35rem 0.5rem 0.5rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  border-radius: var(--radius);
+  background: var(--color-bg-muted);
+}
+.sidebar-section-hint--error {
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.1);
+}
+.sidebar-section-hint .bi {
+  margin-right: 0.25rem;
 }
 .nav-link {
   padding: 0;

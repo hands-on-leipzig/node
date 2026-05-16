@@ -91,6 +91,18 @@ const futureEventTeamSelectOptions = computed(() => {
   return Array.from({ length: n }, (_, i) => i + 1)
 })
 
+const schoolTypeFutureOptions = computed(() => {
+  const out = []
+  for (const opt of SCHOOL_TYPE_OPTIONS) {
+    if (opt.disabled) {
+      out.push({ heading: true, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    } else {
+      out.push({ value: opt.value, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    }
+  }
+  return out
+})
+
 function formatMoney(eur) {
   try {
     return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
@@ -101,6 +113,13 @@ function formatMoney(eur) {
     return `${eur} €`
   }
 }
+
+const futureTeamCountSelectOptions = computed(() =>
+  futureEventTeamSelectOptions.value.map((n) => ({
+    value: n,
+    label: `${n} ${n === 1 ? t('enrollFuture.teamSingular') : t('enrollFuture.teamPlural')} — ${formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * n)}`,
+  })),
+)
 
 function syncEventTeamsArray() {
   if (registerEventTeams.value && selectedPupils.value != null) {
@@ -216,7 +235,8 @@ function choosePupils(num) {
   step.value = 'seasonSets'
 }
 
-function seasonNext() {
+function chooseSeasonSet(count) {
+  seasonSetCount.value = count
   step.value = 'teams'
   syncEventTeamsArray()
 }
@@ -494,38 +514,28 @@ const stepIndex = computed(() => {
       </div>
 
       <!-- Step 2: Saisonset -->
-      <div v-else-if="step === 'seasonSets' && group" class="step-block">
-        <h3 class="step-title"><I18nText k="enrollFuture.stepSeasonSets" /></h3>
-        <p class="step-lead"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
-        <div class="radio-cards">
-          <label class="radio-card">
-            <input v-model.number="seasonSetCount" type="radio" :value="0" />
-            <span class="radio-card-body">
-              <strong><I18nText k="enrollFuture.seasonNone" /></strong>
-              <span class="muted">{{ formatMoney(0) }}</span>
-            </span>
-          </label>
-          <label class="radio-card">
-            <input v-model.number="seasonSetCount" type="radio" :value="1" />
-            <span class="radio-card-body">
-              <strong><I18nText k="enrollFuture.seasonOne" /></strong>
-              <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR) }}</span>
-            </span>
-          </label>
-          <label class="radio-card">
-            <input v-model.number="seasonSetCount" type="radio" :value="2" />
-            <span class="radio-card-body">
-              <strong><I18nText k="enrollFuture.seasonTwo" /></strong>
-              <span>{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</span>
-            </span>
-          </label>
+      <div v-else-if="step === 'seasonSets' && group" class="step-block step-block-season-sets">
+        <div class="season-sets-intro">
+          <h3 class="step-title"><I18nText k="enrollFuture.stepSeasonSets" /></h3>
+          <p class="step-lead"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
+        </div>
+        <div class="option-cards">
+          <button type="button" class="option-card" @click="chooseSeasonSet(0)">
+            <span class="option-card-main"><I18nText k="enrollFuture.seasonNone" /></span>
+            <span class="option-card-price">{{ formatMoney(0) }}</span>
+          </button>
+          <button type="button" class="option-card" @click="chooseSeasonSet(1)">
+            <span class="option-card-main"><I18nText k="enrollFuture.seasonOne" /></span>
+            <span class="option-card-price">{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR) }}</span>
+          </button>
+          <button type="button" class="option-card" @click="chooseSeasonSet(2)">
+            <span class="option-card-main"><I18nText k="enrollFuture.seasonTwo" /></span>
+            <span class="option-card-price">{{ formatMoney(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</span>
+          </button>
         </div>
         <div class="actions">
           <button type="button" class="btn btn-ghost" @click="back">
             <i class="bi bi-arrow-left"></i> <I18nText k="enrollFuture.back" />
-          </button>
-          <button type="button" class="btn btn-primary" @click="seasonNext">
-            <I18nText k="enrollFuture.continue" />
           </button>
         </div>
       </div>
@@ -543,12 +553,11 @@ const stepIndex = computed(() => {
         <template v-if="registerEventTeams">
           <div class="field">
             <label><I18nText k="enrollFuture.teamCountLabel" /></label>
-            <select v-model.number="teamCount" class="select-input">
-              <option v-for="n in futureEventTeamSelectOptions" :key="n" :value="n">
-                {{ n }} {{ n === 1 ? t('enrollFuture.teamSingular') : t('enrollFuture.teamPlural') }}
-                — {{ formatMoney(FUTURE_TEAM_EVENT_UNIT_EUR * n) }}
-              </option>
-            </select>
+            <CustomSelect
+              v-model.number="teamCount"
+              :options="futureTeamCountSelectOptions"
+              :placeholder="t('enrollFuture.teamCountLabel')"
+            />
           </div>
           <div v-for="(team, ti) in eventTeams" :key="'team-' + ti" class="team-block">
             <h4 class="team-block-title">
@@ -621,12 +630,12 @@ const stepIndex = computed(() => {
         </div>
         <div class="field">
           <label for="future-school-type"><I18nText k="enroll.schoolType" /></label>
-          <select id="future-school-type" v-model="form.schoolType">
-            <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-            <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
-              {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
-            </option>
-          </select>
+          <CustomSelect
+            id="future-school-type"
+            v-model="form.schoolType"
+            :options="schoolTypeFutureOptions"
+            :placeholder="t('schoolTypes.none')"
+          />
         </div>
         <div class="field">
           <label for="future-organization"><I18nText k="enroll.schoolName" /></label>
@@ -767,6 +776,15 @@ const stepIndex = computed(() => {
   margin: 0 0 1rem;
   line-height: 1.45;
 }
+.step-block-season-sets .season-sets-intro {
+  margin-bottom: 0.25rem;
+}
+.step-block-season-sets .season-sets-intro .step-title {
+  margin-bottom: 0.5rem;
+}
+.step-block-season-sets .season-sets-intro .step-lead {
+  margin-bottom: 1.25rem;
+}
 .option-cards {
   display: flex;
   flex-direction: column;
@@ -840,9 +858,6 @@ const stepIndex = computed(() => {
   gap: 0.5rem;
   margin-bottom: 1rem;
   font-weight: 500;
-}
-.select-input {
-  width: 100%;
 }
 .team-block {
   margin: 1rem 0;

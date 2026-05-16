@@ -1,14 +1,14 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getTeamDocumentBlobUrl, getClassDocumentBlobUrl } from '@/services/draht'
+import { getTeamDocumentBlobUrl, getClassDocumentBlobUrl, getGroupDocumentBlobUrl } from '@/services/draht'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
   locale: { type: String, default: 'en' },
   title: { type: String, default: 'Timeline' },
-  /** 'teams' or 'classes' – used to build document URL */
+  /** 'teams', 'classes' or 'groups' – used to build document URL */
   teklaType: { type: String, default: 'teams' },
   /** Team or class id – used to build document URL */
   teklaId: { type: [String, Number], default: null },
@@ -106,10 +106,14 @@ async function openPdf(item) {
   pdfError.value = null
   pdfLoading.value = true
   try {
-    const blobUrl =
-      props.teklaType === 'classes'
-        ? await getClassDocumentBlobUrl(props.teklaId, docType, item.label)
-        : await getTeamDocumentBlobUrl(props.teklaId, docType, item.label)
+    let blobUrl
+    if (props.teklaType === 'classes') {
+      blobUrl = await getClassDocumentBlobUrl(props.teklaId, docType, item.label)
+    } else if (props.teklaType === 'groups') {
+      blobUrl = await getGroupDocumentBlobUrl(props.teklaId, docType, item.label)
+    } else {
+      blobUrl = await getTeamDocumentBlobUrl(props.teklaId, docType, item.label)
+    }
     pdfModalUrl.value = blobUrl
     pdfModalTitle.value = item.label
     pdfModalOpen.value = true

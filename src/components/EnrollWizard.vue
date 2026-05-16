@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, enrollClass, enrollFuture, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, listAddressBookGrouped, isDolibarrRowId } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
@@ -310,6 +311,20 @@ function selectFuturePupils(num) {
   scheduleAdvanceIfReady(4)
 }
 
+function seasonSetsStepIndex() {
+  if (edition.value === 'future') return 5
+  if (foundersTeamHasParticipantsStep.value) return 7
+  if (edition.value === 'founders' && foundersType.value === 'class') return 6
+  return -1
+}
+
+function selectWizardSeasonSetCount(count) {
+  if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) return
+  wizardSeasonSetCount.value = count
+  const expected = seasonSetsStepIndex()
+  if (expected >= 0) scheduleAdvanceIfReady(expected)
+}
+
 function selectFutureEventTeamCount(count) {
   const n = Number(count)
   const maxTeams = maxFutureEventTeamsByPupils.value
@@ -469,9 +484,6 @@ const centeredOptionStep = computed(() => {
     || step.value === 2
     || (step.value === 3 && edition.value === 'founders')
     || (step.value === 4 && edition.value === 'future')
-    || (step.value === 5 && edition.value === 'future')
-    || (step.value === 6 && edition.value === 'founders' && foundersType.value === 'class')
-    || (step.value === 7 && foundersTeamHasParticipantsStep.value)
 })
 
 /** Event display label with optional capacity (from flow API). */
@@ -543,6 +555,33 @@ const countryOptions = computed(() => {
     rest: rest.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
   }
 })
+
+const schoolTypeWizardOptions = computed(() => {
+  const out = []
+  for (const opt of SCHOOL_TYPE_OPTIONS) {
+    if (opt.disabled) {
+      out.push({ heading: true, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    } else {
+      out.push({ value: opt.value, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    }
+  }
+  return out
+})
+
+const countryWizardSelectOptions = computed(() => {
+  const out = []
+  out.push({ heading: true, label: t('enroll.countriesTop') })
+  out.push(...countryOptions.value.top)
+  out.push({ heading: true, label: t('enroll.countriesOther') })
+  out.push(...countryOptions.value.rest)
+  return out
+})
+
+const founderGenderOptions = computed(() => [
+  { value: 'M', label: t('detail.genderM') },
+  { value: 'F', label: t('detail.genderF') },
+  { value: 'D', label: t('detail.genderD') },
+])
 
 let zipLookupTimer = null
 let zipLookupAbort = null
@@ -1567,12 +1606,11 @@ watch(
             <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
               <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('schoolType') }">
                 <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
-                <select v-model="formData.schoolType">
-                  <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-                  <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
-                    {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
-                  </option>
-                </select>
+                <CustomSelect
+                  v-model="formData.schoolType"
+                  :options="schoolTypeWizardOptions"
+                  :placeholder="t('schoolTypes.none')"
+                />
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
               <div
@@ -1592,15 +1630,11 @@ watch(
               </div>
               <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('country') }">
                 <label><I18nText k="enroll.schoolCountry" /> <span class="required">*</span></label>
-                <select v-model="formData.country">
-                  <option value="" disabled><I18nText k="enroll.selectCountry" /></option>
-                  <optgroup :label="t('enroll.countriesTop')">
-                    <option v-for="opt in countryOptions.top" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                  </optgroup>
-                  <optgroup :label="t('enroll.countriesOther')">
-                    <option v-for="opt in countryOptions.rest" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                  </optgroup>
-                </select>
+                <CustomSelect
+                  v-model="formData.country"
+                  :options="countryWizardSelectOptions"
+                  :placeholder="t('enroll.selectCountry')"
+                />
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
               </div>
               <div class="field" :class="{ filled: isFilled(formData.zip), invalid: step4ValidationAttempted && isInstitutionFieldMissing('zip') }">
@@ -1670,12 +1704,13 @@ watch(
                   <input v-model="p.firstname" type="text" class="wizard-participant-input" :placeholder="t('detail.firstname')" />
                   <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
                   <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
-                  <select v-model="p.gender" class="wizard-participant-select">
-                    <option value=""><I18nText k="detail.gender" /></option>
-                    <option value="M"><I18nText k="detail.genderM" /></option>
-                    <option value="F"><I18nText k="detail.genderF" /></option>
-                    <option value="D"><I18nText k="detail.genderD" /></option>
-                  </select>
+                  <CustomSelect
+                    v-model="p.gender"
+                    class="wizard-participant-gender"
+                    size="sm"
+                    :options="founderGenderOptions"
+                    :placeholder="t('detail.gender')"
+                  />
                   <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
                     <i class="bi bi-trash"></i>
                   </button>
@@ -1690,11 +1725,12 @@ watch(
           <!-- Season sets (Future step 5 / Founders class step 6 / Founder team step 7) → numberOfBoards / Versandregel -->
           <div
             v-show="(step === 5 && edition === 'future') || (step === 6 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
-            class="wizard-step wizard-step-animate"
-            :class="{ 'wizard-step-centered': centeredOptionStep }"
+            class="wizard-step wizard-step-animate wizard-step-season-sets"
           >
-            <p class="wizard-question"><I18nText k="enrollFuture.stepSeasonSets" /></p>
-            <p class="wizard-hint"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
+            <div class="wizard-season-sets-intro">
+              <h4 class="wizard-season-sets-title"><I18nText k="enrollFuture.stepSeasonSets" /></h4>
+              <p class="wizard-season-sets-lead"><I18nText k="enrollFuture.stepSeasonSetsLead" /></p>
+            </div>
             <p v-if="presetSeasonSetCount != null && [0, 1, 2].includes(presetSeasonSetCount)" class="field-hint valid voucher-forced-msg">
               <i class="bi bi-info-circle-fill" /> <I18nText k="wizard.seasonSetsPresetLocked" /> ({{ effectiveSeasonSetCount }})
             </p>
@@ -1703,32 +1739,28 @@ watch(
                 type="button"
                 class="wizard-option wizard-option-card"
                 :class="{ active: wizardSeasonSetCount === 0 }"
-                @click="wizardSeasonSetCount = 0"
+                @click="selectWizardSeasonSetCount(0)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonNone" /></div>
-                <div class="wizard-option-desc">{{ edition === 'future' ? formatWizardEur(0) : '—' }}</div>
+                <div class="wizard-option-desc">{{ formatWizardEur(0) }}</div>
               </button>
               <button
                 type="button"
                 class="wizard-option wizard-option-card"
                 :class="{ active: wizardSeasonSetCount === 1 }"
-                @click="wizardSeasonSetCount = 1"
+                @click="selectWizardSeasonSetCount(1)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonOne" /></div>
-                <div class="wizard-option-desc">
-                  {{ edition === 'future' ? formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR) : '—' }}
-                </div>
+                <div class="wizard-option-desc">{{ formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR) }}</div>
               </button>
               <button
                 type="button"
                 class="wizard-option wizard-option-card"
                 :class="{ active: wizardSeasonSetCount === 2 }"
-                @click="wizardSeasonSetCount = 2"
+                @click="selectWizardSeasonSetCount(2)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonTwo" /></div>
-                <div class="wizard-option-desc">
-                  {{ edition === 'future' ? formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR * 2) : '—' }}
-                </div>
+                <div class="wizard-option-desc">{{ formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</div>
               </button>
             </div>
           </div>
@@ -1854,7 +1886,14 @@ watch(
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
               </template>
-              <AddressSelector v-else v-model="invoiceAddress" :addresses="invoiceAddresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+              <AddressSelector
+                v-else
+                v-model="invoiceAddress"
+                :addresses="invoiceAddresses"
+                :label="t('enroll.invoiceAddress')"
+                :show-label="false"
+                id-prefix="wizard-invoice"
+              />
             </div>
             <div class="wizard-address-section">
               <label class="wizard-delivery-toggle">
@@ -1962,7 +2001,14 @@ watch(
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
               </template>
-              <AddressSelector v-else v-model="invoiceAddress" :addresses="invoiceAddresses" :label="t('enroll.invoiceAddress')" id-prefix="wizard-invoice" />
+              <AddressSelector
+                v-else
+                v-model="invoiceAddress"
+                :addresses="invoiceAddresses"
+                :label="t('enroll.invoiceAddress')"
+                :show-label="false"
+                id-prefix="wizard-invoice"
+              />
             </div>
             <div class="wizard-address-section">
               <label class="wizard-delivery-toggle">
@@ -2208,6 +2254,38 @@ watch(
   margin: 0.2rem auto 0;
 }
 
+.wizard-step-season-sets {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.wizard-season-sets-intro {
+  width: 100%;
+  max-width: 36rem;
+  margin: 0 auto 1.25rem;
+}
+.wizard-season-sets-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.wizard-season-sets-lead {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.wizard-step-season-sets .wizard-options {
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+.wizard-step-season-sets .field-hint.valid {
+  max-width: 36rem;
+  margin: 0 auto;
+}
+
 /* Participants step (founder team) */
 .wizard-participants {
   display: flex;
@@ -2240,30 +2318,16 @@ watch(
   font-size: 0.95rem;
   box-shadow: var(--liquid-shadow-inset);
 }
-.wizard-participant-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  padding: 0.5rem 1.85rem 0.5rem 0.6rem;
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius);
-  background-color: var(--liquid-tile-bg-inner);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.45rem center;
-  background-size: 0.95rem;
-  color: var(--color-text);
-  font-size: 0.95rem;
+.wizard-participant-gender {
+  min-width: 0;
+}
+.wizard-participant-gender :deep(.custom-select-trigger) {
+  min-height: 2.35rem;
+  font-size: 0.9rem;
+  padding: 0.4rem 2.1rem 0.4rem 0.5rem;
+  background: var(--liquid-tile-bg-inner);
+  border-color: var(--liquid-border);
   box-shadow: var(--liquid-shadow-inset);
-  cursor: pointer;
-}
-html[data-theme='dark'] .wizard-participant-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-.wizard-participant-select:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-accent-soft), var(--liquid-shadow-inset);
 }
 .wizard-participant-input.wizard-participant-dob {
   min-width: 0;
@@ -2828,35 +2892,14 @@ html[data-theme='dark'] .wizard-participant-select {
   color: var(--color-text);
   margin-bottom: 0.5rem;
 }
-.wizard-step-form .field-select select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  cursor: pointer;
-  padding: 0.95rem 2.65rem 0.95rem 1.05rem;
-  border: 1px solid var(--liquid-border, var(--color-border));
-  border-radius: var(--radius);
-  border-bottom: 1px solid var(--liquid-border, var(--color-border));
-  background-color: var(--liquid-tile-bg-inner);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.85rem center;
-  background-size: 1.15rem;
-  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+.wizard-step-form .field.field-select :deep(.custom-select) {
+  width: 100%;
+}
+.wizard-step-form .field.field-select :deep(.custom-select-trigger) {
   min-height: var(--touch-lg);
   font-size: 1.05rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
-html[data-theme='dark'] .wizard-step-form .field-select select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8a29e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-.wizard-step-form .field-select select:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft), var(--shadow-sm), var(--liquid-shadow-inset);
-  outline: none;
-  background-color: var(--liquid-tile-bg-inner);
-}
-.wizard-step-form .field.field-select.invalid select {
+.wizard-step-form .field.field-select.invalid :deep(.custom-select-trigger) {
   border-color: #dc2626;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12), var(--shadow-sm), var(--liquid-shadow-inset);
 }

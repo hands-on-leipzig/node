@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollClass, getAddresses, validateVoucher, extractAddressesFromResponse, isDolibarrRowId } from '@/services/draht'
 import AddressSelector from '@/components/AddressSelector.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
@@ -11,6 +12,18 @@ import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInsti
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
+
+const schoolTypeClassOptions = computed(() => {
+  const out = []
+  for (const opt of SCHOOL_TYPE_OPTIONS) {
+    if (opt.disabled) {
+      out.push({ heading: true, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    } else {
+      out.push({ value: opt.value, label: opt.labelKey ? t(opt.labelKey) : opt.label })
+    }
+  }
+  return out
+})
 
 const program = route.query.program != null && route.query.program !== ''
   ? parseInt(route.query.program, 10)
@@ -214,12 +227,12 @@ function onFormFieldFocus(e) {
     <form @submit.prevent="submit" class="form" @focusin="onFormFieldFocus">
       <div class="field">
         <label for="class-school-type"><I18nText k="enroll.schoolType" /></label>
-        <select id="class-school-type" v-model="form.schoolType">
-          <option value="" disabled><I18nText k="schoolTypes.none" /></option>
-          <option v-for="opt in SCHOOL_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :disabled="!!opt.disabled">
-            {{ opt.labelKey ? t(opt.labelKey) : opt.label }}
-          </option>
-        </select>
+        <CustomSelect
+          id="class-school-type"
+          v-model="form.schoolType"
+          :options="schoolTypeClassOptions"
+          :placeholder="t('schoolTypes.none')"
+        />
       </div>
       <div class="field">
         <label for="class-organization"><I18nText k="enroll.schoolName" /></label>

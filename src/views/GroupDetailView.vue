@@ -6,6 +6,7 @@ import { getGroup, getEvents, registerGroupForEvent } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
 import {
   FUTURE_TEAM_EVENT_UNIT_EUR,
   futureMaxEventTeams,
@@ -51,6 +52,10 @@ const eventTeamCountOptions = computed(() => {
   const max = Math.max(1, maxEventTeamsSelectable.value)
   return Array.from({ length: max }, (_, idx) => idx + 1)
 })
+
+const eventTeamCountSelectOptions = computed(() =>
+  eventTeamCountOptions.value.map((n) => ({ value: n, label: String(n) })),
+)
 
 const pupilsRequiredForSelectedTeams = computed(() =>
   minPupilsForEventTeamCount(registerEventTeamCount.value),
@@ -271,11 +276,12 @@ watch(
             />
             <div class="detail-event-team-count">
               <label for="group-event-team-count"><I18nText k="groupDetail.eventTeamsLabel" /></label>
-              <select id="group-event-team-count" v-model.number="registerEventTeamCount">
-                <option v-for="n in eventTeamCountOptions" :key="'event-team-count-' + n" :value="n">
-                  {{ n }}
-                </option>
-              </select>
+              <CustomSelect
+                id="group-event-team-count"
+                v-model.number="registerEventTeamCount"
+                size="sm"
+                :options="eventTeamCountSelectOptions"
+              />
               <p class="detail-hint detail-hint-sm">
                 <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedEventCostEur }" />
               </p>
@@ -297,7 +303,7 @@ watch(
         </section>
 
         <section class="detail-section">
-          <h3 class="detail-section-title"><I18nText k="enroll.invoiceAddress" /> / <I18nText k="enroll.deliveryAddress" /></h3>
+          <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
           <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
           <p class="detail-address">
             <template
@@ -400,14 +406,8 @@ watch(
   color: var(--color-text-muted);
   margin-bottom: 0.35rem;
 }
-.detail-event-team-count select {
-  width: 100%;
+.detail-event-team-count :deep(.custom-select) {
   max-width: 10rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.6rem;
-  background: var(--color-bg);
-  color: var(--color-text);
 }
 .detail-btn {
   display: inline-flex;

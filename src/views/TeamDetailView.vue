@@ -455,7 +455,7 @@ watch(
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
       <section class="detail-section">
-        <h3 class="detail-section-title"><I18nText k="enroll.invoiceAddress" /> / <I18nText k="enroll.deliveryAddress" /></h3>
+        <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
         <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
         <p class="detail-address">
           <template

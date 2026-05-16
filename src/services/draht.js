@@ -251,6 +251,18 @@ export function enrollFuture(payload) {
 }
 
 /**
+ * Normalize GET /teams|/classes|/groups list responses from axios.
+ * @param {import('axios').AxiosResponse|undefined} res
+ * @returns {Array}
+ */
+export function parseNodeListPayload(res) {
+  const payload = res?.data
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+/**
  * List enrolled teams for the current coach (GET /handson/node/teams).
  */
 export function listTeams() {
@@ -328,6 +340,11 @@ export function getDashboardCalendarTest() {
 /** Coach dashboard: upcoming events from M365 when configured */
 export function getDashboardCalendarEvents() {
   return api.get('/dashboard-calendar-events')
+}
+
+/** Coach app: registration window from DRAHT season register_start. */
+export function getRegistrationWindow() {
+  return api.get('/registration-window')
 }
 
 /**
@@ -442,6 +459,17 @@ export async function getTeamDocumentBlobUrl(teamId, docType, ref) {
 export async function getClassDocumentBlobUrl(classId, docType, ref) {
   const res = await api.get(
     `/classes/${encodeURIComponent(classId)}/documents/${encodeURIComponent(docType)}/${encodeURIComponent(ref)}`,
+    { responseType: 'blob' }
+  )
+  return URL.createObjectURL(res.data)
+}
+
+/**
+ * Fetch future group document (order or invoice) as blob and return an object URL for the iframe.
+ */
+export async function getGroupDocumentBlobUrl(groupId, docType, ref) {
+  const res = await api.get(
+    `/groups/${encodeURIComponent(groupId)}/documents/${encodeURIComponent(docType)}/${encodeURIComponent(ref)}`,
     { responseType: 'blob' }
   )
   return URL.createObjectURL(res.data)

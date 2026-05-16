@@ -19,7 +19,7 @@ export const FUTURE_GROUP_PRICE_EUR = {
 
 export const FUTURE_SEASON_SET_PRODUCT_REF = 'FUTURE_SEASONSET'
 /** Ein Saisonset – EUR placeholder; zweites Set = gleiche Position ×2 */
-export const FUTURE_SEASON_SET_UNIT_EUR = 150
+export const FUTURE_SEASON_SET_UNIT_EUR = 140
 
 export const FUTURE_TEAM_EVENT_PRODUCT_REF = 'FUTURE_TEAM_EVENT'
 /** Team-Event-Anmeldung pro Team – EUR placeholder */

@@ -21,6 +21,11 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  /** Set false when the parent already renders a section heading (avoids duplicate titles). */
+  showLabel: {
+    type: Boolean,
+    default: true,
+  },
   idPrefix: {
     type: String,
     default: 'addr',
@@ -300,7 +305,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="address-selector">
-    <label class="address-label">{{ label }}</label>
+    <label v-if="showLabel" class="address-label">{{ label }}</label>
     <div
       class="address-mode-cards"
       role="radiogroup"
@@ -377,14 +382,13 @@ onBeforeUnmount(() => {
       <div class="address-fields">
         <div class="field field-select">
           <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
-          <select
+          <CustomSelect
             :id="idPrefix + '-country'"
-            :value="(modelValue.new?.country || '').toLowerCase()"
-            @change="onCountryChange($event.target.value)"
-          >
-            <option value=""><I18nText k="enroll.selectCountry" /></option>
-            <option v-for="opt in countryOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+            :model-value="(modelValue.new?.country || '').toLowerCase()"
+            :options="countryOptions"
+            :placeholder="t('enroll.selectCountry')"
+            @update:model-value="onCountryChange"
+          />
         </div>
         <div class="field-row">
           <div class="field">
@@ -608,24 +612,13 @@ onBeforeUnmount(() => {
   background: var(--color-bg-elevated);
   color: var(--color-text);
 }
-.address-fields select {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  min-height: var(--touch);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  font-size: var(--text-base);
-  font-family: inherit;
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-}
 .address-fields input:focus {
   outline: none;
   border-color: var(--color-accent);
 }
-.address-fields select:focus {
-  outline: none;
-  border-color: var(--color-accent);
+.address-fields .field-select :deep(.custom-select-trigger) {
+  min-height: var(--touch);
+  font-size: var(--text-base);
 }
 .field-row {
   display: flex;

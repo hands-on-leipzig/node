@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition'
 
 const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
+  /** @type {Array<{ value?: string|number, label?: string, heading?: boolean, disabled?: boolean }>} */
   options: { type: Array, default: () => [] },
   placeholder: { type: String, default: '' },
   id: { type: String, default: '' },
@@ -16,10 +18,53 @@ const open = ref(false)
 const triggerRef = ref(null)
 const panelRef = ref(null)
 const highlightedIndex = ref(-1)
+const { panelStyle, updatePanelPosition } = useDropdownPanelPosition(open, triggerRef, {
+  maxHeight: '16rem',
+})
+
+function isHeading(o) {
+  return !!(o && o.heading === true)
+}
+
+function isOptionDisabled(o) {
+  return !!(o && o.disabled === true && !isHeading(o))
+}
+
+function isSelectable(o) {
+  return !!(o && !isHeading(o) && !isOptionDisabled(o))
+}
+
+/** True when this row sits under the nearest preceding section heading. */
+function optionIsInGroup(idx) {
+  let lastHeading = -1
+  for (let i = 0; i < idx; i++) {
+    if (isHeading(props.options[i])) lastHeading = i
+  }
+  return lastHeading >= 0
+}
+
+function headingIsFirstInPanel(idx) {
+  for (let i = 0; i < idx; i++) {
+    if (isHeading(props.options[i]) || isSelectable(props.options[i]) || isOptionDisabled(props.options[i])) {
+      return false
+    }
+  }
+  return true
+}
+
+const selectableIndexes = computed(() => {
+  const out = []
+  props.options.forEach((o, i) => {
+    if (isSelectable(o)) out.push(i)
+  })
+  return out
+})
 
 const selectedOption = computed(() => {
   if (props.modelValue === '' || props.modelValue === null || props.modelValue === undefined) return null
-  return props.options.find((o) => String(o.value) === String(props.modelValue)) || null
+  return (
+    props.options.find((o) => isSelectable(o) && String(o.value) === String(props.modelValue)) || null
+  )
 })
 
 const displayLabel = computed(() => {
@@ -27,14 +72,30 @@ const displayLabel = computed(() => {
   return o ? (o.label ?? String(o.value)) : props.placeholder
 })
 
+function moveHighlight(delta) {
+  const list = selectableIndexes.value
+  if (!list.length) return
+  let pos = list.indexOf(highlightedIndex.value)
+  if (pos < 0) pos = delta > 0 ? 0 : list.length - 1
+  else pos = Math.max(0, Math.min(list.length - 1, pos + delta))
+  highlightedIndex.value = list[pos]
+}
+
 function toggle() {
   if (props.disabled) return
   open.value = !open.value
-  if (open.value) highlightedIndex.value = props.options.findIndex((o) => String(o.value) === String(props.modelValue))
-  if (open.value && highlightedIndex.value < 0) highlightedIndex.value = 0
+  if (open.value) {
+    const sel = props.options.findIndex(
+      (o) => isSelectable(o) && String(o.value) === String(props.modelValue),
+    )
+    if (sel >= 0) highlightedIndex.value = sel
+    else highlightedIndex.value = selectableIndexes.value[0] ?? -1
+    updatePanelPosition()
+  }
 }
 
 function select(opt) {
+  if (!isSelectable(opt)) return
   emit('update:modelValue', opt.value)
   open.value = false
 }
@@ -55,12 +116,12 @@ function onKeydown(e) {
   }
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, props.options.length - 1)
+    moveHighlight(1)
     return
   }
   if (e.key === 'ArrowUp') {
     e.preventDefault()
-    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
+    moveHighlight(-1)
     return
   }
   if (e.key === 'Enter') {
@@ -72,16 +133,17 @@ function onKeydown(e) {
 }
 
 function onClickOutside(e) {
-  if (open.value && triggerRef.value && panelRef.value && !triggerRef.value.contains(e.target) && !panelRef.value.contains(e.target)) {
-    open.value = false
-  }
+  if (!open.value || !triggerRef.value) return
+  if (triggerRef.value.contains(e.target)) return
+  if (panelRef.value?.contains(e.target)) return
+  open.value = false
 }
 
 onMounted(() => {
-  document.addEventListener('click', onClickOutside)
+  document.addEventListener('click', onClickOutside, true)
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onClickOutside)
+  document.removeEventListener('click', onClickOutside, true)
 })
 </script>
 
@@ -95,8 +157,8 @@ onUnmounted(() => {
       :disabled="disabled"
       :aria-expanded="open"
       aria-haspopup="listbox"
-      aria-label="Choose option"
-      @click="toggle"
+      :aria-label="placeholder || 'Choose option'"
+      @click.stop="toggle"
       @keydown="onKeydown"
     >
       <span class="custom-select-value">{{ displayLabel }}</span>
@@ -104,29 +166,47 @@ onUnmounted(() => {
         <i class="bi bi-chevron-down"></i>
       </span>
     </button>
-    <Transition name="custom-select-drop">
-      <div
-        v-show="open"
-        ref="panelRef"
-        class="custom-select-panel"
-        role="listbox"
-        tabindex="-1"
-      >
-        <button
-          v-for="(opt, idx) in options"
-          :key="String(opt.value)"
-          type="button"
-          role="option"
-          class="custom-select-option"
-          :class="{ selected: String(opt.value) === String(modelValue), highlighted: idx === highlightedIndex }"
-          :aria-selected="String(opt.value) === String(modelValue)"
-          @click="select(opt)"
-          @mouseenter="highlightedIndex = idx"
+    <Teleport to="body">
+      <Transition name="custom-select-drop">
+        <div
+          v-if="open"
+          ref="panelRef"
+          class="custom-select-panel custom-select-panel--floating"
+          :style="panelStyle"
+          role="listbox"
+          tabindex="-1"
         >
-          {{ opt.label ?? opt.value }}
-        </button>
-      </div>
-    </Transition>
+          <template v-for="(opt, idx) in options" :key="'row-' + idx">
+          <div
+            v-if="isHeading(opt)"
+            class="custom-select-heading"
+            :class="{ 'custom-select-heading--first': headingIsFirstInPanel(idx) }"
+            role="presentation"
+          >
+            {{ opt.label }}
+          </div>
+          <button
+            v-else
+            type="button"
+            role="option"
+            class="custom-select-option"
+            :class="{
+              selected: isSelectable(opt) && String(opt.value) === String(modelValue),
+              highlighted: idx === highlightedIndex,
+              'custom-select-option--disabled': isOptionDisabled(opt),
+              'custom-select-option--indented': optionIsInGroup(idx),
+            }"
+            :disabled="isOptionDisabled(opt)"
+            :aria-selected="isSelectable(opt) && String(opt.value) === String(modelValue)"
+            @click="select(opt)"
+            @mouseenter="highlightedIndex = idx"
+          >
+            {{ opt.label ?? opt.value }}
+          </button>
+          </template>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -197,20 +277,33 @@ onUnmounted(() => {
   transform: translateY(-50%) rotate(180deg);
 }
 .custom-select-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 50;
-  max-height: 16rem;
   overflow-y: auto;
   background: var(--liquid-popover-fill);
   border: 1px solid var(--liquid-border, var(--color-border));
-  border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  padding: 0.3rem;
+  padding: 0.35rem 0.25rem;
   backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
   -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+}
+.custom-select-panel--floating {
+  border-radius: var(--radius);
+}
+.custom-select-heading {
+  margin: 0.55rem 0.35rem 0.25rem;
+  padding: 0.5rem 0.65rem 0.4rem 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-bg-muted) 88%, transparent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  pointer-events: none;
+  user-select: none;
+}
+.custom-select-heading--first {
+  margin-top: 0.15rem;
 }
 .custom-select-option {
   display: block;
@@ -226,8 +319,25 @@ onUnmounted(() => {
   text-align: left;
   transition: background 0.1s;
 }
-.custom-select-option:hover,
-.custom-select-option.highlighted {
+.custom-select-option--indented {
+  margin-left: 0.65rem;
+  margin-right: 0.2rem;
+  padding-left: 1.15rem;
+  width: calc(100% - 0.85rem);
+  border-left: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+.custom-select.size-sm .custom-select-option--indented {
+  margin-left: 0.5rem;
+  padding-left: 0.95rem;
+  width: calc(100% - 0.7rem);
+}
+.custom-select-option--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.custom-select-option:hover:not(:disabled),
+.custom-select-option.highlighted:not(:disabled) {
   background: var(--color-bg-muted);
 }
 .custom-select-option.selected {
@@ -235,8 +345,8 @@ onUnmounted(() => {
   color: var(--color-accent);
   font-weight: 500;
 }
-.custom-select-option.selected.highlighted,
-.custom-select-option.selected:hover {
+.custom-select-option.selected.highlighted:not(:disabled),
+.custom-select-option.selected:hover:not(:disabled) {
   background: var(--color-accent-soft);
 }
 .custom-select.size-sm .custom-select-trigger {
