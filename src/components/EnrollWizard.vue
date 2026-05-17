@@ -174,15 +174,6 @@ const wizardProgressSteps = computed(() => {
   const s = step.value
   const withIndex = (items) => items.map((it, idx) => ({ ...it, index: idx + 1, label: t(it.key) }))
 
-  if (!edition.value) {
-    return withIndex([
-      { key: 'wizard.progressChoose', active: s <= 1, done: false },
-      { key: 'wizard.progressDetails', active: false, done: false },
-      { key: 'wizard.progressAddresses', active: false, done: false },
-      { key: 'wizard.progressReview', active: false, done: false },
-    ])
-  }
-
   if (edition.value === 'future') {
     return withIndex([
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
@@ -414,43 +405,103 @@ const futureOrderTotalEur = computed(
     futureOrderEventTeamsPriceEur.value,
 )
 
+// generate the summary of selected options as a list of displayable items
+// only show items that were set in previous steps
 const summaryItems = computed(() => {
   const items = []
+
   if (voucher.value?.trim() && voucherValid.value === true) {
+    // voucher item
     items.push({ label: t('wizard.entryByCode') })
   }
-  if (edition.value === 'founders') {
-    items.push({ label: t('dashboard.editionFounders') })
-  } else if (edition.value === 'future') {
-    items.push({ label: t('dashboard.editionFuture') })
+
+
+  if (step.value > 1) {
+    // edition item founders
+    if (edition.value == 'founders') items.push({ label: t('dashboard.editionFounders') })
+    
+    // edition item future
+    if (edition.value == 'future') items.push({ label: t('dashboard.editionFuture') })
   }
-  if (edition.value === 'future' && futureGroup.value) {
-    items.push({ label: t(futureGroup.value === '5' ? 'dashboard.optionFutureGroup5' : 'dashboard.optionFutureGroup8') })
+
+  
+  if (step.value > 2) {
+    // future group size item
+    if (edition.value === 'future' && futureGroup.value) items.push({ label: t(futureGroup.value === '5' ? 'dashboard.optionFutureGroup5' : 'dashboard.optionFutureGroup8') })      
+    
+    // founders age variant item
+    if (edition.value === 'founders' && foundersVariant.value) items.push({ label: t(foundersVariant.value === 'explore' ? 'wizard.optionExplore' : 'wizard.optionChallenge') })
   }
-  if (edition.value === 'founders' && foundersVariant.value) {
-    items.push({ label: t(foundersVariant.value === 'explore' ? 'wizard.optionExplore' : 'wizard.optionChallenge') })
+
+  
+  //step 3
+  if (step.value > 3) {
+    // future school info -> no item 
+    
+    // founders class or group item
+    if (edition.value === 'founders' && foundersType.value) items.push({ label: t(foundersType.value === 'team' ? 'dashboard.team' : 'dashboard.class') })
   }
-  if (edition.value === 'future' && futurePupils.value != null) {
-    items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
+
+
+  //step 4
+  if (step.value > 4) {
+    // future pupil count item
+    if (edition.value === 'future' && futurePupils.value != null) items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
+  
+    // founders school info -> no item    
   }
-  if (edition.value === 'future' || edition.value === 'founders') {
-    const sc = effectiveSeasonSetCount.value
-    const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
-    items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
+
+
+  // step 5
+  if (step.value > 5) {
+    // future saison set count
+    if (edition.value === 'future') {
+      const sc = effectiveSeasonSetCount.value
+      const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
+      items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
+    }
+
+    // founders team signup
+    if (edition.value == 'founders' && foundersType.value == 'team' && formData.value.name?.trim()) items.push({ label: 'Name: ' + formData.value.name.trim()})
+
+    // founders class pupil count
+    if (edition.value == 'founders' && foundersType.value == 'class' && formData.value.playersTotal) items.push({ label: `${formData.value.playersTotal} ${t('enrollFuture.pupils')}`})
   }
-  if (edition.value === 'future' && futureOnSiteEvent.value === 'yes') {
-    if (futureTeamEventSummaries.value.length > 0) {
-      futureTeamEventSummaries.value.forEach((line) => items.push({ label: line }))
-    } else if (futureEventId.value) {
-      items.push({ label: selectedFutureEventLabel.value || t('wizard.onSiteEventSelected') })
+
+  // step 6
+  if (step.value > 6) {
+    // future event signup
+    if (edition.value === 'future' && futureOnSiteEvent.value === 'yes') {
+      if (futureTeamEventSummaries.value.length > 0) {
+        futureTeamEventSummaries.value.forEach((line) => items.push({ label: line }))
+      } else if (futureEventId.value) {
+        items.push({ label: selectedFutureEventLabel.value || t('wizard.onSiteEventSelected') })
+      }
+    }
+
+    // founders class saison set count
+    if (edition.value === 'founders' && foundersType.value == 'class') {
+      const sc = effectiveSeasonSetCount.value
+      const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
+      items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
     }
   }
-  if (edition.value === 'founders' && foundersType.value) {
-    items.push({ label: t(foundersType.value === 'team' ? 'dashboard.team' : 'dashboard.class') })
+
+
+  // step 7
+  if (step.value > 7) {
+    // future confirm adress -> no item
+
+    // founders confirm adress -> no item
+
+    // founders team saison set count
+    if (edition.value === 'founders' && foundersType.value == 'team') {
+      const sc = effectiveSeasonSetCount.value
+      const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
+      items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
+    }
   }
-  if (formData.value.name?.trim()) {
-    items.push({ label: formData.value.name.trim() })
-  }
+
   return items
 })
 
@@ -853,12 +904,9 @@ function next() {
 }
 
 function prev() {
-  if (step.value === 1) {
-    step.value = 0
-    hasVoucherCode.value = null
-    return
-  }
-  if (step.value > 1) step.value--
+  if (step.value == 1) hasVoucherCode.value = null
+
+  step.value--
 }
 
 function handleBrowserBack() {
@@ -1441,7 +1489,6 @@ watch(
       <div class="wizard-hero">
         <div class="wizard-hero-content">
           <h2 id="wizard-title"><I18nText k="wizard.ctaTitle" /></h2>
-          <p class="wizard-hero-text"><I18nText k="dashboard.intro" /></p>
           <div v-if="summaryItems.length" class="wizard-path">
             <div v-for="(item, idx) in summaryItems" :key="idx" class="wizard-path-step">
               <span class="wizard-path-icon">
@@ -1453,6 +1500,7 @@ watch(
               <span class="wizard-path-label">{{ item.label }}</span>
             </div>
           </div>
+          <p v-else class="wizard-hero-text"><I18nText k="dashboard.intro" /></p>
           <!-- Progress only after voucher step: totalSteps/edition are unknown until then. -->
           <template v-if="step > 1">
             <div class="wizard-hero-progress">
@@ -1673,7 +1721,7 @@ watch(
             <template v-else-if="foundersType === 'class'">
               <p class="wizard-form-section-title"><I18nText k="wizard.stepClassParticipants" /></p>
               <div class="field" :class="{ filled: isFilled(formData.playersTotal) }">
-                <input v-model="formData.playersTotal" type="number" min="0" step="1" placeholder=" " />
+                <input v-model="formData.playersTotal" type="number" min="0" step="1" value="8"/>
                 <label><I18nText k="enrollClass.playersTotal" /></label>
               </div>
             </template>
