@@ -1440,7 +1440,6 @@ watch(
     <div class="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div class="wizard-hero">
         <div class="wizard-hero-content">
-          <p class="wizard-eyebrow"><I18nText k="wizard.stepEdition" /></p>
           <h2 id="wizard-title"><I18nText k="wizard.ctaTitle" /></h2>
           <p class="wizard-hero-text"><I18nText k="dashboard.intro" /></p>
           <div v-if="summaryItems.length" class="wizard-path">
@@ -1455,12 +1454,12 @@ watch(
             </div>
           </div>
           <!-- Progress only after voucher step: totalSteps/edition are unknown until then. -->
-          <template v-if="step > 0">
+          <template v-if="step > 1">
             <div class="wizard-hero-progress">
               <div class="wizard-progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
                 <span :style="{ width: `${progress}%` }"></span>
               </div>
-              <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
+              <p class="wizard-step-label">{{ stepTitle }} ({{ step - 1 }}/{{ totalSteps - 2}})</p>
             </div>
             <div class="wizard-hero-stepper">
               <p class="wizard-hero-stepper-title"><I18nText k="wizard.progressTitle" /></p>
