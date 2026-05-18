@@ -74,7 +74,9 @@ function toggle() {
 }
 
 function select(ev) {
-  emit('update:modelValue', ev.id)
+  const id = ev?.id ?? ev?.rowid
+  if (id == null || id === '') return
+  emit('update:modelValue', Number.isFinite(Number(id)) ? Number(id) : id)
   open.value = false
 }
 

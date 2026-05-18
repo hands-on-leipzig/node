@@ -2,22 +2,24 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { enrollTeam, enrollClass, enrollFuture, getEventsNearest, validateVoucher, updateTeamPlayers, registerTeamForEvent, listAddressBookGrouped, isDolibarrRowId } from '@/services/draht'
+import {
+  enrollTeam,
+  enrollClass,
+  enrollFuture,
+  fetchEnrollmentPricingQuote,
+  getEventsNearest,
+  validateVoucher,
+  updateTeamPlayers,
+  registerTeamForEvent,
+  listAddressBookGrouped,
+  isDolibarrRowId,
+} from '@/services/draht'
+import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
-import {
-  FUTURE_GROUP_PRICE_EUR,
-  FUTURE_SEASON_SET_UNIT_EUR,
-  FUTURE_TEAM_EVENT_UNIT_EUR,
-} from '@/config/futureEditionConfig'
-import {
-  FOUNDERS_SEASON_SET_UNIT_EUR,
-  FOUNDERS_TEAM_EVENT_UNIT_EUR,
-  foundersRegistrationPriceEur,
-} from '@/config/foundersEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -349,18 +351,136 @@ function scheduleAdvanceIfReady(expectedStep) {
   })
 }
 
-function formatFutureGroupPriceEur(pupils) {
-  const amount = FUTURE_GROUP_PRICE_EUR[Number(pupils)]
-  if (!Number.isFinite(amount)) return ''
-  try {
-    return new Intl.NumberFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-    }).format(amount)
-  } catch {
-    return `${amount} €`
+const futurePupilCompare = ref(null)
+const futurePupilCompareLoading = ref(false)
+let futurePupilCompareSeq = 0
+
+async function refreshFuturePupilCompare() {
+  if (edition.value !== 'future' || !futureGroup.value) {
+    futurePupilCompare.value = null
+    futurePupilCompareLoading.value = false
+    return
   }
+  const seq = ++futurePupilCompareSeq
+  futurePupilCompareLoading.value = true
+  try {
+    const data = await fetchEnrollmentPricingQuote({
+      edition: 'future',
+      group: futureGroup.value,
+      country: resolveQuoteCountryCode(),
+      seasonSetCount: 0,
+      hasEvent: false,
+      futureOnSiteEvent: 'later',
+      comparePupils: [...FUTURE_PUPIL_OPTIONS],
+      voucher: voucherValid.value === true && voucher.value?.trim() ? voucher.value.trim() : undefined,
+    })
+    if (seq !== futurePupilCompareSeq) return
+    futurePupilCompare.value = data?.comparePupils ?? null
+  } catch {
+    if (seq === futurePupilCompareSeq) futurePupilCompare.value = null
+  } finally {
+    if (seq === futurePupilCompareSeq) futurePupilCompareLoading.value = false
+  }
+}
+
+function formatFutureGroupPriceEur(pupils) {
+  const key = String(Number(pupils))
+  const cmp = futurePupilCompare.value?.[key] ?? pricingQuote.value?.comparePupils?.[key]
+  const amount = cmp?.groupGrossEur ?? cmp?.totalGrossEur
+  if (!Number.isFinite(amount)) {
+    return futurePupilCompareLoading.value || pricingLoading.value ? '…' : ''
+  }
+  return formatWizardEur(amount)
+}
+
+function quoteLineProductName(line) {
+  const label = String(line?.label ?? '').trim()
+  if (label) return label
+  return String(line?.productRef ?? '').trim()
+}
+
+function formatSeasonSetOptionPrice(setCount) {
+  const cmp = pricingQuote.value?.compareSeasonSets?.[String(Number(setCount))]
+  const amount = cmp?.seasonSetsGrossEur ?? 0
+  if (pricingLoading.value && !Number.isFinite(amount)) return '…'
+  return formatWizardEur(amount)
+}
+
+const pricingQuotePayload = computed(() => {
+  if (!edition.value) return null
+  const payload = {
+    edition: edition.value,
+    country: resolveQuoteCountryCode(),
+    seasonSetCount: effectiveSeasonSetCount.value,
+    voucher: voucherValid.value === true && voucher.value?.trim() ? voucher.value.trim() : undefined,
+  }
+
+  if (edition.value === 'future') {
+    if (!futureGroup.value) return null
+    payload.group = futureGroup.value
+    if (futurePupils.value != null) payload.pupils = Number(futurePupils.value)
+    payload.futureOnSiteEvent = futureOnSiteEvent.value
+    payload.eventTeamCount = futureOnSiteEvent.value === 'yes' ? normalizeFutureEventTeamCount() : 0
+    if (futureOnSiteEvent.value === 'yes' && futureEventId.value) payload.eventId = futureEventId.value
+    payload.comparePupils = [...FUTURE_PUPIL_OPTIONS]
+    payload.compareSeasonSets = [0, 1, 2]
+  } else if (edition.value === 'founders') {
+    if (!foundersVariant.value || !foundersType.value) return null
+    payload.foundersVariant = foundersVariant.value
+    payload.foundersType = foundersType.value
+    const isTeam = foundersType.value === 'team'
+    payload.program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
+    if (foundersType.value === 'class') {
+      const pt = Number(formData.value.playersTotal)
+      if (Number.isFinite(pt) && pt > 0) {
+        payload.playersTotal = pt
+        payload.registeredPupils = pt
+      }
+    } else {
+      const pc = founderTeamPlayers.value.filter((p) => p.firstname || p.name || p.gender || p.birthdayStr).length
+      payload.participantCount = pc
+      payload.registeredPupils = pc
+      if (founderTeamEventId.value) {
+        payload.founderTeamEventId = founderTeamEventId.value
+        payload.hasEvent = true
+      }
+    }
+    if (foundersNeedsSeasonSets.value) {
+      payload.compareSeasonSets = [0, 1, 2]
+    }
+  } else {
+    return null
+  }
+
+  return payload
+})
+
+const { quote: pricingQuote, loading: pricingLoading, error: pricingError } = useEnrollmentPricingQuote(
+  () => pricingQuotePayload.value,
+)
+
+const pricingLines = computed(() => (Array.isArray(pricingQuote.value?.lines) ? pricingQuote.value.lines : []))
+
+const pricingDisplayLines = computed(() => pricingLines.value)
+
+const pricingTotalGrossEur = computed(() => {
+  const t = Number(pricingQuote.value?.totalGrossEur)
+  return Number.isFinite(t) ? t : 0
+})
+
+const pricingUseApi = computed(() => pricingQuote.value?.ok === true)
+
+const quotedEventTeamUnitGross = computed(() => {
+  const ln = pricingLines.value.find((l) => l.category === 'eventTeams' && Number(l.qty) > 0)
+  if (!ln) return 0
+  const u = Number(ln.unitGrossEur)
+  return Number.isFinite(u) ? u : 0
+})
+
+function pricingLineShowsWasPrice(line) {
+  const cat = Number(line?.catalogGrossEur)
+  const gross = Number(line?.lineGrossEur)
+  return Number.isFinite(cat) && Number.isFinite(gross) && cat > gross + 0.01
 }
 
 function formatWizardEur(amount) {
@@ -460,57 +580,31 @@ function selectFutureTeamEvent(teamIndex, eventId) {
   updateDerivedFutureEventId()
 }
 
-const futureOrderGroupPriceEur = computed(() => {
-  const p = Number(futurePupils.value)
-  const a = FUTURE_GROUP_PRICE_EUR[p]
-  return Number.isFinite(a) ? a : 0
-})
-
-const futureOrderSeasonSetsPriceEur = computed(() => {
-  const n = Number(effectiveSeasonSetCount.value)
-  if (!Number.isFinite(n) || n < 0) return 0
-  return n * FUTURE_SEASON_SET_UNIT_EUR
-})
-
 const futureOrderEventTeamsCount = computed(() => {
   if (futureOnSiteEvent.value !== 'yes') return 0
   return normalizeFutureEventTeamCount()
 })
 
-const futureOrderEventTeamsPriceEur = computed(
-  () => futureOrderEventTeamsCount.value * FUTURE_TEAM_EVENT_UNIT_EUR,
-)
+function resolveQuoteCountryCode() {
+  const fromInstitution = formData.value.country?.trim()
+  if (fromInstitution) return fromInstitution.length === 2 ? fromInstitution.toUpperCase() : fromInstitution
+  const newC = deliveryAddress.value?.new?.country?.trim()
+  if (newC) return newC.length === 2 ? newC.toUpperCase() : newC
+  if (deliveryAddress.value?.useExisting && deliveryAddress.value?.addressId) {
+    const id = String(deliveryAddress.value.addressId)
+    const found = deliveryAddresses.value.find((a) => String(a.id) === id)
+    const c = found?.country != null ? String(found.country).trim() : ''
+    if (c) return c.length === 2 ? c.toUpperCase() : c
+  }
+  return 'DE'
+}
 
-const futureOrderTotalEur = computed(
-  () =>
-    futureOrderGroupPriceEur.value +
-    futureOrderSeasonSetsPriceEur.value +
-    futureOrderEventTeamsPriceEur.value,
-)
-
-const foundersOrderRegistrationPriceEur = computed(() =>
-  edition.value === 'founders'
-    ? foundersRegistrationPriceEur(foundersVariant.value, foundersType.value)
-    : 0,
-)
-
-const foundersOrderSeasonSetsPriceEur = computed(() => {
-  if (edition.value !== 'founders') return 0
-  const n = Number(effectiveSeasonSetCount.value)
-  if (!Number.isFinite(n) || n < 0) return 0
-  return n * FOUNDERS_SEASON_SET_UNIT_EUR
-})
-
-const foundersOrderEventPriceEur = computed(() => {
-  if (edition.value !== 'founders' || foundersType.value !== 'team') return 0
-  return founderTeamEventId.value ? FOUNDERS_TEAM_EVENT_UNIT_EUR : 0
-})
-
-const foundersOrderTotalEur = computed(
-  () =>
-    foundersOrderRegistrationPriceEur.value +
-    foundersOrderSeasonSetsPriceEur.value +
-    foundersOrderEventPriceEur.value,
+watch(
+  [edition, futureGroup, () => formData.value.country, voucher, voucherValid],
+  () => {
+    refreshFuturePupilCompare()
+  },
+  { immediate: true },
 )
 
 const summaryItems = computed(() => {
@@ -1505,6 +1599,10 @@ async function submit() {
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
       payload.num_boards = sc
+      if (isTeam && founderTeamEventId.value) {
+        const evId = Number(founderTeamEventId.value)
+        if (Number.isFinite(evId) && evId > 0) payload.eventId = evId
+      }
       if (!isTeam) {
         const v = formData.value.playersTotal
         if (v !== '' && v != null) {
@@ -1966,7 +2064,7 @@ watch(
                 @click="selectWizardSeasonSetCount(0)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonNone" /></div>
-                <div class="wizard-option-desc">{{ formatWizardEur(0) }}</div>
+                <div class="wizard-option-desc">{{ formatSeasonSetOptionPrice(0) }}</div>
               </button>
               <button
                 type="button"
@@ -1975,7 +2073,7 @@ watch(
                 @click="selectWizardSeasonSetCount(1)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonOne" /></div>
-                <div class="wizard-option-desc">{{ formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR) }}</div>
+                <div class="wizard-option-desc">{{ formatSeasonSetOptionPrice(1) }}</div>
               </button>
               <button
                 type="button"
@@ -1984,7 +2082,7 @@ watch(
                 @click="selectWizardSeasonSetCount(2)"
               >
                 <div class="wizard-option-main"><I18nText k="enrollFuture.seasonTwo" /></div>
-                <div class="wizard-option-desc">{{ formatWizardEur(FUTURE_SEASON_SET_UNIT_EUR * 2) }}</div>
+                <div class="wizard-option-desc">{{ formatSeasonSetOptionPrice(2) }}</div>
               </button>
             </div>
           </div>
@@ -2172,39 +2270,38 @@ watch(
               </div>
               <div class="wizard-cart-divider" role="presentation" />
               <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
-              <div class="wizard-cart-row wizard-cart-row--price">
-                <span>
-                  <I18nText k="wizard.orderPriceGroup" />
-                  <span v-if="futurePupils != null" class="wizard-cart-muted">
-                    ({{ futurePupils }} <I18nText k="enrollFuture.pupils" />)
+              <p v-if="pricingLoading" class="wizard-hint"><I18nText k="wizard.pricingLoading" /></p>
+              <p v-else-if="!pricingUseApi" class="wizard-hint"><I18nText k="wizard.pricingUnavailable" /></p>
+              <template v-else>
+                <div
+                  v-for="(line, li) in pricingDisplayLines"
+                  :key="'future-price-' + li"
+                  class="wizard-cart-row wizard-cart-row--price"
+                >
+                  <span class="wizard-cart-line-label">
+                    <span class="wizard-cart-product-name">{{ quoteLineProductName(line) || '—' }}</span>
+                    <span v-if="line.category === 'group' && futurePupils != null" class="wizard-cart-muted">
+                      · {{ futurePupils }} <I18nText k="enrollFuture.pupils" />
+                    </span>
+                    <span v-else-if="Number(line.qty) > 0" class="wizard-cart-muted">
+                      · {{ line.qty }}×
+                    </span>
+                    <span v-if="line.free" class="wizard-cart-muted"> · <I18nText k="wizard.priceFree" /></span>
                   </span>
-                </span>
-                <strong>{{ formatWizardEur(futureOrderGroupPriceEur) }}</strong>
-              </div>
-              <div class="wizard-cart-row wizard-cart-row--price">
-                <span>
-                  <I18nText k="wizard.orderPriceSeasonSets" />
-                  <span class="wizard-cart-muted"> ({{ effectiveSeasonSetCount }}×)</span>
-                </span>
-                <strong>{{ formatWizardEur(futureOrderSeasonSetsPriceEur) }}</strong>
-              </div>
-              <div v-if="futureOnSiteEvent === 'yes'" class="wizard-cart-row wizard-cart-row--price">
-                <span>
-                  <I18nText k="wizard.orderPriceEventTeams" />
-                  <span class="wizard-cart-muted">
-                    ({{ futureOrderEventTeamsCount }}× {{ formatWizardEur(FUTURE_TEAM_EVENT_UNIT_EUR) }})
+                  <span class="wizard-price-amounts">
+                    <span v-if="pricingLineShowsWasPrice(line)" class="wizard-price-was">{{ formatWizardEur(line.catalogGrossEur) }}</span>
+                    <strong>{{ formatWizardEur(line.lineGrossEur) }}</strong>
                   </span>
-                </span>
-                <strong>{{ formatWizardEur(futureOrderEventTeamsPriceEur) }}</strong>
-              </div>
-              <div v-else class="wizard-cart-row wizard-cart-row--price">
-                <span><I18nText k="wizard.orderPriceEventLater" /></span>
-                <strong>{{ formatWizardEur(0) }}</strong>
-              </div>
-              <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
-                <span><I18nText k="wizard.orderPriceTotal" /></span>
-                <strong>{{ formatWizardEur(futureOrderTotalEur) }}</strong>
-              </div>
+                </div>
+                <div v-if="futureOnSiteEvent !== 'yes'" class="wizard-cart-row wizard-cart-row--price">
+                  <span><I18nText k="wizard.orderPriceEventLater" /></span>
+                  <strong>{{ formatWizardEur(0) }}</strong>
+                </div>
+                <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
+                  <span><I18nText k="wizard.orderPriceTotal" /></span>
+                  <strong>{{ formatWizardEur(pricingTotalGrossEur) }}</strong>
+                </div>
+              </template>
             </div>
             <EnrollConsentCheckboxes
               id-prefix="wizard-consent-future"
@@ -2302,39 +2399,31 @@ watch(
               </div>
               <div class="wizard-cart-divider" role="presentation" />
               <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
-              <div class="wizard-cart-row wizard-cart-row--price">
-                <span>
-                  <I18nText
-                    :k="foundersType === 'team' ? 'wizard.orderPriceTeamRegistration' : 'wizard.orderPriceClassRegistration'"
-                  />
-                </span>
-                <strong>{{ formatWizardEur(foundersOrderRegistrationPriceEur) }}</strong>
-              </div>
-              <div v-if="foundersNeedsSeasonSets" class="wizard-cart-row wizard-cart-row--price">
-                <span>
-                  <I18nText k="wizard.orderPriceSeasonSets" />
-                  <span v-if="effectiveSeasonSetCount > 0" class="wizard-cart-muted">
-                    ({{ effectiveSeasonSetCount }}× {{ formatWizardEur(FOUNDERS_SEASON_SET_UNIT_EUR) }})
+              <p v-if="pricingLoading" class="wizard-hint"><I18nText k="wizard.pricingLoading" /></p>
+              <p v-else-if="!pricingUseApi" class="wizard-hint"><I18nText k="wizard.pricingUnavailable" /></p>
+              <template v-else>
+                <div
+                  v-for="(line, li) in pricingDisplayLines"
+                  :key="'founders-price-' + li"
+                  class="wizard-cart-row wizard-cart-row--price"
+                >
+                  <span class="wizard-cart-line-label">
+                    <span class="wizard-cart-product-name">{{ quoteLineProductName(line) || '—' }}</span>
+                    <span v-if="Number(line.qty) > 0" class="wizard-cart-muted">
+                      · {{ line.qty }}×
+                    </span>
+                    <span v-if="line.free" class="wizard-cart-muted"> · <I18nText k="wizard.priceFree" /></span>
                   </span>
-                </span>
-                <strong>{{ formatWizardEur(foundersOrderSeasonSetsPriceEur) }}</strong>
-              </div>
-              <div
-                v-if="foundersType === 'team' && founderTeamEventId"
-                class="wizard-cart-row wizard-cart-row--price"
-              >
-                <span>
-                  <I18nText k="wizard.orderPriceEventRegistration" />
-                  <span class="wizard-cart-muted">
-                    (1× {{ formatWizardEur(FOUNDERS_TEAM_EVENT_UNIT_EUR) }})
+                  <span class="wizard-price-amounts">
+                    <span v-if="pricingLineShowsWasPrice(line)" class="wizard-price-was">{{ formatWizardEur(line.catalogGrossEur) }}</span>
+                    <strong>{{ formatWizardEur(line.lineGrossEur) }}</strong>
                   </span>
-                </span>
-                <strong>{{ formatWizardEur(foundersOrderEventPriceEur) }}</strong>
-              </div>
-              <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
-                <span><I18nText k="wizard.orderPriceTotal" /></span>
-                <strong>{{ formatWizardEur(foundersOrderTotalEur) }}</strong>
-              </div>
+                </div>
+                <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
+                  <span><I18nText k="wizard.orderPriceTotal" /></span>
+                  <strong>{{ formatWizardEur(pricingTotalGrossEur) }}</strong>
+                </div>
+              </template>
               <p class="wizard-hint wizard-pricing-disclaimer">
                 <I18nText k="enrollFuture.pricingDisclaimer" />
               </p>
@@ -3251,6 +3340,30 @@ watch(
 }
 .wizard-cart-row--price {
   font-size: 0.9rem;
+}
+.wizard-price-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.35rem 0.5rem;
+  text-align: right;
+}
+.wizard-price-was {
+  color: var(--color-text-muted, #64748b);
+  text-decoration: line-through;
+  font-weight: 500;
+  font-size: 0.85em;
+}
+.wizard-cart-line-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.45rem;
+  min-width: 0;
+}
+.wizard-cart-product-name {
+  font-weight: 600;
 }
 .wizard-cart-row--total {
   margin-top: 0.35rem;

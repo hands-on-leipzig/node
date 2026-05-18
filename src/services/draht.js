@@ -251,6 +251,21 @@ export function enrollFuture(payload) {
 }
 
 /**
+ * Pricing quote from DRAHT unified rules (same logic as order creation, incl. voucher overrides).
+ *
+ * @param {Record<string, unknown>} payload edition, program, country, pupils, seasonSetCount, eventTeamCount, hasEvent, voucher, comparePupils, …
+ * @returns {Promise<{ ok: boolean, lines: Array<Record<string, unknown>>, totalGrossEur: number, comparePupils?: Record<string, { groupGrossEur: number, totalGrossEur: number }>, voucherApplied?: boolean, message?: string }>}
+ */
+export async function fetchEnrollmentPricingQuote(payload) {
+  const res = await api.post('/pricing/quote', payload)
+  const body = res.data
+  if (body && typeof body === 'object' && body.data && typeof body.data === 'object') {
+    return body.data
+  }
+  return body && typeof body === 'object' ? body : { ok: false, lines: [], totalGrossEur: 0 }
+}
+
+/**
  * Extract raw list rows from axios response (same rules as pre–improvements-15 sidebar code, plus deep unwrap).
  * @param {import('axios').AxiosResponse|undefined} res
  * @returns {Array<Record<string, unknown>>}
