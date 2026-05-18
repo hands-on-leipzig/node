@@ -39,9 +39,9 @@ export default {
         "signInWithSso": "Mit SSO anmelden"
     },
     "venues": {
-        "title": "Austragungsorte 2026/27 ",
+        "title": "Austragungsorte Saison 2026/27 ",
         "lead": "Hier findest du alle Austragungsorte der FIRST LEGO League BIOGLOW Saison 2026/27 in Deutschland, Österreich und der Schweiz. Entdecke die interaktive Karte und die Standortliste, um herauszufinden, wo in deiner Nähe ein FIRST LEGO League Event stattfindet.",
-        "ctaRegister": "Zur Teamanmeldung",
+        "ctaRegister": "Zur Anmeldung",
         "loading": "Austragungsorte werden geladen…",
         "loadError": "Austragungsorte konnten nicht geladen werden.",
         "retry": "Erneut versuchen",
