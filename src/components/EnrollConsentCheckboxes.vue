@@ -1,11 +1,55 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PdfViewerModal from '@/components/PdfViewerModal.vue'
+import { participationTermsPdfForLocale } from '@/config/enrollDocuments'
+import { fetchParticipationTermsPdfUrls } from '@/services/documentsConfig'
+import { getParticipationTermsPdfBlobUrl } from '@/services/draht'
+import { usePdfViewer } from '@/composables/usePdfViewer'
 
-defineProps({
+const props = defineProps({
   idPrefix: { type: String, default: 'enroll-consent' },
+  /** Optional fixed PDF URL; overrides SharePoint config and locale fallback. */
+  termsPdfUrl: { type: String, default: '' },
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const { open: termsPdfOpen, url: termsPdfUrl, title: termsPdfTitle, openPdf, close: closeTermsPdf } =
+  usePdfViewer()
+
+/** @type {import('vue').Ref<{ de: string, en: string }>} */
+const participationTermsFromConfig = ref({ de: '', en: '' })
+
+const activeTermsPdfUrl = computed(() => {
+  if (props.termsPdfUrl?.trim()) return props.termsPdfUrl.trim()
+  return participationTermsPdfForLocale(locale.value, participationTermsFromConfig.value)
+})
+
+const canOpenTermsPdf = computed(() => {
+  if (props.termsPdfUrl?.trim()) return true
+  const cfg = participationTermsFromConfig.value
+  if (cfg?.de || cfg?.en) return true
+  return !!activeTermsPdfUrl.value
+})
+
+async function openTermsPdf(event) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  const proxyBlob = await getParticipationTermsPdfBlobUrl(locale.value)
+  if (proxyBlob) {
+    await openPdf(proxyBlob, t('enroll.consentTermsPdfTitle'))
+    return
+  }
+
+  const url = activeTermsPdfUrl.value
+  if (!url) return
+  await openPdf(url, t('enroll.consentTermsPdfTitle'))
+}
+
+onMounted(async () => {
+  participationTermsFromConfig.value = await fetchParticipationTermsPdfUrls()
+})
 
 const consentDataProcessing = defineModel('consentDataProcessing', { type: Boolean, default: false })
 const consentTerms = defineModel('consentTerms', { type: Boolean, default: false })
@@ -63,7 +107,18 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
         </span>
         <span class="enroll-consent-body">
           <span class="enroll-consent-label">
-            <I18nText k="enroll.consentTerms" />
+            <I18nText k="enroll.consentTermsPrefix" />
+            {{ ' ' }}
+            <button
+              type="button"
+              class="enroll-consent-terms-link"
+              :disabled="!canOpenTermsPdf"
+              @click="openTermsPdf"
+            >
+              <I18nText k="enroll.consentTermsLink" />
+            </button>
+            {{ ' ' }}
+            <I18nText k="enroll.consentTermsSuffix" />
             <span class="required" aria-hidden="true">*</span>
           </span>
         </span>
@@ -91,8 +146,14 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
       </label>
     </div>
   </div>
-</template>
 
+  <PdfViewerModal
+    :show="termsPdfOpen"
+    :pdf-url="termsPdfUrl"
+    :title="termsPdfTitle"
+    @close="closeTermsPdf"
+  />
+</template>
 <style scoped>
 .enroll-consents {
   margin-top: 1.25rem;
@@ -305,5 +366,29 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
   color: #dc2626;
   margin-left: 0.15rem;
   font-weight: 600;
+}
+
+.enroll-consent-terms-link {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.enroll-consent-terms-link:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--color-accent) 75%, var(--color-text));
+}
+
+.enroll-consent-terms-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
 }
 </style>

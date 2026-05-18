@@ -154,6 +154,17 @@ const maxFutureEventTeamsByPupils = computed(() => {
   if (!Number.isFinite(pupils) || pupils <= 0) return 0
   return Math.max(1, Math.floor(pupils / FUTURE_EVENT_TEAM_SIZE))
 })
+
+function futureTeamPillNeedsMorePupils(count) {
+  const n = Number(count)
+  if (!Number.isFinite(n) || n <= maxFutureEventTeamsByPupils.value) return false
+  return futureEventTeamCount.value !== n
+}
+
+const futureTeamPillsShowExpandHint = computed(() =>
+  futureOnSiteEvent.value === 'yes'
+  && futureTeamOptionCounts.value.some((c) => c > maxFutureEventTeamsByPupils.value),
+)
 const futureTeamEventsAllSelected = computed(() => {
   if (futureOnSiteEvent.value !== 'yes') return true
   if (futureTeamEvents.value.length === 0) return false
@@ -1814,16 +1825,27 @@ watch(
                       class="wizard-event-team-count-pill"
                       :class="{
                         active: futureEventTeamCount === count,
-                        'is-disabled': count > maxFutureEventTeamsByPupils,
+                        'needs-pupils-upgrade': futureTeamPillNeedsMorePupils(count),
                       }"
-                      :aria-disabled="count > maxFutureEventTeamsByPupils ? 'true' : 'false'"
                       @click="selectFutureEventTeamCount(count)"
                     >
                       <span class="wizard-event-team-count-pill-main">
                         {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
                       </span>
+                      <span
+                        v-if="futureTeamPillNeedsMorePupils(count)"
+                        class="wizard-event-team-count-pill-hint"
+                      >
+                        <I18nText
+                          k="wizard.eventTeamCountNeedsPupils"
+                          :values="{ pupils: count * FUTURE_EVENT_TEAM_SIZE }"
+                        />
+                      </span>
                     </button>
                   </div>
+                  <p v-if="futureTeamPillsShowExpandHint" class="wizard-hint wizard-event-team-expand-hint">
+                    <I18nText k="wizard.onSiteEventTeamsExpandHint" />
+                  </p>
                   <p v-if="futureEventTeamCount > 1" class="wizard-event-label wizard-event-per-team-label">
                     <I18nText k="wizard.onSiteEventPerTeam" />
                   </p>
@@ -2486,7 +2508,7 @@ watch(
   -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
-.wizard-event-team-count-pill:hover:not(.is-disabled) {
+.wizard-event-team-count-pill:hover {
   border-color: color-mix(in srgb, var(--color-accent) 28%, var(--liquid-border));
   background: var(--liquid-tile-bg);
 }
@@ -2495,13 +2517,33 @@ watch(
   background: var(--liquid-tile-bg-strong);
   box-shadow: var(--liquid-shadow), var(--liquid-shadow-inset);
 }
-.wizard-event-team-count-pill.is-disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.wizard-event-team-count-pill.needs-pupils-upgrade {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--liquid-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--liquid-tile-bg-inner));
+  cursor: pointer;
+}
+.wizard-event-team-count-pill.needs-pupils-upgrade:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--liquid-border));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--liquid-tile-bg));
+}
+.wizard-event-team-count-pill.needs-pupils-upgrade.active {
+  border-style: solid;
 }
 .wizard-event-team-count-pill-main {
   font-weight: 600;
   font-size: 0.98rem;
+}
+.wizard-event-team-count-pill-hint {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--color-accent) 78%, var(--color-text-muted));
+}
+.wizard-event-team-expand-hint {
+  margin: -0.35rem 0 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .wizard-event-per-team-label {
   margin-bottom: 0.5rem;

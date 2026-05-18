@@ -17,6 +17,21 @@ function normalizeFiles(raw) {
     .slice(0, 150)
 }
 
+function normalizeHttpsUrl(url) {
+  const s = String(url ?? '').trim()
+  return /^https?:\/\//i.test(s) ? s : ''
+}
+
+function normalizeParticipationTermsPdf(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { de: '', en: '' }
+  }
+  return {
+    de: normalizeHttpsUrl(raw.de),
+    en: normalizeHttpsUrl(raw.en),
+  }
+}
+
 function normalizeConfig(j) {
   if (!j || typeof j !== 'object') {
     return {
@@ -24,6 +39,7 @@ function normalizeConfig(j) {
       title: '',
       files: [],
       skipGraphFileListing: false,
+      participationTermsPdf: { de: '', en: '' },
     }
   }
   return {
@@ -31,6 +47,7 @@ function normalizeConfig(j) {
     title: String(j.title ?? '').trim(),
     files: normalizeFiles(j.files),
     skipGraphFileListing: !!j.skipGraphFileListing,
+    participationTermsPdf: normalizeParticipationTermsPdf(j.participationTermsPdf),
   }
 }
 
@@ -38,8 +55,24 @@ function unwrapPayload(data) {
   if (!data || typeof data !== 'object') return data
   const inner = data.data
   if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-    if ('folderUrl' in inner || 'files' in inner || 'title' in inner || 'graphOk' in inner) {
+    if (
+      'folderUrl' in inner ||
+      'files' in inner ||
+      'title' in inner ||
+      'graphOk' in inner ||
+      'participationTermsPdf' in inner
+    ) {
       return inner
+    }
+    const inner2 = inner.data
+    if (inner2 && typeof inner2 === 'object' && !Array.isArray(inner2)) {
+      if (
+        'folderUrl' in inner2 ||
+        'files' in inner2 ||
+        'participationTermsPdf' in inner2
+      ) {
+        return inner2
+      }
     }
   }
   return data
@@ -88,6 +121,7 @@ export async function fetchDocumentsConfig() {
     title: '',
     files: [],
     skipGraphFileListing: false,
+    participationTermsPdf: { de: '', en: '' },
   }
 
   let base = null
@@ -146,6 +180,34 @@ export async function fetchDocumentsConfig() {
     files: mergedFiles,
     graphFolders,
     skipGraphFileListing: base.skipGraphFileListing,
+    participationTermsPdf: base.participationTermsPdf,
     graphMeta,
   }
+}
+
+/**
+ * Participation terms PDF URLs (SharePoint) for enrollment checkboxes.
+ * @returns {Promise<{ de: string, en: string }>}
+ */
+export async function fetchParticipationTermsPdfUrls() {
+  const empty = { de: '', en: '' }
+  try {
+    const res = await getDocumentsConfig()
+    const base = normalizeConfig(unwrapPayload(res?.data))
+    if (base.participationTermsPdf.de || base.participationTermsPdf.en) {
+      return base.participationTermsPdf
+    }
+  } catch {
+    /* API unavailable */
+  }
+  try {
+    const r2 = await fetch(`${import.meta.env.BASE_URL}documents-config.json`)
+    if (r2.ok) {
+      const base = normalizeConfig(await r2.json())
+      return base.participationTermsPdf
+    }
+  } catch {
+    /* static fallback */
+  }
+  return empty
 }

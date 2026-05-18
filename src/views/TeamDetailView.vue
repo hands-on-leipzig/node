@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getTeam, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { timelineHasShipmentStep } from '@/utils/timeline'
+import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
@@ -43,6 +45,9 @@ const timelineSteps = computed(() => {
   if (!t) return []
   return Array.isArray(t.timeline) ? t.timeline : (Array.isArray(t) ? t : [])
 })
+
+const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
+const shipmentScheduleProp = useTeklaShipmentSchedule(team, showShipmentSchedule)
 
 const genderOptions = computed(() => [
   { value: '', label: t('detail.gender') },
@@ -373,7 +378,8 @@ watch(
         :locale="locale"
         tekla-type="teams"
         :tekla-id="team.id"
-        :versandaufschub="team.versandaufschub ?? null"
+        :shipment-schedule="shipmentScheduleProp"
+        :versandaufschub="showShipmentSchedule ? (team.versandaufschub ?? null) : undefined"
         class="detail-timeline-first"
         @versandaufschub-save="saveVersandaufschub"
       />
@@ -786,8 +792,20 @@ watch(
 }
 .detail-btn-primary {
   background: var(--color-accent);
-  color: var(--color-bg);
+  color: var(--color-on-accent);
   border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.detail-btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.detail-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--color-on-accent);
 }
 .detail-btn-ghost {
   padding: 0.25rem;

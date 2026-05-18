@@ -87,8 +87,19 @@ function doLogin() {
     <div class="hero">
       <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-logo">
-        <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="logo-img" />
+        <img src="/logo.png" alt="JOIN" class="logo-img logo-img--join" />
       </div>
+      <p class="hero-partner">
+        <span class="hero-partner-label"><I18nText k="common.organizedBy" /></span>
+        <a
+          href="https://www.hands-on-technology.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hero-partner-link"
+        >
+          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="hero-partner-logo" />
+        </a>
+      </p>
       <h1><I18nText k="common.appName" /></h1>
       <p class="tagline"><I18nText k="home.tagline" /></p>
       <div class="actions">
@@ -224,6 +235,38 @@ function doLogin() {
   width: auto;
   display: block;
   object-fit: contain;
+}
+.hero-logo .logo-img--join {
+  height: 3.25rem;
+  max-width: min(16rem, 88vw);
+  margin: 0 auto;
+}
+.hero-partner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: -0.35rem 0 1.25rem;
+}
+.hero-partner-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+.hero-partner-link {
+  display: block;
+  line-height: 0;
+}
+.hero-partner-logo {
+  height: 1.85rem;
+  width: auto;
+  object-fit: contain;
+  opacity: 0.9;
+}
+.hero-partner-link:hover .hero-partner-logo {
+  opacity: 1;
 }
 .hero h1 {
   font-size: var(--text-4xl);

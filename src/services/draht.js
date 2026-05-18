@@ -251,15 +251,79 @@ export function enrollFuture(payload) {
 }
 
 /**
+ * Extract raw list rows from axios response (same rules as pre–improvements-15 sidebar code, plus deep unwrap).
+ * @param {import('axios').AxiosResponse|undefined} res
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function extractNodeListArray(res) {
+  if (res?.data == null) return []
+  let d = res.data
+  if (Array.isArray(d)) return d
+  if (d && typeof d === 'object' && Array.isArray(d.data)) return d.data
+  let node = d
+  for (let depth = 0; depth < 8; depth++) {
+    if (Array.isArray(node)) return node
+    if (node && typeof node === 'object' && Object.prototype.hasOwnProperty.call(node, 'data')) {
+      node = node.data
+      continue
+    }
+    break
+  }
+  return []
+}
+
+/**
+ * One list row from GET /teams|/classes|/groups (id + display fields).
+ * @param {unknown} row
+ * @returns {{ id: number, name: string, organization: string|null, ref: string|null }|null}
+ */
+export function normalizeNodeListRow(row) {
+  if (!row || typeof row !== 'object') return null
+  const idRaw = row.id ?? row.rowid ?? row.ID
+  const id = idRaw != null && idRaw !== '' ? Number(idRaw) : NaN
+  if (!Number.isFinite(id) || id <= 0) return null
+  const name = String(row.name ?? row.label ?? row.ref ?? '').trim()
+  return {
+    id,
+    name: name || `#${id}`,
+    organization: row.organization ?? row.org ?? null,
+    ref: row.ref != null ? String(row.ref) : null,
+  }
+}
+
+/**
  * Normalize GET /teams|/classes|/groups list responses from axios.
  * @param {import('axios').AxiosResponse|undefined} res
- * @returns {Array}
+ * @returns {Array<{ id: number, name: string, organization: string|null, ref: string|null }>}
  */
 export function parseNodeListPayload(res) {
-  const payload = res?.data
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
-  return []
+  const rows = extractNodeListArray(res)
+  const out = []
+  for (const row of rows) {
+    const normalized = normalizeNodeListRow(row)
+    if (normalized) {
+      out.push(normalized)
+      continue
+    }
+    if (row && typeof row === 'object') {
+      const idRaw = row.id ?? row.rowid ?? row.ID
+      const id = idRaw != null && idRaw !== '' ? Number(idRaw) : NaN
+      if (Number.isFinite(id) && id > 0) {
+        out.push({
+          ...row,
+          id,
+          name: String(row.name ?? row.label ?? row.ref ?? `#${id}`).trim() || `#${id}`,
+        })
+      }
+    }
+  }
+  if (import.meta.env.DEV && rows.length > 0 && out.length === 0) {
+    console.warn('[parseNodeListPayload] rows present but none parsed', rows[0], res?.data)
+  }
+  if (import.meta.env.DEV && rows.length === 0 && res?.data != null) {
+    console.warn('[parseNodeListPayload] empty list, response shape', res.data)
+  }
+  return out
 }
 
 /**
@@ -297,6 +361,25 @@ export function getOpenTasks() {
  */
 export function getDocumentsConfig() {
   return api.get('/documents-config')
+}
+
+/**
+ * Participation terms PDF via server proxy (SharePoint-safe). Returns blob URL for iframe.
+ * @param {'de'|'en'|string} lang
+ * @returns {Promise<string|null>}
+ */
+export async function getParticipationTermsPdfBlobUrl(lang = 'de') {
+  const key = String(lang || 'de').toLowerCase().startsWith('en') ? 'en' : 'de'
+  try {
+    const res = await api.get(`/participation-terms-pdf/${key}`, { responseType: 'blob' })
+    const blob = res?.data
+    if (blob && blob.size > 100) {
+      return URL.createObjectURL(blob)
+    }
+  } catch {
+    /* not configured or fetch failed */
+  }
+  return null
 }
 
 /**
@@ -433,6 +516,20 @@ export function inviteCoCoach(payload) {
  * Payload: { eventId, eventTeamCount } where eventTeamCount is number of 8-pupil teams.
  * Optional `registeredPupils` bumps group capacity when more teams require a higher tier (8/16/24/32).
  */
+/**
+ * Update group versandaufschub. Payload: { versandaufschub: "Y-m-d" | null }. Returns updated group card.
+ */
+export function updateGroupVersandaufschub(groupId, payload) {
+  return api.put('/groups/' + encodeURIComponent(groupId) + '/versandaufschub', payload)
+}
+
+/**
+ * Update class versandaufschub. Payload: { versandaufschub: "Y-m-d" | null }. Returns updated class card.
+ */
+export function updateClassVersandaufschub(classId, payload) {
+  return api.put('/classes/' + encodeURIComponent(classId) + '/versandaufschub', payload)
+}
+
 export function registerGroupForEvent(groupId, eventId, eventTeamCount, options = {}) {
   const body = { eventId, eventTeamCount }
   if (options.registeredPupils != null && Number.isFinite(Number(options.registeredPupils))) {

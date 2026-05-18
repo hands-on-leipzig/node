@@ -12,6 +12,8 @@ const { t } = useI18n()
 
 const folderUrl = ref('')
 const title = ref('')
+const participationTermsDe = ref('')
+const participationTermsEn = ref('')
 const skipGraphFileListing = ref(false)
 /** @type {import('vue').Ref<Array<{ name: string, url: string, folder: string }>>} */
 const files = ref([])
@@ -50,8 +52,23 @@ function unwrapApiData(data) {
   return data
 }
 
+function apiErrorMessage(e, fallback) {
+  const d = e?.response?.data
+  const msg =
+    (typeof d === 'string' && d.trim()) ||
+    (typeof d?.message === 'string' && d.message.trim()) ||
+    (typeof d?.error === 'string' && d.error.trim()) ||
+    (typeof d?.error?.message === 'string' && d.error.message.trim()) ||
+    (Array.isArray(d?.errors) ? d.errors.join(' ').trim() : '') ||
+    (typeof e?.message === 'string' && e.message.trim()) ||
+    ''
+  const status = e?.response?.status
+  if (msg) return status ? `${msg} (HTTP ${status})` : msg
+  return status ? `${fallback} (HTTP ${status})` : fallback
+}
+
 function emptyRow() {
-  return { name: '', url: '' }
+  return { name: '', url: '', folder: '' }
 }
 
 async function load() {
@@ -61,11 +78,18 @@ async function load() {
     const res = await getDocumentsConfig()
     const raw = res?.data
     const j =
-      raw?.data && typeof raw.data === 'object' && ('folderUrl' in raw.data || 'files' in raw.data)
+      raw?.data &&
+      typeof raw.data === 'object' &&
+      ('folderUrl' in raw.data || 'files' in raw.data || 'participationTermsPdf' in raw.data)
         ? raw.data
         : raw
     folderUrl.value = j?.folderUrl || ''
     title.value = j?.title || ''
+    const pt = j?.participationTermsPdf
+    participationTermsDe.value =
+      pt && typeof pt === 'object' ? String(pt.de ?? '').trim() : ''
+    participationTermsEn.value =
+      pt && typeof pt === 'object' ? String(pt.en ?? '').trim() : ''
     skipGraphFileListing.value = !!j?.skipGraphFileListing
     const list = Array.isArray(j?.files) ? j.files : []
     files.value =
@@ -181,6 +205,7 @@ async function runProbeFolder() {
 }
 
 async function save() {
+  if (saving.value) return
   saving.value = true
   error.value = null
   success.value = false
@@ -188,6 +213,10 @@ async function save() {
     const res = await putDocumentsConfig({
       folderUrl: folderUrl.value.trim(),
       title: title.value.trim(),
+      participationTermsPdf: {
+        de: participationTermsDe.value.trim(),
+        en: participationTermsEn.value.trim(),
+      },
       files: payloadFiles(),
       skipGraphFileListing: skipGraphFileListing.value,
     })
@@ -198,6 +227,11 @@ async function save() {
         : raw
     folderUrl.value = j?.folderUrl || ''
     title.value = j?.title || ''
+    const ptSaved = j?.participationTermsPdf
+    participationTermsDe.value =
+      ptSaved && typeof ptSaved === 'object' ? String(ptSaved.de ?? '').trim() : ''
+    participationTermsEn.value =
+      ptSaved && typeof ptSaved === 'object' ? String(ptSaved.en ?? '').trim() : ''
     skipGraphFileListing.value = !!j?.skipGraphFileListing
     const list = Array.isArray(j?.files) ? j.files : []
     files.value =
@@ -215,11 +249,11 @@ async function save() {
       success.value = false
     }, 8000)
   } catch (e) {
-    const msg = e.response?.data?.message || e.response?.data?.error
+    console.error('[AdminDocuments] save failed', e?.response?.status, e?.response?.data)
     error.value =
       e.response?.status === 403
         ? t('admin.documentsForbidden')
-        : msg || t('admin.documentsSaveFailed')
+        : apiErrorMessage(e, t('admin.documentsSaveFailed'))
   } finally {
     saving.value = false
   }
@@ -241,7 +275,34 @@ onMounted(load)
     <div v-if="loading" class="admin-loading">
       <i class="bi bi-arrow-repeat spin"></i> <I18nText k="dashboard.loading" />
     </div>
-    <form v-else class="admin-form" @submit.prevent="save">
+    <form v-else class="admin-form" novalidate @submit.prevent="save">
+      <fieldset class="admin-fieldset">
+        <legend><I18nText k="admin.documentsParticipationTermsSection" /></legend>
+        <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsParticipationTermsHint" /></p>
+        <label class="admin-label">
+          <span><I18nText k="admin.documentsParticipationTermsDe" /></span>
+          <input
+            v-model="participationTermsDe"
+            type="text"
+            inputmode="url"
+            class="admin-input"
+            :placeholder="t('admin.documentsFileUrlPlaceholder')"
+            autocomplete="off"
+          />
+        </label>
+        <label class="admin-label">
+          <span><I18nText k="admin.documentsParticipationTermsEn" /></span>
+          <input
+            v-model="participationTermsEn"
+            type="text"
+            inputmode="url"
+            class="admin-input"
+            :placeholder="t('admin.documentsFileUrlPlaceholder')"
+            autocomplete="off"
+          />
+        </label>
+      </fieldset>
+
       <fieldset class="admin-fieldset">
         <legend><I18nText k="admin.documentsFilesSection" /></legend>
         <p class="admin-hint admin-hint-block"><I18nText k="admin.documentsFilesHint" /></p>
@@ -269,7 +330,8 @@ onMounted(load)
           />
           <input
             v-model="row.url"
-            type="url"
+            type="text"
+            inputmode="url"
             class="admin-input admin-input-url"
             :placeholder="t('admin.documentsFileUrlPlaceholder')"
             autocomplete="off"
@@ -292,7 +354,8 @@ onMounted(load)
         <span><I18nText k="admin.documentsFolderUrl" /></span>
         <input
           v-model="folderUrl"
-          type="url"
+          type="text"
+          inputmode="url"
           class="admin-input"
           :placeholder="t('admin.documentsFolderPlaceholder')"
           autocomplete="off"
@@ -500,7 +563,7 @@ onMounted(load)
         </template>
       </div>
 
-      <button type="submit" class="admin-save" :disabled="saving">
+      <button type="button" class="admin-save" :disabled="saving" @click="save">
         <i v-if="saving" class="bi bi-arrow-repeat spin"></i>
         <template v-if="saving"><I18nText k="common.save" />…</template>
         <I18nText v-else k="admin.documentsSave" />

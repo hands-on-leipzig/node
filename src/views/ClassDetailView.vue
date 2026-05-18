@@ -2,8 +2,10 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getClass } from '@/services/draht'
+import { getClass, updateClassVersandaufschub } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { timelineHasShipmentStep } from '@/utils/timeline'
+import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 
 const route = useRoute()
@@ -19,6 +21,19 @@ const timelineSteps = computed(() => {
   if (!t) return []
   return Array.isArray(t.timeline) ? t.timeline : (Array.isArray(t) ? t : [])
 })
+
+const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
+const shipmentScheduleProp = useTeklaShipmentSchedule(cls, showShipmentSchedule)
+
+async function saveVersandaufschub(dateStrOrNull) {
+  if (!id.value) return
+  try {
+    const res = await updateClassVersandaufschub(id.value, { versandaufschub: dateStrOrNull })
+    cls.value = res.data
+  } catch (e) {
+    console.error('[ClassDetail] versandaufschub save failed', e)
+  }
+}
 
 function statusLabel(obj) {
   if (!obj || typeof obj !== 'object') return ''
@@ -97,7 +112,10 @@ watch(
         :locale="locale"
         tekla-type="classes"
         :tekla-id="cls.id"
+        :shipment-schedule="shipmentScheduleProp"
+        :versandaufschub="showShipmentSchedule ? (cls.versandaufschub ?? null) : undefined"
         class="detail-timeline-first"
+        @versandaufschub-save="saveVersandaufschub"
       />
 
       <div class="detail-overview">

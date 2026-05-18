@@ -88,6 +88,7 @@
   --color-accent-hover: #e66d00;
   --color-accent-muted: rgba(255, 122, 0, 0.18);
   --color-accent-soft: rgba(255, 122, 0, 0.14);
+  --color-on-accent: #ffffff;
 
   --color-sidebar: transparent;
   --color-sidebar-border: rgba(255, 255, 255, 0.35);
@@ -172,6 +173,7 @@ html[data-theme='dark'] {
   --color-accent-hover: #ffb366;
   --color-accent-muted: rgba(255, 159, 77, 0.22);
   --color-accent-soft: rgba(255, 159, 77, 0.14);
+  --color-on-accent: #1c1917;
 
   --color-sidebar: transparent;
   --color-sidebar-border: rgba(255, 255, 255, 0.12);

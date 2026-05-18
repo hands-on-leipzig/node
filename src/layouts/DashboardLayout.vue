@@ -93,6 +93,19 @@ async function loadSidebarLists() {
         || t('nav.sidebarGroupsLoadFailed')
       console.warn('[sidebar] listGroups failed', err)
     }
+    if (teams.value.length > 0 || classes.value.length > 0) {
+      foundersSectionOpen.value = true
+    }
+    if (groups.value.length > 0) {
+      futureSectionOpen.value = true
+    }
+    if (import.meta.env.DEV) {
+      console.info('[sidebar] loaded', {
+        teams: teams.value.length,
+        classes: classes.value.length,
+        groups: groups.value.length,
+      })
+    }
   } finally {
     sidebarLoading.value = false
   }
@@ -198,7 +211,6 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('popstate', handleBrowserBack)
   pushBackTrapState()
-  loadSidebarLists()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
@@ -213,9 +225,18 @@ watch(
     pushBackTrapState()
   }
 )
-watch(isCoachApp, (coach) => {
-  if (coach) loadSidebarLists()
-})
+watch(
+  isCoachApp,
+  (coach) => {
+    if (coach) void loadSidebarLists()
+    else {
+      teams.value = []
+      classes.value = []
+      groups.value = []
+    }
+  },
+  { immediate: true },
+)
 
 function switchToDe() {
   setLocale('de')
@@ -306,7 +327,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="sidebar-brand" @click="closeSidebar">
-        <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-brand-logo" />
+        <img src="/logo.png" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
       </RouterLink>
       <nav class="sidebar-nav">
         <RouterLink
@@ -327,10 +348,10 @@ const { canInstall, promptInstall } = usePwaInstall()
             <i class="bi bi-arrow-repeat spin"></i>
           </div>
           <template v-else>
-            <template v-if="hasFoundersEnrollments">
-              <button
-                type="button"
-                class="sidebar-section-toggle"
+            <button
+              v-if="hasFoundersEnrollments"
+              type="button"
+              class="sidebar-section-toggle"
                 :aria-expanded="foundersSectionOpen"
                 :aria-controls="'sidebar-section-founders'"
                 @click="toggleFoundersSection"
@@ -338,7 +359,11 @@ const { canInstall, promptInstall } = usePwaInstall()
                 <i class="bi sidebar-section-toggle-icon" :class="foundersSectionOpen ? 'bi-dash-lg' : 'bi-plus-lg'" aria-hidden="true"></i>
                 <span class="sidebar-section-toggle-label"><I18nText k="nav.sidebarSectionFounders" /></span>
               </button>
-              <div v-show="foundersSectionOpen" id="sidebar-section-founders" class="sidebar-section-entries">
+            <div
+              v-show="!hasFoundersEnrollments || foundersSectionOpen"
+              id="sidebar-section-founders"
+              class="sidebar-section-entries"
+            >
                 <button
                   v-for="team in teams"
                   :key="'team-' + team.id"
@@ -375,8 +400,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                     <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
                   </span>
                 </button>
-              </div>
-            </template>
+            </div>
             <p v-if="sidebarGroupsError" class="sidebar-section-hint sidebar-section-hint--error">
               <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
               {{ sidebarGroupsError }}
@@ -417,6 +441,17 @@ const { canInstall, promptInstall } = usePwaInstall()
           </template>
         </template>
       </nav>
+      <div class="sidebar-partner">
+        <p class="sidebar-partner-label"><I18nText k="common.organizedBy" /></p>
+        <a
+          href="https://www.hands-on-technology.org"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="sidebar-partner-link"
+        >
+          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo" />
+        </a>
+      </div>
       <div v-if="isGuestShell" class="sidebar-bottom sidebar-bottom-guest">
         <div class="sidebar-guest-tools">
           <button
@@ -664,7 +699,7 @@ const { canInstall, promptInstall } = usePwaInstall()
   align-items: center;
   justify-content: center;
   margin: 0 0.75rem;
-  padding: 0.25rem 0.2rem 0.85rem;
+  padding: 0.35rem 0 0.85rem;
   border-bottom: 1px solid var(--color-border);
   text-decoration: none;
 }
@@ -674,6 +709,42 @@ const { canInstall, promptInstall } = usePwaInstall()
   max-width: 100%;
   object-fit: contain;
   display: block;
+}
+.sidebar-brand-logo--join {
+  width: 100%;
+  height: auto;
+  max-height: 3.25rem;
+  object-fit: contain;
+  object-position: center;
+}
+.sidebar-partner {
+  margin: 0.75rem 0.75rem 0;
+  padding: 0.65rem 0.5rem 0;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+.sidebar-partner-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+.sidebar-partner-link {
+  display: inline-block;
+  line-height: 0;
+}
+.sidebar-partner-logo {
+  height: 2rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  opacity: 0.92;
+  transition: opacity 0.15s;
+}
+.sidebar-partner-link:hover .sidebar-partner-logo {
+  opacity: 1;
 }
 
 /* Icon + label row; full-width click target */
@@ -1174,8 +1245,11 @@ const { canInstall, promptInstall } = usePwaInstall()
   .sidebar-brand {
     padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
   }
-  .sidebar-brand-logo {
-    height: 2.85rem;
+  .sidebar-brand-logo--join {
+    max-height: 2.75rem;
+  }
+  .sidebar-partner-logo {
+    height: 1.65rem;
   }
   .content {
     padding: 1rem;
@@ -1185,8 +1259,8 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 
 @media (max-width: 420px) {
-  .sidebar-brand-logo {
-    height: 2.45rem;
+  .sidebar-brand-logo--join {
+    max-height: 2.35rem;
   }
 }
 </style>

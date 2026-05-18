@@ -2,31 +2,18 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getGroup, getEvents, registerGroupForEvent } from '@/services/draht'
+import { getGroup, updateGroupVersandaufschub } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { timelineHasShipmentStep } from '@/utils/timeline'
+import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
-import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import CustomSelect from '@/components/CustomSelect.vue'
-import {
-  FUTURE_TEAM_EVENT_UNIT_EUR,
-  futureMaxEventTeams,
-  futureMaxSelectableEventTeams,
-  minPupilsForEventTeamCount,
-} from '@/config/futureEditionConfig'
+import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
 const group = ref(null)
 const loading = ref(true)
 const error = ref(null)
-const events = ref([])
-const eventsLoading = ref(false)
-const registerEventId = ref('')
-const registerEventTeamCount = ref(1)
-const registeringEvent = ref(false)
-const registerEventError = ref(null)
-const registerEventSuccess = ref(false)
-
 const id = computed(() => route.params.id)
 
 const timelineSteps = computed(() => {
@@ -35,41 +22,8 @@ const timelineSteps = computed(() => {
   return Array.isArray(tl.timeline) ? tl.timeline : (Array.isArray(tl) ? tl : [])
 })
 
-const registeredPupils = computed(() => {
-  const n = Number(group.value?.registeredPupils || 0)
-  return Number.isFinite(n) && n > 0 ? n : 0
-})
-
-/** Teams allowed with current group size (8 TN → 1 Team, …). */
-const maxEventTeamsForCurrentPupils = computed(() =>
-  registeredPupils.value > 0 ? futureMaxEventTeams(registeredPupils.value) : 1,
-)
-
-/** Nachmeldung: bis CRM-Maximum wählbar; bei Bedarf wird die TN-Zahl automatisch angehoben. */
-const maxEventTeamsSelectable = computed(() => futureMaxSelectableEventTeams())
-
-const eventTeamCountOptions = computed(() => {
-  const max = Math.max(1, maxEventTeamsSelectable.value)
-  return Array.from({ length: max }, (_, idx) => idx + 1)
-})
-
-const eventTeamCountSelectOptions = computed(() =>
-  eventTeamCountOptions.value.map((n) => ({ value: n, label: String(n) })),
-)
-
-const pupilsRequiredForSelectedTeams = computed(() =>
-  minPupilsForEventTeamCount(registerEventTeamCount.value),
-)
-
-const willAutoIncreasePupils = computed(
-  () => pupilsRequiredForSelectedTeams.value > registeredPupils.value,
-)
-
-const estimatedEventCostEur = computed(() => {
-  const count = Number(registerEventTeamCount.value || 0)
-  if (!Number.isFinite(count) || count <= 0) return 0
-  return count * FUTURE_TEAM_EVENT_UNIT_EUR
-})
+const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
+const shipmentScheduleProp = useTeklaShipmentSchedule(group, showShipmentSchedule)
 
 function formatAddress(addr) {
   return formatOverviewAddress(addr, locale.value)
@@ -98,72 +52,22 @@ async function fetchGroup() {
   }
 }
 
-async function loadEvents() {
-  eventsLoading.value = true
-  events.value = []
-  registerEventError.value = null
-  try {
-    const res = await getEvents()
-    const data = res.data
-    const list = Array.isArray(data) ? data : (data?.data ?? (data?.events ?? []))
-    events.value = Array.isArray(list) ? list : []
-  } catch (_) {
-    events.value = []
-  } finally {
-    eventsLoading.value = false
-  }
+function onGroupUpdated(card) {
+  group.value = card
 }
 
-async function submitRegisterForEvent() {
-  const eventId = registerEventId.value?.trim()
-  if (!id.value || !eventId) return
-  registeringEvent.value = true
-  registerEventError.value = null
-  registerEventSuccess.value = false
+async function saveVersandaufschub(dateStrOrNull) {
+  if (!id.value) return
   try {
-    const teamCount = Math.min(
-      Math.max(1, Number(registerEventTeamCount.value || 1)),
-      maxEventTeamsSelectable.value,
-    )
-    const neededPupils = minPupilsForEventTeamCount(teamCount)
-    const currentPupils = registeredPupils.value
-    const registeredPupilsPayload = Math.max(currentPupils, neededPupils)
-    const res = await registerGroupForEvent(id.value, eventId, teamCount, {
-      registeredPupils: registeredPupilsPayload > currentPupils ? registeredPupilsPayload : undefined,
-    })
+    const res = await updateGroupVersandaufschub(id.value, { versandaufschub: dateStrOrNull })
     group.value = res.data
-    registerEventSuccess.value = true
-    setTimeout(() => { registerEventSuccess.value = false }, 3000)
   } catch (e) {
-    registerEventError.value = e.response?.data?.message || e.message || t('groupDetail.registerEventFailed')
-  } finally {
-    registeringEvent.value = false
+    console.error('[GroupDetail] versandaufschub save failed', e)
   }
 }
 
-/** Event display label with optional capacity (from flow API). */
-function eventLabel(ev) {
-  const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
-  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
-  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
-  if (typeof used === 'number' && typeof max === 'number') {
-    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
-  }
-  return name
-}
-
-onMounted(async () => {
-  await fetchGroup()
-  loadEvents()
-})
-watch(id, async () => {
-  await fetchGroup()
-  loadEvents()
-})
-
-watch(maxEventTeamsSelectable, (max) => {
-  if (registerEventTeamCount.value > max) registerEventTeamCount.value = max
-})
+onMounted(fetchGroup)
+watch(id, fetchGroup)
 watch(
   () => route.query.focus,
   () => {
@@ -199,7 +103,10 @@ watch(
         :locale="locale"
         tekla-type="groups"
         :tekla-id="group.id"
+        :shipment-schedule="shipmentScheduleProp"
+        :versandaufschub="showShipmentSchedule ? (group.versandaufschub ?? null) : undefined"
         class="detail-timeline-first"
+        @versandaufschub-save="saveVersandaufschub"
       />
 
       <div class="detail-overview">
@@ -236,70 +143,12 @@ watch(
           </dl>
         </section>
 
-        <section class="detail-section">
-          <h3 class="detail-section-title"><I18nText k="groupDetail.event" /></h3>
-          <p v-if="group.event && (group.event.label || group.event.ref)" class="detail-event-current">
-            {{ group.event.label || group.event.ref }}
-          </p>
-          <p class="detail-hint"><I18nText k="groupDetail.registerForEventHint" /></p>
-          <p class="detail-hint detail-hint-sm">
-            <I18nText
-              k="groupDetail.teamCountHint"
-              :values="{
-                pupils: registeredPupils || '—',
-                maxCurrent: maxEventTeamsForCurrentPupils,
-                maxSelectable: maxEventTeamsSelectable,
-              }"
-            />
-          </p>
-          <p
-            v-if="willAutoIncreasePupils"
-            class="detail-hint detail-hint-sm detail-hint-accent"
-          >
-            <I18nText
-              k="groupDetail.eventTeamAutoPupilsHint"
-              :values="{
-                teams: registerEventTeamCount,
-                pupils: pupilsRequiredForSelectedTeams,
-              }"
-            />
-          </p>
-          <div class="detail-register-event">
-            <EventSelectDropdown
-              :title="t('wizard.eventSelectAllEvents')"
-              :events="events"
-              :loading="eventsLoading"
-              :model-value="registerEventId"
-              :placeholder="t('groupDetail.selectEvent')"
-              :event-label-fn="eventLabel"
-              @update:model-value="registerEventId = $event"
-            />
-            <div class="detail-event-team-count">
-              <label for="group-event-team-count"><I18nText k="groupDetail.eventTeamsLabel" /></label>
-              <CustomSelect
-                id="group-event-team-count"
-                v-model.number="registerEventTeamCount"
-                size="sm"
-                :options="eventTeamCountSelectOptions"
-              />
-              <p class="detail-hint detail-hint-sm">
-                <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedEventCostEur }" />
-              </p>
-            </div>
-            <button
-              type="button"
-              class="detail-btn detail-btn-primary"
-              :disabled="!registerEventId || registeringEvent"
-              @click="submitRegisterForEvent"
-            >
-              <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
-              <i v-else class="bi bi-calendar-check"></i>
-              <I18nText v-if="registeringEvent" k="groupDetail.registering" />
-              <I18nText v-else k="groupDetail.registerForEventButton" />
-            </button>
-          </div>
-          <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
-          <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> <I18nText k="groupDetail.registerEventSuccess" /></p>
+        <section class="detail-section detail-section--wide">
+          <FutureGroupEventTeamsPanel
+            :group-id="group.id"
+            :group="group"
+            @updated="onGroupUpdated"
+          />
         </section>
 
         <section class="detail-section">
@@ -375,74 +224,9 @@ watch(
 .detail-co-coaches-wrap { margin-top: 0.25rem; }
 .detail-coaches { margin: 0; font-size: var(--text-base); color: var(--color-text); }
 .detail-coaches span + span::before { content: ', '; }
-.detail-event-current {
-  margin: 0 0 0.65rem;
-  font-size: var(--text-base);
-  color: var(--color-text);
-  font-weight: 600;
-}
-.detail-hint {
-  margin: 0 0 0.5rem;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  line-height: 1.45;
-}
-.detail-hint-sm {
-  font-size: 0.82rem;
-  margin-bottom: 0.75rem;
-}
-.detail-hint-accent {
-  color: color-mix(in srgb, var(--color-accent) 85%, var(--color-text));
-  font-weight: 500;
-}
-.detail-register-event {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-.detail-event-team-count label {
-  display: block;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin-bottom: 0.35rem;
-}
-.detail-event-team-count :deep(.custom-select) {
-  max-width: 10rem;
-}
-.detail-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-  padding: 0.55rem 0.9rem;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-.detail-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.detail-btn-primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
-}
-.detail-message {
-  margin: 0.6rem 0 0;
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.detail-message-error { color: var(--color-error, #dc2626); }
-.detail-message-success { color: #16a34a; }
 @media (min-width: 960px) {
   .detail-view { max-width: 78rem; }
   .detail-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-section--wide { grid-column: 1 / -1; }
 }
 </style>

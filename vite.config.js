@@ -28,11 +28,11 @@ export default defineConfig(({ mode }) => {
     vueDevTools(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['favicon.png', 'logo.png'],
       manifest: {
-        name: 'haNds On Technology Dashboard',
-        short_name: 'HOT Dashboard',
-        description: 'Dashboard and enrollment for haNds On Technology.',
+        name: 'JOIN – Coach Dashboard',
+        short_name: 'JOIN',
+        description: 'Coach dashboard and enrollment for JOIN.',
         theme_color: '#ff7a00',
         background_color: '#fafaf9',
         display: 'standalone',
@@ -40,9 +40,16 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: '/favicon.ico',
-            sizes: '64x64 32x32 24x24 16x16',
-            type: 'image/x-icon',
+            src: '/favicon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/favicon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

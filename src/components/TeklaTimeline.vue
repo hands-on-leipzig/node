@@ -3,6 +3,11 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getTeamDocumentBlobUrl, getClassDocumentBlobUrl, getGroupDocumentBlobUrl } from '@/services/draht'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
+import {
+  defaultShipmentPickerRange,
+  fallbackShipmentWednesdays,
+  formatShipmentDate,
+} from '@/utils/shipmentSchedule'
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
@@ -12,16 +17,20 @@ const props = defineProps({
   teklaType: { type: String, default: 'teams' },
   /** Team or class id – used to build document URL */
   teklaId: { type: [String, Number], default: null },
-  /** Versandaufschub date (Unix timestamp) or null – show set/change UI next to Versand step when defined (even if null) */
+  /**
+   * { earliestDate, standardDate, coachMinDate } as Y-m-d from API.
+   * When set, shows standard Wednesday shipment UI at Versand step.
+   */
+  shipmentSchedule: { type: Object, default: null },
+  /** @deprecated use shipmentSchedule – kept for backward compatibility */
   versandaufschub: { type: [Number, null], default: undefined },
 })
 
-const emit = defineEmits(['versandaufschub-save'])
+const emit = defineEmits(['versandaufschub-save', 'shipment-date-save'])
 
 const { t } = useI18n()
 
-const showVersandaufschubForm = ref(false)
-const versandaufschubDateStr = ref('')
+const selectedShipmentYmd = ref('')
 
 const isOpen = ref(true)
 const expandKey = ref(0)
@@ -135,38 +144,90 @@ function closePdfModal() {
   pdfModalOpen.value = false
 }
 
-const isVersandaufschubEnabled = computed(() => props.versandaufschub !== undefined)
+/** Parent passes non-null when Versand step exists; versandaufschub kept as fallback. */
+const shipmentControlsEnabled = computed(
+  () => props.shipmentSchedule !== null || props.versandaufschub !== undefined,
+)
+
+function ymdFromVersandaufschub(ts) {
+  if (ts == null || ts === '') return null
+  const ms = typeof ts === 'number' ? ts * 1000 : Date.parse(ts)
+  if (!Number.isFinite(ms)) return null
+  return new Date(ms).toISOString().slice(0, 10)
+}
+
+const schedule = computed(() => {
+  if (!shipmentControlsEnabled.value) return null
+  const s = props.shipmentSchedule && typeof props.shipmentSchedule === 'object'
+    ? props.shipmentSchedule
+    : {}
+  const earliest = s.earliestDate || ymdFromVersandaufschub(props.versandaufschub) || null
+  const standard = s.standardDate || null
+  return {
+    earliestDate: earliest,
+    standardDate: standard,
+    coachMinDate: s.coachMinDate || null,
+    isCustom: !!(standard && earliest && earliest !== standard),
+  }
+})
+
+const isShipmentPickerEnabled = computed(() => shipmentControlsEnabled.value)
+
+/** Geplanter Versand (frühestes Mittwoch-Datum). */
+const plannedYmd = computed(() => schedule.value?.earliestDate || schedule.value?.standardDate || '')
+
+const earliestYmd = computed(() => plannedYmd.value)
+const standardYmd = computed(() => schedule.value?.standardDate || '')
+const coachMinYmd = computed(() => schedule.value?.coachMinDate || '')
+
+const isCustomShipment = computed(() => !!schedule.value?.isCustom)
+
+const wednesdayOptions = computed(() => {
+  const anchor = standardYmd.value || earliestYmd.value
+  const ymds = anchor
+    ? defaultShipmentPickerRange(anchor, coachMinYmd.value, 16).options
+    : fallbackShipmentWednesdays(coachMinYmd.value, 24)
+  return ymds.map((ymd) => ({
+    value: ymd,
+    label: formatShipmentDate(ymd, props.locale),
+  }))
+})
+
+const shipmentSelectionDirty = computed(() => {
+  if (!selectedShipmentYmd.value) return false
+  if (!plannedYmd.value) return true
+  return selectedShipmentYmd.value !== plannedYmd.value
+})
+
+watch(
+  [plannedYmd, wednesdayOptions],
+  () => {
+    const planned = plannedYmd.value
+    if (planned && wednesdayOptions.value.some((o) => o.value === planned)) {
+      selectedShipmentYmd.value = planned
+    } else if (wednesdayOptions.value.length) {
+      selectedShipmentYmd.value = wednesdayOptions.value[0].value
+    } else {
+      selectedShipmentYmd.value = planned || ''
+    }
+  },
+  { immediate: true },
+)
 
 function isShipmentStep(step) {
   return step && (step.de === 'Versand' && step.en === 'Shipment')
 }
 
-function formatVersandaufschubDate(ts) {
-  if (!ts) return ''
-  const d = new Date(typeof ts === 'number' ? ts * 1000 : ts)
-  return d.toLocaleDateString(props.locale === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+function submitShipmentDate() {
+  const val = selectedShipmentYmd.value?.trim()
+  if (!val) return
+  emit('shipment-date-save', val)
+  emit('versandaufschub-save', val)
 }
 
-function openVersandaufschubForm() {
-  versandaufschubDateStr.value = props.versandaufschub
-    ? new Date(props.versandaufschub * 1000).toISOString().slice(0, 10)
-    : ''
-  showVersandaufschubForm.value = true
-}
-
-function submitVersandaufschub() {
-  const val = versandaufschubDateStr.value?.trim() || null
-  emit('versandaufschub-save', val || null)
-  showVersandaufschubForm.value = false
-}
-
-function clearVersandaufschub() {
+function resetToStandardShipment() {
+  emit('shipment-date-save', null)
   emit('versandaufschub-save', null)
-  showVersandaufschubForm.value = false
-}
-
-function cancelVersandaufschubForm() {
-  showVersandaufschubForm.value = false
 }
 </script>
 
@@ -252,43 +313,66 @@ function cancelVersandaufschubForm() {
                     </span>
                   </li>
                 </ul>
-                <!-- Versandaufschub next to Versand step (teams only) -->
+                <!-- Frühestes Versanddatum (Mittwoch) am Versand-Schritt -->
                 <div
-                  v-if="isShipmentStep(step) && isVersandaufschubEnabled"
+                  v-if="isShipmentStep(step) && isShipmentPickerEnabled"
                   class="tekla-versandaufschub"
                 >
-                  <template v-if="showVersandaufschubForm">
-                    <div class="tekla-versandaufschub-form">
-                      <input
-                        v-model="versandaufschubDateStr"
-                        type="date"
-                        class="tekla-versandaufschub-input"
-                        :placeholder="t('detail.versandaufschub')"
-                      />
-                      <button type="button" class="tekla-btn tekla-btn-primary" @click="submitVersandaufschub">
-                        <I18nText k="common.save" />
-                      </button>
-                      <button v-if="versandaufschub" type="button" class="tekla-btn" @click="clearVersandaufschub">
-                        <I18nText k="detail.versandaufschubClear" />
-                      </button>
-                      <button type="button" class="tekla-btn" @click="cancelVersandaufschubForm">
-                        <I18nText k="common.cancel" />
-                      </button>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <span v-if="versandaufschub" class="tekla-versandaufschub-text">
-                      <I18nText k="detail.versandaufschubBis" /> {{ formatVersandaufschubDate(versandaufschub) }}
-                    </span>
-                    <button
-                      type="button"
-                      class="tekla-versandaufschub-btn"
-                      @click="openVersandaufschubForm"
-                    >
-                      <I18nText v-if="versandaufschub" k="detail.versandaufschubChange" />
-                      <I18nText v-else k="detail.versandaufschubSet" />
-                    </button>
-                  </template>
+                  <p v-if="plannedYmd" class="tekla-shipment-planned">
+                    <I18nText k="detail.shipmentPlannedLabel" />
+                    <strong>{{ formatShipmentDate(plannedYmd, locale) }}</strong>
+                  </p>
+                  <p v-if="standardYmd" class="tekla-shipment-standard">
+                    <I18nText k="detail.shipmentStandardLabel" />
+                    <strong>{{ formatShipmentDate(standardYmd, locale) }}</strong>
+                  </p>
+                  <p v-else-if="plannedYmd" class="tekla-shipment-hint">
+                    <I18nText k="detail.shipmentStandardMissing" />
+                  </p>
+                  <p v-else class="tekla-shipment-hint">
+                    <I18nText k="detail.shipmentNoDateYet" />
+                  </p>
+                  <p v-if="isCustomShipment" class="tekla-shipment-current">
+                    <I18nText k="detail.shipmentDiffersFromStandard" />
+                  </p>
+                  <p v-else-if="standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
+                    <I18nText k="detail.shipmentEarliestIsStandard" />
+                  </p>
+                  <p class="tekla-shipment-hint">
+                    <I18nText k="detail.shipmentWednesdayHint" />
+                  </p>
+                  <div class="tekla-versandaufschub-form tekla-shipment-picker">
+                    <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
+                        <I18nText k="detail.shipmentPickWednesday" />
+                      </label>
+                      <select
+                        :id="`shipment-date-${teklaId}`"
+                        v-model="selectedShipmentYmd"
+                        class="tekla-versandaufschub-input tekla-shipment-select"
+                      >
+                        <option v-for="opt in wednesdayOptions" :key="opt.value" :value="opt.value">
+                          {{ opt.label }}
+                        </option>
+                      </select>
+                      <div class="tekla-shipment-form-actions">
+                        <button
+                          type="button"
+                          class="tekla-btn tekla-btn-primary"
+                          :disabled="!shipmentSelectionDirty"
+                          @click="submitShipmentDate"
+                        >
+                          <I18nText k="common.save" />
+                        </button>
+                        <button
+                          v-if="isCustomShipment && standardYmd"
+                          type="button"
+                          class="tekla-btn"
+                          @click="resetToStandardShipment"
+                        >
+                          <I18nText k="detail.shipmentResetStandard" />
+                        </button>
+                      </div>
+                  </div>
                 </div>
               </div>
             </li>
@@ -570,14 +654,68 @@ function cancelVersandaufschubForm() {
 
 .tekla-versandaufschub {
   margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem 1rem;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.tekla-shipment-planned {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.tekla-shipment-planned strong {
+  font-weight: 700;
+}
+
+.tekla-shipment-standard,
+.tekla-shipment-current,
+.tekla-shipment-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.tekla-shipment-hint {
+  color: var(--color-fg-muted);
+  font-size: var(--text-xs);
+}
+
+.tekla-shipment-current--standard {
+  color: var(--color-success, #16a34a);
+}
+
+.tekla-shipment-select-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.tekla-shipment-select {
+  min-width: 16rem;
+  max-width: 100%;
+}
+
+.tekla-shipment-picker {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.tekla-shipment-form-actions {
+  display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .tekla-versandaufschub-text {
@@ -601,17 +739,26 @@ function cancelVersandaufschubForm() {
 
 .tekla-versandaufschub-form {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.5rem;
   width: 100%;
 }
 
 .tekla-versandaufschub-input {
-  font-size: var(--text-sm);
-  padding: 0.35rem 0.5rem;
+  font-size: var(--text-base);
+  padding: 0.5rem 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  width: 100%;
+  max-width: 22rem;
+}
+
+.tekla-shipment-select {
+  appearance: auto;
+  cursor: pointer;
 }
 
 .tekla-btn {
@@ -626,7 +773,19 @@ function cancelVersandaufschubForm() {
 
 .tekla-btn-primary {
   background: var(--color-accent);
-  color: var(--color-bg);
+  color: var(--color-on-accent);
   border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.tekla-btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.tekla-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--color-on-accent);
 }
 </style>
