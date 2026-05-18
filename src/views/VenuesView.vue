@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/auth/keycloak'
 import { fetchPublicVenues } from '@/services/publicVenues'
 import VenuesMap from '@/components/VenuesMap.vue'
+import VenueDetailModal from '@/components/VenueDetailModal.vue'
 import {
   venueMatchesFilters,
   clusterVenuesForMap,
@@ -33,6 +34,7 @@ const countries = ref({ de: true, at: true, ch: true })
 const offers = ref({ exhibition: true, competition: true, future: true })
 
 const openAccordions = ref({})
+const selectedVenue = ref(null)
 
 const COUNTRY_KEYS = ['de', 'at', 'ch']
 const OFFER_KEYS = ['exhibition', 'competition', 'future']
@@ -49,6 +51,10 @@ const filteredVenues = computed(() =>
 )
 
 const mapClusters = computed(() => clusterVenuesForMap(filteredVenues.value))
+
+const showFutureSection = computed(() => offers.value.future)
+const showExploreSection = computed(() => offers.value.exhibition)
+const showChallengeSection = computed(() => offers.value.competition)
 
 function regioByProgram(program) {
   return filteredVenues.value
@@ -68,6 +74,34 @@ function eventsByCountry(list, country) {
   return list.filter((v) => v.country === country)
 }
 
+/** Länder-Akkordeons nur anzeigen, wenn Land im Kartenfilter aktiv ist und Treffer da sind. */
+function countriesWithEvents(list) {
+  return COUNTRY_KEYS.filter((c) => countries.value[c] && eventsByCountry(list, c).length > 0)
+}
+
+function sectionEvents(section) {
+  if (section === 'future') return futureEvents.value
+  return regioByProgram(section)
+}
+
+function syncAccordionsToFilters() {
+  const next = { ...openAccordions.value }
+  for (const section of ['future', 'explore', 'challenge']) {
+    if (section === 'future' && !showFutureSection.value) continue
+    if (section === 'explore' && !showExploreSection.value) continue
+    if (section === 'challenge' && !showChallengeSection.value) continue
+    const list = sectionEvents(section)
+    for (const c of COUNTRY_KEYS) {
+      const key = accordionKey(section, c)
+      const count = countries.value[c] ? eventsByCountry(list, c).length : 0
+      next[key] = count > 0
+    }
+  }
+  openAccordions.value = next
+}
+
+watch([countries, offers, filteredVenues], syncAccordionsToFilters, { deep: true, immediate: true })
+
 function accordionKey(section, country) {
   return `${section}-${country}`
 }
@@ -79,6 +113,21 @@ function isAccordionOpen(section, country) {
 function toggleAccordion(section, country) {
   const key = accordionKey(section, country)
   openAccordions.value = { ...openAccordions.value, [key]: !openAccordions.value[key] }
+}
+
+function openVenueDetail(venue) {
+  if (!venue?.id) return
+  selectedVenue.value = venue
+}
+
+function closeVenueDetail() {
+  selectedVenue.value = null
+}
+
+function onMapVenueSelect(venue) {
+  if (!venue?.id) return
+  const full = venues.value.find((v) => v.id === venue.id)
+  openVenueDetail(full || venue)
 }
 
 async function loadVenues() {
@@ -106,10 +155,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="venues-page venues-page--shell">
+  <div class="venues-page venues-page--shell liquid-surface-scope">
     <main class="venues-main">
-      <section class="venues-hero">
-        <div v-if="showForbidden" class="venues-forbidden">
+      <section class="venues-hero liquid-surface liquid-surface--accent">
+        <div v-if="showForbidden" class="venues-forbidden liquid-surface liquid-surface--radius-lg liquid-surface--accent">
           <p><i class="bi bi-shield-exclamation"></i> <I18nText k="auth.forbiddenMessage" /></p>
           <button type="button" class="btn btn-secondary btn-sm" @click="logout">
             <I18nText k="auth.logout" />
@@ -124,11 +173,11 @@ onMounted(() => {
         </div>
       </section>
 
-      <div v-if="loading" class="venues-status">
+      <div v-if="loading" class="venues-status liquid-surface">
         <i class="bi bi-arrow-repeat spin"></i>
         <I18nText k="venues.loading" />
       </div>
-      <div v-else-if="error" class="venues-status venues-status-error">
+      <div v-else-if="error" class="venues-status venues-status-error liquid-surface">
         <i class="bi bi-exclamation-circle"></i>
         {{ error }}
         <button type="button" class="btn btn-secondary btn-sm" @click="loadVenues">
@@ -145,18 +194,24 @@ onMounted(() => {
           <i class="bi bi-info-circle"></i>
           <I18nText k="venues.emptyListHint" />
         </p>
-        <section class="venues-map-section">
+        <section class="venues-map-section liquid-surface liquid-surface--accent liquid-surface--accent-blue">
           <VenuesMap
             v-model:countries="countries"
             v-model:offers="offers"
             :clusters="mapClusters"
             :result-count="filteredVenues.length"
+            @venue-select="onMapVenueSelect"
           />
         </section>
 
-        <section class="venues-program-section">
+        <p v-if="venues.length && filteredVenues.length === 0" class="venues-hint">
+          <i class="bi bi-funnel"></i>
+          <I18nText k="venues.noFilterResults" />
+        </p>
+
+        <section v-if="showFutureSection" class="venues-program-section">
           <h2 class="venues-section-title"><I18nText k="venues.sectionFuture" /></h2>
-          <div v-for="country in COUNTRY_KEYS" :key="'future-' + country" class="venues-accordion">
+          <div v-for="country in countriesWithEvents(futureEvents)" :key="'future-' + country" class="venues-accordion liquid-surface liquid-surface--radius-lg liquid-surface--accent">
             <button
               type="button"
               class="venues-accordion-head"
@@ -168,7 +223,8 @@ onMounted(() => {
               <span class="venues-accordion-count">{{ eventsByCountry(futureEvents, country).length }}</span>
             </button>
             <ul v-show="isAccordionOpen('future', country)" class="venues-accordion-body">
-              <li v-for="ev in eventsByCountry(futureEvents, country)" :key="ev.id" class="venues-event-row">
+              <li v-for="ev in eventsByCountry(futureEvents, country)" :key="ev.id">
+                <button type="button" class="venues-event-row" @click="openVenueDetail(ev)">
                 <span class="venues-event-name">{{ venueDisplayName(ev, locale) }}</span>
                 <span class="venues-event-meta">
                   <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
@@ -177,6 +233,7 @@ onMounted(() => {
                     · <I18nText k="venues.futureTrack5" />
                   </template>
                 </span>
+                </button>
               </li>
               <li v-if="!eventsByCountry(futureEvents, country).length" class="venues-empty">
                 <I18nText k="venues.noEventsInRegion" />
@@ -185,11 +242,21 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-for="section in ['explore', 'challenge']" :key="section" class="venues-program-section">
+        <section
+          v-for="section in ['explore', 'challenge']"
+          v-show="section === 'explore' ? showExploreSection : showChallengeSection"
+          :key="section"
+          class="venues-program-section"
+        >
           <h2 class="venues-section-title">
             <I18nText :k="section === 'explore' ? 'venues.sectionExplore' : 'venues.sectionChallenge'" />
           </h2>
-          <div v-for="country in COUNTRY_KEYS" :key="section + country" class="venues-accordion">
+          <div
+            v-for="country in countriesWithEvents(regioByProgram(section))"
+            :key="section + country"
+            class="venues-accordion liquid-surface liquid-surface--radius-lg liquid-surface--accent"
+            :class="section === 'explore' ? 'liquid-surface--accent-blue' : 'liquid-surface--accent-amber'"
+          >
             <button
               type="button"
               class="venues-accordion-head"
@@ -203,12 +270,14 @@ onMounted(() => {
               </span>
             </button>
             <ul v-show="isAccordionOpen(section, country)" class="venues-accordion-body">
-              <li v-for="ev in eventsByCountry(regioByProgram(section), country)" :key="ev.id" class="venues-event-row">
-                <span class="venues-event-name">{{ venueDisplayName(ev, locale) }}</span>
-                <span class="venues-event-meta">
-                  <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
-                  <template v-if="venueCapacityLabel(ev, t)"> · {{ venueCapacityLabel(ev, t) }}</template>
-                </span>
+              <li v-for="ev in eventsByCountry(regioByProgram(section), country)" :key="ev.id">
+                <button type="button" class="venues-event-row" @click="openVenueDetail(ev)">
+                  <span class="venues-event-name">{{ venueDisplayName(ev, locale) }}</span>
+                  <span class="venues-event-meta">
+                    <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
+                    <template v-if="venueCapacityLabel(ev, t)"> · {{ venueCapacityLabel(ev, t) }}</template>
+                  </span>
+                </button>
               </li>
               <li v-if="!eventsByCountry(regioByProgram(section), country).length" class="venues-empty">
                 <I18nText k="venues.noEventsInRegion" />
@@ -219,6 +288,12 @@ onMounted(() => {
 
       </template>
     </main>
+
+    <VenueDetailModal
+      :show="!!selectedVenue"
+      :venue="selectedVenue"
+      @close="closeVenueDetail"
+    />
   </div>
 </template>
 
@@ -259,12 +334,6 @@ onMounted(() => {
 .venues-forbidden {
   margin-bottom: 1rem;
   padding: 1rem;
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  box-shadow: var(--liquid-shadow);
 }
 .venues-forbidden p {
   margin: 0 0 0.75rem;
@@ -272,12 +341,6 @@ onMounted(() => {
 .venues-hero {
   margin-bottom: 2rem;
   padding: 1.5rem 1.35rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 .venues-title {
   font-size: var(--text-3xl);
@@ -311,12 +374,6 @@ onMounted(() => {
   padding: 2rem;
   justify-content: center;
   color: var(--color-text-muted);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 .venues-status-error {
   flex-direction: column;
@@ -348,13 +405,7 @@ onMounted(() => {
   margin-bottom: 2.5rem;
   min-height: var(--venues-map-height);
   height: var(--venues-map-height);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
   overflow: hidden;
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 @media (min-width: 900px) {
   .venues-map-section {
@@ -374,14 +425,8 @@ onMounted(() => {
   margin: 0 0 1rem;
 }
 .venues-accordion {
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-lg);
   margin-bottom: 0.5rem;
   overflow: hidden;
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
-  box-shadow: var(--shadow-sm);
 }
 .venues-accordion-head {
   width: 100%;
@@ -410,13 +455,30 @@ onMounted(() => {
   border-top: 1px solid var(--color-border);
 }
 .venues-event-row {
+  width: 100%;
+  margin: 0;
   padding: 0.5rem 0;
+  border: none;
   border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.15rem;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
-.venues-event-row:last-child {
+.venues-event-row:hover {
+  background: var(--color-bg-muted);
+}
+.venues-event-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.venues-accordion-body > li:last-child .venues-event-row {
   border-bottom: none;
 }
 .venues-event-name {
@@ -436,12 +498,6 @@ onMounted(() => {
 }
 .venues-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-xl);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 .venues-table {
   width: 100%;

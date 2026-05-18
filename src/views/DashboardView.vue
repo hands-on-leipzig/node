@@ -555,24 +555,24 @@ const hasDocumentTreeContent = computed(() => {
 </script>
 
 <template>
-  <div class="dashboard-view">
-    <div v-if="loading" class="dashboard-loading">
+  <div class="dashboard-view liquid-surface-scope">
+    <div v-if="loading" class="dashboard-loading liquid-surface">
       <i class="bi bi-arrow-repeat spin"></i>
       <I18nText k="dashboard.loading" />
     </div>
-    <div v-else-if="error" class="dashboard-error">
+    <div v-else-if="error" class="dashboard-error liquid-surface">
       <i class="bi bi-exclamation-circle"></i>
       {{ error }}
     </div>
     <template v-else>
-      <header class="dashboard-header">
+      <header class="dashboard-header liquid-surface liquid-surface--accent">
         <h1 class="dashboard-title"><I18nText k="dashboard.cockpitTitle" /></h1>
         <p class="dashboard-subtitle"><I18nText k="dashboard.cockpitSubtitle" /></p>
       </header>
 
       <div class="dashboard-grid">
         <!-- Section: Register new team / class -->
-        <section class="dashboard-card dashboard-card-register">
+        <section class="dashboard-card liquid-surface liquid-surface--accent dashboard-card-register">
           <h2 class="dashboard-card-title">
             <i class="bi bi-plus-circle"></i>
             <I18nText k="dashboard.registerNew" />
@@ -606,7 +606,7 @@ const hasDocumentTreeContent = computed(() => {
         </section>
 
         <!-- Section: Tasks to do (only teams/classes with action required) -->
-        <section class="dashboard-card dashboard-card-tasks">
+        <section class="dashboard-card liquid-surface liquid-surface--accent liquid-surface--accent-amber dashboard-card-tasks">
           <h2 class="dashboard-card-title">
             <i class="bi bi-list-check"></i>
             <I18nText k="dashboard.tasksToDo" />
@@ -639,7 +639,7 @@ const hasDocumentTreeContent = computed(() => {
         </section>
 
         <!-- Documents for download (SharePoint / shared folder) — always visible -->
-        <section class="dashboard-card dashboard-card-documents">
+        <section class="dashboard-card liquid-surface liquid-surface--accent liquid-surface--accent-blue dashboard-card-documents">
           <h2 class="dashboard-card-title">
             <i class="bi bi-cloud-arrow-down"></i>
             <template v-if="documentsConfig.title">{{ documentsConfig.title }}</template>
@@ -696,7 +696,7 @@ const hasDocumentTreeContent = computed(() => {
         </section>
 
         <!-- Upcoming events (only when admin enabled calendar feed) -->
-        <section v-if="calendarTileVisible" class="dashboard-card dashboard-card-events">
+        <section v-if="calendarTileVisible" class="dashboard-card liquid-surface liquid-surface--accent liquid-surface--accent-teal dashboard-card-events">
           <h2 class="dashboard-card-title">
             <i class="bi bi-calendar-event"></i>
             <I18nText k="dashboard.upcomingEvents" />
@@ -927,48 +927,6 @@ const hasDocumentTreeContent = computed(() => {
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 2rem;
-
-  /* Mehr „Liquid“ nur auf dieser Seite (Teleport-Dialoge hängen am body → globale Tokens) */
-  --liquid-blur: 58px;
-  --liquid-saturate: 1.92;
-  --liquid-tile-bg: linear-gradient(
-    168deg,
-    rgba(255, 255, 255, 0.44) 0%,
-    rgba(255, 255, 255, 0.16) 50%,
-    rgba(255, 255, 255, 0.07) 100%
-  );
-  --liquid-tile-bg-inner: linear-gradient(
-    168deg,
-    rgba(255, 255, 255, 0.25) 0%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  --liquid-border: rgba(255, 255, 255, 0.9);
-  --liquid-border-soft: rgba(255, 255, 255, 0.46);
-  --liquid-shadow: 0 24px 62px rgba(0, 0, 0, 0.09), 0 9px 26px rgba(0, 0, 0, 0.055),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.98), inset 0 -1.5px 0 rgba(0, 0, 0, 0.036);
-  --shadow-lg: 0 30px 72px rgba(0, 0, 0, 0.11), 0 12px 28px rgba(0, 0, 0, 0.062),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.82);
-}
-
-:global(html[data-theme='dark']) .dashboard-view {
-  --liquid-blur: 66px;
-  --liquid-saturate: 1.82;
-  --liquid-tile-bg: linear-gradient(
-    168deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(56, 50, 48, 0.38) 48%,
-    rgba(26, 24, 22, 0.52) 100%
-  );
-  --liquid-tile-bg-inner: linear-gradient(
-    168deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(48, 44, 42, 0.34) 100%
-  );
-  --liquid-border: rgba(255, 255, 255, 0.26);
-  --liquid-border-soft: rgba(255, 255, 255, 0.13);
-  --liquid-shadow: 0 26px 64px rgba(0, 0, 0, 0.52), 0 10px 24px rgba(0, 0, 0, 0.34),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.17), inset 0 -1.5px 0 rgba(0, 0, 0, 0.38);
-  --shadow-lg: 0 32px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.13);
 }
 
 .dashboard-loading,
@@ -980,12 +938,6 @@ const hasDocumentTreeContent = computed(() => {
   min-height: 14rem;
   font-size: 1.25rem;
   color: var(--color-text-muted);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-error {
@@ -995,12 +947,6 @@ const hasDocumentTreeContent = computed(() => {
 .dashboard-header {
   margin-bottom: 1.75rem;
   padding: 1.25rem 1.5rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-title {
@@ -1024,13 +970,7 @@ const hasDocumentTreeContent = computed(() => {
 }
 
 .dashboard-card {
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-xl);
   padding: 1.25rem 1.5rem;
-  box-shadow: var(--liquid-shadow);
 }
 
 .dashboard-card-title {
@@ -1067,14 +1007,8 @@ const hasDocumentTreeContent = computed(() => {
   line-height: 1.45;
 }
 
-/* Tasks */
-.dashboard-card-tasks {
-  border-left: 3px solid #b45309;
-}
-
 .dashboard-card-documents {
   grid-column: 1 / -1;
-  border-left: 3px solid #2563eb;
 }
 .dashboard-documents-loading {
   display: flex;
@@ -1267,11 +1201,6 @@ const hasDocumentTreeContent = computed(() => {
 .dashboard-empty .bi {
   color: #16a34a;
   font-size: 1.25rem;
-}
-
-/* Register CTA */
-.dashboard-card-register {
-  border-left: 3px solid var(--color-accent);
 }
 
 .dashboard-cta {
@@ -1549,10 +1478,8 @@ const hasDocumentTreeContent = computed(() => {
   cursor: not-allowed;
 }
 
-/* Upcoming events */
 .dashboard-card-events {
   grid-column: 1 / -1;
-  border-left: 3px solid #0d9488;
 }
 
 .dashboard-events-list {

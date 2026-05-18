@@ -452,31 +452,59 @@ const { canInstall, promptInstall } = usePwaInstall()
           <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo" />
         </a>
       </div>
-      <div v-if="isGuestShell" class="sidebar-bottom sidebar-bottom-guest">
-        <div class="sidebar-guest-tools">
-          <button
-            type="button"
-            class="profile-pill"
-            :class="{ active: theme === 'light' }"
-            :title="t('common.light')"
-            @click="setTheme('light')"
-          >
-            <i class="bi bi-sun-fill"></i>
-          </button>
-          <button
-            type="button"
-            class="profile-pill"
-            :class="{ active: theme === 'dark' }"
-            :title="t('common.dark')"
-            @click="setTheme('dark')"
-          >
-            <i class="bi bi-moon-fill"></i>
-          </button>
-          <button type="button" class="profile-pill" :class="{ active: locale === 'de' }" @click="switchToDe">DE</button>
-          <button type="button" class="profile-pill" :class="{ active: locale === 'en' }" @click="switchToEn">EN</button>
+      <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">
+        <div class="sidebar-prefs">
+          <div class="sidebar-prefs-block">
+            <span class="sidebar-prefs-heading"><I18nText k="common.theme" /></span>
+            <div class="sidebar-prefs-row" role="group" :aria-label="t('common.theme')">
+              <button
+                type="button"
+                class="sidebar-pref-btn"
+                :class="{ active: theme === 'light' }"
+                :aria-pressed="theme === 'light'"
+                @click="setTheme('light')"
+              >
+                <i class="bi bi-sun-fill" aria-hidden="true" />
+                <span><I18nText k="common.light" /></span>
+              </button>
+              <button
+                type="button"
+                class="sidebar-pref-btn"
+                :class="{ active: theme === 'dark' }"
+                :aria-pressed="theme === 'dark'"
+                @click="setTheme('dark')"
+              >
+                <i class="bi bi-moon-fill" aria-hidden="true" />
+                <span><I18nText k="common.dark" /></span>
+              </button>
+            </div>
+          </div>
+          <div class="sidebar-prefs-block">
+            <span class="sidebar-prefs-heading"><I18nText k="common.language" /></span>
+            <div class="sidebar-prefs-row" role="group" :aria-label="t('common.language')">
+              <button
+                type="button"
+                class="sidebar-pref-btn"
+                :class="{ active: locale === 'de' }"
+                :aria-pressed="locale === 'de'"
+                @click="switchToDe"
+              >
+                DE
+              </button>
+              <button
+                type="button"
+                class="sidebar-pref-btn"
+                :class="{ active: locale === 'en' }"
+                :aria-pressed="locale === 'en'"
+                @click="switchToEn"
+              >
+                EN
+              </button>
+            </div>
+          </div>
         </div>
         <button
-          v-if="!isAuthenticated()"
+          v-if="isGuestShell && !isAuthenticated()"
           type="button"
           class="sidebar-login-btn sidebar-item"
           @click="doLogin(); closeSidebar()"
@@ -485,7 +513,7 @@ const { canInstall, promptInstall } = usePwaInstall()
           <span class="sidebar-item-label"><I18nText k="nav.login" /></span>
         </button>
         <button
-          v-else
+          v-else-if="isGuestShell"
           type="button"
           class="sidebar-login-btn sidebar-item"
           @click="doLogout(); closeSidebar()"
@@ -493,9 +521,7 @@ const { canInstall, promptInstall } = usePwaInstall()
           <span class="sidebar-item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
           <span class="sidebar-item-label"><I18nText k="auth.logout" /></span>
         </button>
-      </div>
-      <div v-else class="sidebar-bottom">
-        <div class="sidebar-profile-wrap">
+        <div v-else class="sidebar-profile-wrap">
           <button
             type="button"
             class="profile-trigger sidebar-item"
@@ -533,25 +559,9 @@ const { canInstall, promptInstall } = usePwaInstall()
                 <i class="bi bi-question-circle"></i>
                 <span><I18nText k="common.help" /></span>
               </button>
-              <div class="profile-menu-section">
-                <span class="profile-menu-label"><I18nText k="common.language" /></span>
+              <div v-if="hasAdminRole()" class="profile-menu-section">
+                <span class="profile-menu-label"><I18nText k="nav.adminTranslations" /></span>
                 <div class="profile-menu-btns">
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: locale === 'de' }"
-                    @click="switchToDe"
-                  >
-                    DE
-                  </button>
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: locale === 'en' }"
-                    @click="switchToEn"
-                  >
-                    EN
-                  </button>
                   <button
                     type="button"
                     class="profile-pill"
@@ -563,7 +573,6 @@ const { canInstall, promptInstall } = usePwaInstall()
                     Keys
                   </button>
                   <button
-                    v-if="hasAdminRole()"
                     type="button"
                     class="profile-pill"
                     :class="{ active: translationEditMode }"
@@ -572,29 +581,6 @@ const { canInstall, promptInstall } = usePwaInstall()
                   >
                     <i class="bi bi-pencil-square"></i>
                     Edit
-                  </button>
-                </div>
-              </div>
-              <div class="profile-menu-section">
-                <span class="profile-menu-label"><I18nText k="common.theme" /></span>
-                <div class="profile-menu-btns">
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: theme === 'light' }"
-                    @click="setTheme('light')"
-                  >
-                    <i class="bi bi-sun-fill"></i>
-                    <I18nText k="common.light" />
-                  </button>
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: theme === 'dark' }"
-                    @click="setTheme('dark')"
-                  >
-                    <i class="bi bi-moon-fill"></i>
-                    <I18nText k="common.dark" />
                   </button>
                 </div>
               </div>
@@ -718,13 +704,13 @@ const { canInstall, promptInstall } = usePwaInstall()
   object-position: center;
 }
 .sidebar-partner {
-  margin: 0.75rem 0.75rem 0;
-  padding: 0.65rem 0.5rem 0;
+  margin: 0.75rem 0.5rem 0;
+  padding: 0.65rem 0.35rem 0;
   border-top: 1px solid var(--color-border);
   text-align: center;
 }
 .sidebar-partner-label {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.45rem;
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -732,15 +718,17 @@ const { canInstall, promptInstall } = usePwaInstall()
   color: var(--color-text-subtle);
 }
 .sidebar-partner-link {
-  display: inline-block;
+  display: block;
+  width: 100%;
   line-height: 0;
 }
 .sidebar-partner-logo {
-  height: 2rem;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
+  height: auto;
+  max-height: 3.25rem;
   object-fit: contain;
-  opacity: 0.92;
+  object-position: center;
+  opacity: 0.95;
   transition: opacity 0.15s;
 }
 .sidebar-partner-link:hover .sidebar-partner-logo {
@@ -955,21 +943,82 @@ const { canInstall, promptInstall } = usePwaInstall()
   to { transform: rotate(360deg); }
 }
 
-.sidebar-bottom-guest {
+.sidebar-bottom {
+  padding: 0.75rem 0.5rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+  margin-top: auto;
+  background: var(--liquid-bg-subtle);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  flex-shrink: 0;
 }
-.sidebar-guest-tools {
+.sidebar-bottom--guest {
+  gap: 0.75rem;
+}
+.sidebar-prefs {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0 0.15rem;
+}
+.sidebar-prefs-block {
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
-  justify-content: flex-start;
+}
+.sidebar-prefs-heading {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+.sidebar-prefs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+.sidebar-pref-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius);
+  background: var(--liquid-tile-bg-inner);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(calc(var(--liquid-saturate) * 0.9));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(calc(var(--liquid-saturate) * 0.9));
+  box-shadow: var(--liquid-shadow-inset);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.sidebar-pref-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--liquid-border);
+}
+.sidebar-pref-btn.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: 0 2px 10px rgba(255, 122, 0, 0.28);
+}
+.sidebar-pref-btn .bi {
+  font-size: 1rem;
+  flex-shrink: 0;
 }
 .sidebar-login-btn {
-  width: calc(100% - 1rem);
+  width: 100%;
   max-width: 100%;
-  margin: 0 0.5rem;
+  margin: 0;
   justify-content: flex-start;
   border: 1px solid var(--color-border);
   background: var(--color-accent-soft);
@@ -990,18 +1039,15 @@ const { canInstall, promptInstall } = usePwaInstall()
   font-size: 1.2rem;
 }
 
-.sidebar-bottom {
-  padding: 0.5rem 0.75rem 0;
-  border-top: 1px solid var(--color-border);
-  margin-top: auto;
-  background: var(--liquid-bg-subtle);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
 .sidebar-profile-wrap {
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 .profile-trigger {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -1038,6 +1084,10 @@ const { canInstall, promptInstall } = usePwaInstall()
   font-weight: 600;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  overflow: hidden;
+}
+.profile-trigger .profile-avatar {
+  margin: 0;
 }
 .profile-avatar-img {
   width: 100%;
@@ -1053,7 +1103,11 @@ const { canInstall, promptInstall } = usePwaInstall()
   position: absolute;
   bottom: calc(100% + 0.5rem);
   left: 0;
-  min-width: 12rem;
+  right: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--liquid-popover-fill);
   backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
   -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
@@ -1249,7 +1303,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     max-height: 2.75rem;
   }
   .sidebar-partner-logo {
-    height: 1.65rem;
+    max-height: 2.5rem;
   }
   .content {
     padding: 1rem;

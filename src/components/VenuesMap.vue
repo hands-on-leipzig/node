@@ -22,6 +22,8 @@ const props = defineProps({
   },
 })
 
+const emit = defineEmits(['venue-select'])
+
 const { t } = useI18n()
 
 const mapWrap = ref(null)
@@ -188,6 +190,10 @@ function syncMarkers() {
     if (cluster.count > 1) {
       marker.bindTooltip(String(cluster.count), { permanent: true, direction: 'center', className: 'venues-map-count' })
     }
+    marker.on('click', () => {
+      const list = Array.isArray(cluster.venues) ? cluster.venues : []
+      if (list.length) emit('venue-select', list[0])
+    })
     marker.addTo(layer)
     bounds.push([lat, lon])
   }

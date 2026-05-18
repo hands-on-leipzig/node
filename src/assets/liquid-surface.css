@@ -1,0 +1,105 @@
+/**
+ * Dashboard-style liquid glass panels: bright rim, 1.5px top inset (3D lift), optional left accent.
+ * Apply .liquid-surface-scope on a container (or the panel itself for teleports).
+ */
+
+.liquid-surface-scope {
+  --liquid-blur: 58px;
+  --liquid-saturate: 1.92;
+  --liquid-tile-bg: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.44) 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --liquid-tile-bg-inner: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  --liquid-border: rgba(255, 255, 255, 0.9);
+  --liquid-border-soft: rgba(255, 255, 255, 0.46);
+  --liquid-shadow: 0 24px 62px rgba(0, 0, 0, 0.09), 0 9px 26px rgba(0, 0, 0, 0.055),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98), inset 0 -1.5px 0 rgba(0, 0, 0, 0.036);
+  --liquid-shadow-inset: inset 0 1.5px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.032);
+  --shadow-lg: 0 30px 72px rgba(0, 0, 0, 0.11), 0 12px 28px rgba(0, 0, 0, 0.062),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme='dark'] .liquid-surface-scope {
+  --liquid-blur: 66px;
+  --liquid-saturate: 1.82;
+  --liquid-tile-bg: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(56, 50, 48, 0.38) 48%,
+    rgba(26, 24, 22, 0.52) 100%
+  );
+  --liquid-tile-bg-inner: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(48, 44, 42, 0.34) 100%
+  );
+  --liquid-border: rgba(255, 255, 255, 0.26);
+  --liquid-border-soft: rgba(255, 255, 255, 0.13);
+  --liquid-shadow: 0 26px 64px rgba(0, 0, 0, 0.52), 0 10px 24px rgba(0, 0, 0, 0.34),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.17), inset 0 -1.5px 0 rgba(0, 0, 0, 0.38);
+  --liquid-shadow-inset: inset 0 1.5px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 32px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+.liquid-surface {
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--liquid-shadow);
+}
+
+.liquid-surface--radius-lg {
+  border-radius: var(--radius-lg);
+}
+
+.liquid-surface--accent {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: var(--liquid-surface-accent, var(--color-accent));
+}
+
+.liquid-surface--accent-blue {
+  --liquid-surface-accent: #2563eb;
+}
+
+.liquid-surface--accent-amber {
+  --liquid-surface-accent: #b45309;
+}
+
+.liquid-surface--accent-teal {
+  --liquid-surface-accent: #0d9488;
+}
+
+.liquid-surface-inner {
+  background: var(--liquid-tile-bg-inner);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.92));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.92));
+  border: 1px solid var(--liquid-border-soft);
+  box-shadow: var(--liquid-shadow-inset);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .liquid-surface-scope .liquid-surface {
+    background: rgba(255, 252, 248, 0.94);
+  }
+  html[data-theme='dark'] .liquid-surface-scope .liquid-surface {
+    background: rgba(58, 54, 52, 0.96);
+  }
+  .liquid-surface-scope .liquid-surface-inner {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  html[data-theme='dark'] .liquid-surface-scope .liquid-surface-inner {
+    background: rgba(44, 40, 38, 0.92);
+  }
+}

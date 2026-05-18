@@ -6,8 +6,9 @@
  * @param {{ countries: Set<string>, offers: Set<string> }} filters
  */
 export function venueMatchesFilters(venue, filters) {
-  if (filters.countries.size && !filters.countries.has(venue.country)) return false
-  if (filters.offers.size && !filters.offers.has(venue.offerCategory)) return false
+  if (!filters.countries.size || !filters.offers.size) return false
+  if (!filters.countries.has(venue.country)) return false
+  if (!filters.offers.has(venue.offerCategory)) return false
   return true
 }
 
