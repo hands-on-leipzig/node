@@ -39,9 +39,9 @@ export default {
         "signInWithSso": "Sign in with SSO"
     },
     "venues": {
-        "title": "Event locations 2026-27",
-        "lead": "Here you can find all event locations for the FIRST LEGO League BIOGLOW Season 2026/27 in Germany, Austria, and Switzerland. Explore the interactive map and location list to find a FIRST LEGO League event near you.",
-        "ctaRegister": "Team registration",
+        "title": "Event locations 2026-27 season",
+        "lead": "Here you can find all event locations for the FIRST LEGO League BIOGLOW season 2026/27 in Germany, Austria, and Switzerland. Explore the interactive map and location list to find a FIRST LEGO League event near you.\n",
+        "ctaRegister": "To registration",
         "loading": "Loading venues…",
         "loadError": "Could not load venues.",
         "retry": "Try again",
