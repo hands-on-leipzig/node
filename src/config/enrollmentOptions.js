@@ -21,3 +21,14 @@ export const EDITION_FUTURE = 'future'
 
 /** Future Edition: nur 8 / 16 / 24 laut Anmeldelogik */
 export const FUTURE_PUPIL_OPTIONS = [8, 16, 24]
+
+/** Tekla `reason_attention` keys (see mod-handson/class/tekla.class.php). */
+export const REASON_ATTENTION_OPTIONS = [
+  { value: 'virtual_fll', labelKey: 'wizard.reasonVirtualFll' },
+  { value: 'social_media', labelKey: 'wizard.reasonSocialMedia' },
+  { value: 'fair', labelKey: 'wizard.reasonFair' },
+  { value: 'retailer', labelKey: 'wizard.reasonRetailer' },
+  { value: 'press', labelKey: 'wizard.reasonPress' },
+  { value: 'research', labelKey: 'wizard.reasonResearch' },
+  { value: 'other', labelKey: 'wizard.reasonOther' },
+]

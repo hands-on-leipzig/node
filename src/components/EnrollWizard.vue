@@ -7,12 +7,17 @@ import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
+import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import {
   FUTURE_GROUP_PRICE_EUR,
   FUTURE_SEASON_SET_UNIT_EUR,
   FUTURE_TEAM_EVENT_UNIT_EUR,
 } from '@/config/futureEditionConfig'
+import {
+  FOUNDERS_SEASON_SET_UNIT_EUR,
+  FOUNDERS_TEAM_EVENT_UNIT_EUR,
+  foundersRegistrationPriceEur,
+} from '@/config/foundersEditionConfig'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -38,7 +43,14 @@ const emptyAddressState = () => ({
   new: { street: '', postalCode: '', city: '', country: '' },
 })
 
-// Step 0: Voucher / Direkteinstieg
+// Step 0a: FLL experience (before voucher)
+const introSubStep = ref('fll') // 'fll' | 'voucher'
+/** User already participated in FLL: 'yes' | 'no' (maps to tekla first_participation inverted). */
+const fllParticipatedBefore = ref(null)
+/** Tekla reason_attention when first participation. */
+const reasonAttention = ref(null)
+
+// Step 0b: Voucher / Direkteinstieg
 const hasVoucherCode = ref(null) // null | 'yes' | 'no'
 // Step 1
 const edition = ref(null) // 'founders' | 'future'
@@ -90,6 +102,7 @@ const presetSeasonSetCount = ref(null)
 const wizardSeasonSetCount = ref(1)
 
 const effectiveSeasonSetCount = computed(() => {
+  if (edition.value === 'founders' && foundersVariant.value === 'explore') return 0
   if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) {
     return presetSeasonSetCount.value
   }
@@ -128,15 +141,43 @@ const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
 )
 
+const foundersNeedsSeasonSets = computed(
+  () => edition.value === 'founders' && foundersVariant.value === 'challenge',
+)
+
+const foundersSeasonSetsStep = computed(() => {
+  if (!foundersNeedsSeasonSets.value) return -1
+  if (foundersTeamHasParticipantsStep.value) return 7
+  if (foundersType.value === 'class') return 6
+  return -1
+})
+
+const foundersAddressesStep = computed(() => {
+  if (edition.value !== 'founders') return -1
+  if (foundersTeamHasParticipantsStep.value) {
+    return foundersNeedsSeasonSets.value ? 8 : 7
+  }
+  return foundersNeedsSeasonSets.value ? 7 : 6
+})
+
+const foundersOrderStep = computed(() => {
+  if (edition.value !== 'founders') return -1
+  return foundersAddressesStep.value + 1
+})
+
 /** Founders inserts team/class between variant (2) and institution — institution shifts +1 vs Future. */
 const institutionStepIndex = computed(() => (edition.value === 'founders' ? 4 : 3))
 const participantsStepIndex = computed(() => (edition.value === 'founders' ? 5 : 4))
 
 const lastStep = computed(() => {
-  // Future: 5=sets, 6=on-site, 7=addresses, 8=review. Founders class: +sets before addresses. Team: event, then sets, addresses, order.
+  // Future: 5=sets, 6=on-site, 7=addresses, 8=review. Founders Explore: no season sets.
   if (edition.value === 'future') return 8
-  if (foundersTeamHasParticipantsStep.value) return 9
-  if (edition.value === 'founders') return 8
+  if (foundersTeamHasParticipantsStep.value) {
+    return foundersNeedsSeasonSets.value ? 9 : 8
+  }
+  if (edition.value === 'founders') {
+    return foundersNeedsSeasonSets.value ? 8 : 7
+  }
   return 1
 })
 
@@ -207,33 +248,49 @@ const wizardProgressSteps = computed(() => {
   }
 
   if (foundersTeamHasParticipantsStep.value) {
-    return withIndex([
+    const addr = foundersAddressesStep.value
+    const order = foundersOrderStep.value
+    const items = [
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
       { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
       { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
       { key: 'wizard.progressEvent', active: s === 6, done: s > 6 },
-      { key: 'wizard.progressSeasonSets', active: s === 7, done: s > 7 },
-      { key: 'wizard.progressAddresses', active: s === 8, done: s > 8 },
-      { key: 'wizard.progressReview', active: s === 9, done: success.value },
-    ])
+    ]
+    if (foundersNeedsSeasonSets.value) {
+      items.push({ key: 'wizard.progressSeasonSets', active: s === 7, done: s > 7 })
+    }
+    items.push(
+      { key: 'wizard.progressAddresses', active: s === addr, done: s > addr },
+      { key: 'wizard.progressReview', active: s === order, done: success.value },
+    )
+    return withIndex(items)
   }
 
-  return withIndex([
+  const addr = foundersAddressesStep.value
+  const order = foundersOrderStep.value
+  const items = [
     { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
     { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
     { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
     { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
-    { key: 'wizard.progressSeasonSets', active: s === 6, done: s > 6 },
-    { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
-    { key: 'wizard.progressReview', active: s === 8, done: success.value },
-  ])
+  ]
+  if (foundersNeedsSeasonSets.value) {
+    items.push({ key: 'wizard.progressSeasonSets', active: s === 6, done: s > 6 })
+  }
+  items.push(
+    { key: 'wizard.progressAddresses', active: s === addr, done: s > addr },
+    { key: 'wizard.progressReview', active: s === order, done: success.value },
+  )
+  return withIndex(items)
 })
 
 const stepTitle = computed(() => {
   const s = step.value
   const ft = foundersTeamHasParticipantsStep.value
-  if (s === 0) return t('wizard.stepVoucherCode')
+  if (s === 0) {
+    return introSubStep.value === 'fll' ? t('wizard.stepFllExperience') : t('wizard.stepVoucherCode')
+  }
   if (s === 1) return t('wizard.stepEdition')
   if (s === 2) return edition.value === 'future' ? t('wizard.stepFutureGroup') : t('wizard.stepVariant')
   if (s === 3) {
@@ -256,22 +313,30 @@ const stepTitle = computed(() => {
   if (s === 6) {
     if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
     if (ft) return t('wizard.stepEvent')
-    if (edition.value === 'founders' && foundersType.value === 'class') return t('enrollFuture.stepSeasonSets')
+    if (edition.value === 'founders' && foundersType.value === 'class') {
+      return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
+    }
     return ''
   }
   if (s === 7) {
     if (edition.value === 'future') return t('wizard.stepAddresses')
-    if (ft) return t('enrollFuture.stepSeasonSets')
-    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepAddresses')
+    if (ft) {
+      return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
+    }
+    if (edition.value === 'founders' && foundersType.value === 'class') {
+      return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
+    }
     return ''
   }
   if (s === 8) {
     if (edition.value === 'future') return t('wizard.stepOrder')
-    if (ft) return t('wizard.stepAddresses')
+    if (ft) {
+      return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
+    }
     if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepOrder')
     return ''
   }
-  if (s === 9 && ft) return t('wizard.stepOrder')
+  if (s === 9 && ft && foundersNeedsSeasonSets.value) return t('wizard.stepOrder')
   return ''
 })
 
@@ -324,9 +389,7 @@ function selectFuturePupils(num) {
 
 function seasonSetsStepIndex() {
   if (edition.value === 'future') return 5
-  if (foundersTeamHasParticipantsStep.value) return 7
-  if (edition.value === 'founders' && foundersType.value === 'class') return 6
-  return -1
+  return foundersSeasonSetsStep.value
 }
 
 function selectWizardSeasonSetCount(count) {
@@ -425,6 +488,31 @@ const futureOrderTotalEur = computed(
     futureOrderEventTeamsPriceEur.value,
 )
 
+const foundersOrderRegistrationPriceEur = computed(() =>
+  edition.value === 'founders'
+    ? foundersRegistrationPriceEur(foundersVariant.value, foundersType.value)
+    : 0,
+)
+
+const foundersOrderSeasonSetsPriceEur = computed(() => {
+  if (edition.value !== 'founders') return 0
+  const n = Number(effectiveSeasonSetCount.value)
+  if (!Number.isFinite(n) || n < 0) return 0
+  return n * FOUNDERS_SEASON_SET_UNIT_EUR
+})
+
+const foundersOrderEventPriceEur = computed(() => {
+  if (edition.value !== 'founders' || foundersType.value !== 'team') return 0
+  return founderTeamEventId.value ? FOUNDERS_TEAM_EVENT_UNIT_EUR : 0
+})
+
+const foundersOrderTotalEur = computed(
+  () =>
+    foundersOrderRegistrationPriceEur.value +
+    foundersOrderSeasonSetsPriceEur.value +
+    foundersOrderEventPriceEur.value,
+)
+
 const summaryItems = computed(() => {
   const items = []
   if (voucher.value?.trim() && voucherValid.value === true) {
@@ -444,7 +532,7 @@ const summaryItems = computed(() => {
   if (edition.value === 'future' && futurePupils.value != null) {
     items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
   }
-  if (edition.value === 'future' || edition.value === 'founders') {
+  if (edition.value === 'future' || foundersNeedsSeasonSets.value) {
     const sc = effectiveSeasonSetCount.value
     const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
     items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
@@ -490,7 +578,10 @@ const selectedFounderEventLabel = computed(() => {
 })
 
 const centeredOptionStep = computed(() => {
-  if (step.value === 0) return hasVoucherCode.value === null
+  if (step.value === 0 && introSubStep.value === 'fll') {
+    return fllParticipatedBefore.value === null || fllParticipatedBefore.value === 'no'
+  }
+  if (step.value === 0 && introSubStep.value === 'voucher') return hasVoucherCode.value === null
   return step.value === 1
     || step.value === 2
     || (step.value === 3 && edition.value === 'founders')
@@ -630,6 +721,45 @@ function chooseNoVoucher() {
   step.value = 1
 }
 
+function advanceIntroToVoucher() {
+  nextTick(() => {
+    if (!props.open) return
+    if (step.value !== 0 || introSubStep.value !== 'fll') return
+    if (fllParticipatedBefore.value === 'yes') {
+      introSubStep.value = 'voucher'
+      return
+    }
+    if (fllParticipatedBefore.value === 'no' && reasonAttention.value) {
+      introSubStep.value = 'voucher'
+    }
+  })
+}
+
+function selectFllParticipatedBefore(val) {
+  fllParticipatedBefore.value = val
+  if (val === 'yes') {
+    reasonAttention.value = null
+    advanceIntroToVoucher()
+  }
+}
+
+function selectReasonAttention(value) {
+  reasonAttention.value = value
+  advanceIntroToVoucher()
+}
+
+function buildParticipationPayload() {
+  if (fllParticipatedBefore.value === 'yes') {
+    return { firstParticipation: 'no' }
+  }
+  if (fllParticipatedBefore.value === 'no') {
+    const payload = { firstParticipation: 'yes' }
+    if (reasonAttention.value) payload.reasonAttention = reasonAttention.value
+    return payload
+  }
+  return {}
+}
+
 function selectEdition(val) {
   edition.value = val
   scheduleAdvanceIfReady(1)
@@ -643,6 +773,10 @@ function selectFutureGroup(val) {
 
 function selectFoundersVariant(val) {
   foundersVariant.value = val
+  if (val === 'explore') {
+    wizardSeasonSetCount.value = 0
+    if (presetSeasonSetCount.value != null) presetSeasonSetCount.value = 0
+  }
   scheduleAdvanceIfReady(2)
 }
 
@@ -652,6 +786,9 @@ function selectFoundersType(val) {
 }
 
 function openWizard() {
+  introSubStep.value = 'fll'
+  fllParticipatedBefore.value = null
+  reasonAttention.value = null
   hasVoucherCode.value = null
   edition.value = null
   futureGroup.value = null
@@ -768,6 +905,11 @@ function canNext() {
   const s = step.value
   const ft = foundersTeamHasParticipantsStep.value
   if (s === 0) {
+    if (introSubStep.value === 'fll') {
+      if (fllParticipatedBefore.value === 'yes') return true
+      if (fllParticipatedBefore.value === 'no') return !!reasonAttention.value
+      return false
+    }
     if (hasVoucherCode.value === 'no') return true
     if (hasVoucherCode.value === 'yes') return !!voucher.value?.trim() && voucherValid.value === true
     return false
@@ -806,28 +948,36 @@ function canNext() {
     }
     if (ft) return true
     if (edition.value === 'founders' && foundersType.value === 'class') {
-      const w = Number(wizardSeasonSetCount.value)
-      return [0, 1, 2].includes(w)
+      if (foundersNeedsSeasonSets.value) {
+        const w = Number(wizardSeasonSetCount.value)
+        return [0, 1, 2].includes(w)
+      }
+      return areAddressesValid()
     }
     return false
   }
   if (s === 7) {
     if (edition.value === 'future') return areAddressesValid()
     if (ft) {
-      const w = Number(wizardSeasonSetCount.value)
-      return [0, 1, 2].includes(w)
+      if (foundersNeedsSeasonSets.value) {
+        const w = Number(wizardSeasonSetCount.value)
+        return [0, 1, 2].includes(w)
+      }
+      return areAddressesValid()
     }
-    if (edition.value === 'founders' && foundersType.value === 'class') return areAddressesValid()
+    if (edition.value === 'founders' && foundersType.value === 'class') {
+      return foundersNeedsSeasonSets.value ? areAddressesValid() : false
+    }
     return false
   }
   if (s === 8) {
     if (edition.value === 'future') return false
-    if (ft) return areAddressesValid()
+    if (ft) return foundersNeedsSeasonSets.value ? areAddressesValid() : false
     if (edition.value === 'founders' && foundersType.value === 'class') return false
     return false
   }
   if (s === 9) {
-    if (ft) return false
+    if (ft && foundersNeedsSeasonSets.value) return false
   }
   return false
 }
@@ -839,6 +989,10 @@ function next() {
   }
   if (step.value === participantsStepIndex.value && !hasRequiredParticipantFields()) {
     step4ValidationAttempted.value = true
+    return
+  }
+  if (step.value === 0 && introSubStep.value === 'fll') {
+    introSubStep.value = 'voucher'
     return
   }
   if (step.value === 0) {
@@ -866,7 +1020,24 @@ function next() {
 function prev() {
   if (step.value === 1) {
     step.value = 0
+    introSubStep.value = 'voucher'
     hasVoucherCode.value = null
+    return
+  }
+  if (step.value === 0 && introSubStep.value === 'voucher') {
+    introSubStep.value = 'fll'
+    hasVoucherCode.value = null
+    voucher.value = ''
+    voucherValid.value = null
+    voucherMessage.value = ''
+    voucherType.value = null
+    voucherInvoiceId.value = null
+    voucherInvoiceName.value = null
+    voucherPresetInvoiceId.value = null
+    voucherPresetInvoiceName.value = null
+    presetSeasonSetCount.value = null
+    presetRegisterEventTeams.value = null
+    presetEventTeamCount.value = null
     return
   }
   if (step.value > 1) step.value--
@@ -1138,7 +1309,9 @@ function firstIncompleteEnrollmentStep() {
     if (!foundersType.value) return 3
     if (!hasRequiredInstitutionFields()) return 4
     if (!hasRequiredParticipantFields()) return 5
-    return 6
+    if (foundersTeamHasParticipantsStep.value) return 6
+    if (foundersNeedsSeasonSets.value) return 6
+    return foundersAddressesStep.value
   }
   return 1
 }
@@ -1214,7 +1387,7 @@ async function onVoucherBlur() {
       },
     })
 
-    if (result.valid && voucherValid.value === true && props.open && step.value === 0 && hasVoucherCode.value === 'yes') {
+    if (result.valid && voucherValid.value === true && props.open && step.value === 0 && introSubStep.value === 'voucher' && hasVoucherCode.value === 'yes') {
       nextTick(() => {
         if (canNext()) next()
       })
@@ -1266,6 +1439,7 @@ async function submit() {
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
+        ...buildParticipationPayload(),
       }
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
@@ -1326,6 +1500,7 @@ async function submit() {
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
+        ...buildParticipationPayload(),
       }
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
@@ -1501,9 +1676,47 @@ watch(
         <div class="wizard-panel-main">
           <div class="wizard-scroll">
             <div class="wizard-body" :class="{ 'wizard-body--center-options': centeredOptionStep }">
-          <!-- Step 0: Voucher-Code / Direkteinstieg -->
+          <!-- Step 0a: FLL experience -->
           <div
-            v-show="step === 0"
+            v-show="step === 0 && introSubStep === 'fll'"
+            class="wizard-step wizard-step-voucher wizard-step-animate"
+            :class="{ 'wizard-step-voucher--choice': fllParticipatedBefore === null }"
+          >
+            <div class="wizard-step-voucher-inner">
+              <p class="wizard-question"><I18nText k="wizard.fllParticipatedQuestion" /></p>
+              <div v-if="fllParticipatedBefore === null" class="wizard-options wizard-options-stack">
+                <button type="button" class="wizard-option wizard-option-card" @click="selectFllParticipatedBefore('yes')">
+                  <div class="wizard-option-main"><I18nText k="wizard.fllParticipatedYes" /></div>
+                </button>
+                <button type="button" class="wizard-option wizard-option-card" @click="selectFllParticipatedBefore('no')">
+                  <div class="wizard-option-main"><I18nText k="wizard.fllParticipatedNo" /></div>
+                </button>
+              </div>
+              <template v-else-if="fllParticipatedBefore === 'no'">
+                <p class="wizard-question wizard-question--follow"><I18nText k="wizard.reasonAttentionQuestion" /></p>
+                <p class="wizard-hint"><I18nText k="wizard.reasonAttentionHint" /></p>
+                <div class="wizard-options wizard-options-stack wizard-options-reason">
+                  <button
+                    v-for="opt in REASON_ATTENTION_OPTIONS"
+                    :key="opt.value"
+                    type="button"
+                    class="wizard-option wizard-option-card"
+                    :class="{ active: reasonAttention === opt.value }"
+                    @click="selectReasonAttention(opt.value)"
+                  >
+                    <div class="wizard-option-main"><I18nText :k="opt.labelKey" /></div>
+                  </button>
+                </div>
+                <button type="button" class="btn btn-ghost wizard-back-link" @click="fllParticipatedBefore = null; reasonAttention = null">
+                  <i class="bi bi-arrow-left"></i> <I18nText k="wizard.fllParticipatedBack" />
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Step 0b: Voucher-Code / Direkteinstieg -->
+          <div
+            v-show="step === 0 && introSubStep === 'voucher'"
             class="wizard-step wizard-step-voucher wizard-step-animate"
             :class="{ 'wizard-step-voucher--choice': hasVoucherCode === null }"
           >
@@ -1735,7 +1948,7 @@ watch(
 
           <!-- Season sets (Future step 5 / Founders class step 6 / Founder team step 7) → numberOfBoards / Versandregel -->
           <div
-            v-show="(step === 5 && edition === 'future') || (step === 6 && edition === 'founders' && foundersType === 'class') || (step === 7 && foundersTeamHasParticipantsStep)"
+            v-show="(step === 5 && edition === 'future') || (edition === 'founders' && foundersNeedsSeasonSets && step === foundersSeasonSetsStep)"
             class="wizard-step wizard-step-animate wizard-step-season-sets"
           >
             <div class="wizard-season-sets-intro">
@@ -2004,6 +2217,7 @@ watch(
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
               <ul>
                 <li><I18nText k="wizard.nextStepsItemCreated" /></li>
+                <li><I18nText k="wizard.nextStepsItemEmailConfirmation" /></li>
                 <li><I18nText k="wizard.nextStepsItemManage" /></li>
                 <li><I18nText k="wizard.nextStepsItemStatus" /></li>
               </ul>
@@ -2012,7 +2226,7 @@ watch(
 
           <!-- Step 7: Addresses (Founders class) / Step 8: Addresses (Founder team) -->
           <div
-            v-show="(step === 7 && edition === 'founders' && foundersType === 'class') || (step === 8 && foundersTeamHasParticipantsStep)"
+            v-show="edition === 'founders' && step === foundersAddressesStep"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
@@ -2043,7 +2257,7 @@ watch(
 
           <!-- Step 8: Order (Founders class) / Step 9: Order (Founder team) -->
           <div
-            v-show="(step === 8 && edition === 'founders' && foundersType === 'class') || (step === 9 && foundersTeamHasParticipantsStep)"
+            v-show="edition === 'founders' && step === foundersOrderStep"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
             <div class="wizard-cart">
@@ -2062,7 +2276,7 @@ watch(
                   <I18nText v-else k="wizard.optionChallenge" tag="span" />
                 </strong>
               </div>
-              <div class="wizard-cart-row">
+              <div v-if="foundersNeedsSeasonSets" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderSeasonSets" /></span>
                 <strong>
                   <I18nText v-if="effectiveSeasonSetCount === 0" k="enrollFuture.seasonNone" tag="span" />
@@ -2086,6 +2300,44 @@ watch(
                 <span><I18nText k="enroll.voucher" /></span>
                 <strong>{{ voucherValid === true ? (voucherMessage || voucher) : voucher }}</strong>
               </div>
+              <div class="wizard-cart-divider" role="presentation" />
+              <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
+              <div class="wizard-cart-row wizard-cart-row--price">
+                <span>
+                  <I18nText
+                    :k="foundersType === 'team' ? 'wizard.orderPriceTeamRegistration' : 'wizard.orderPriceClassRegistration'"
+                  />
+                </span>
+                <strong>{{ formatWizardEur(foundersOrderRegistrationPriceEur) }}</strong>
+              </div>
+              <div v-if="foundersNeedsSeasonSets" class="wizard-cart-row wizard-cart-row--price">
+                <span>
+                  <I18nText k="wizard.orderPriceSeasonSets" />
+                  <span v-if="effectiveSeasonSetCount > 0" class="wizard-cart-muted">
+                    ({{ effectiveSeasonSetCount }}× {{ formatWizardEur(FOUNDERS_SEASON_SET_UNIT_EUR) }})
+                  </span>
+                </span>
+                <strong>{{ formatWizardEur(foundersOrderSeasonSetsPriceEur) }}</strong>
+              </div>
+              <div
+                v-if="foundersType === 'team' && founderTeamEventId"
+                class="wizard-cart-row wizard-cart-row--price"
+              >
+                <span>
+                  <I18nText k="wizard.orderPriceEventRegistration" />
+                  <span class="wizard-cart-muted">
+                    (1× {{ formatWizardEur(FOUNDERS_TEAM_EVENT_UNIT_EUR) }})
+                  </span>
+                </span>
+                <strong>{{ formatWizardEur(foundersOrderEventPriceEur) }}</strong>
+              </div>
+              <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
+                <span><I18nText k="wizard.orderPriceTotal" /></span>
+                <strong>{{ formatWizardEur(foundersOrderTotalEur) }}</strong>
+              </div>
+              <p class="wizard-hint wizard-pricing-disclaimer">
+                <I18nText k="enrollFuture.pricingDisclaimer" />
+              </p>
             </div>
             <EnrollConsentCheckboxes
               id-prefix="wizard-consent-founders"
@@ -2098,6 +2350,7 @@ watch(
               <h4><I18nText k="wizard.nextStepsTitle" /></h4>
               <ul>
                 <li><I18nText k="wizard.nextStepsItemCreated" /></li>
+                <li><I18nText k="wizard.nextStepsItemEmailConfirmation" /></li>
                 <li><I18nText k="wizard.nextStepsItemManage" /></li>
                 <li><I18nText k="wizard.nextStepsItemStatus" /></li>
               </ul>
@@ -2115,7 +2368,7 @@ watch(
           </div>
 
           <div class="wizard-footer">
-            <button type="button" class="btn btn-ghost" :disabled="step === 0" @click="prev">
+            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="prev">
               <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
             </button>
             <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== participantsStepIndex && !canNext()" @click="next">
@@ -2683,6 +2936,9 @@ watch(
   font-weight: 500;
   color: var(--color-text);
   margin: 0 0 1rem;
+}
+.wizard-question--follow {
+  margin-top: 1.5rem;
 }
 .wizard-hint {
   margin: 0.35rem 0 1.25rem;

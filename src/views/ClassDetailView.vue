@@ -7,6 +7,7 @@ import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
+import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -102,6 +103,7 @@ watch(
         <div class="detail-heading">
           <h2 class="detail-title">{{ cls.label || cls.name || cls.ref }}</h2>
           <p v-if="cls.ref" class="detail-ref">{{ cls.ref }}</p>
+          <DetailEnrollmentBadges :card="cls" />
         </div>
       </div>
 

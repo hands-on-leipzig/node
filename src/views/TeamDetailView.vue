@@ -9,6 +9,7 @@ import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
+import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -368,6 +369,7 @@ watch(
         <div class="detail-heading">
           <h2 class="detail-title">{{ team.label || team.name || team.ref }}</h2>
           <p v-if="team.ref" class="detail-ref">{{ team.ref }}</p>
+          <DetailEnrollmentBadges :card="team" />
         </div>
       </div>
 

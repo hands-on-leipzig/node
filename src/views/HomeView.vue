@@ -87,7 +87,7 @@ function doLogin() {
     <div class="hero">
       <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-logo">
-        <img src="/logo.png" alt="JOIN" class="logo-img logo-img--join" />
+        <img src="/JOIN_v1.0.png" alt="JOIN" class="logo-img logo-img--join" />
       </div>
       <p class="hero-partner">
         <span class="hero-partner-label"><I18nText k="common.organizedBy" /></span>

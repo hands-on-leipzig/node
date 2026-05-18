@@ -327,7 +327,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="sidebar-brand" @click="closeSidebar">
-        <img src="/logo.png" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
+        <img src="/JOIN_v1.0.png" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
       </RouterLink>
       <nav class="sidebar-nav">
         <RouterLink

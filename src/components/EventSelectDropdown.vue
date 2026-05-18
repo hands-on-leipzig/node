@@ -2,8 +2,9 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition'
+import { organizeEventsForSelect, flatEventSelectOptions } from '@/utils/events'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps({
   /** List of event objects (id, label/name/title/ref, capacity, registered, etc.) */
@@ -28,10 +29,30 @@ const { panelStyle, updatePanelPosition } = useDropdownPanelPosition(open, trigg
   maxHeight: '280px',
 })
 
+const eventSections = computed(() =>
+  organizeEventsForSelect(props.events, { nearestLimit: 5, locale: locale.value }),
+)
+
+const flatOptions = computed(() => flatEventSelectOptions(eventSections.value))
+
 const selectedEvent = computed(() => {
   if (props.modelValue === '' || props.modelValue === null || props.modelValue === undefined) return null
-  return props.events.find((e) => String(e.id) === String(props.modelValue)) || null
+  return flatOptions.value.find((e) => String(e.id) === String(props.modelValue))
+    || props.events.find((e) => String(e.id) === String(props.modelValue))
+    || null
 })
+
+function countrySectionLabel(code) {
+  if (code === 'de' || code === 'at' || code === 'ch') {
+    return t(`venues.country.${code}`)
+  }
+  if (code === 'other') return t('wizard.eventSelectCountryOther')
+  return code.toUpperCase()
+}
+
+function flatIndexForEvent(ev) {
+  return flatOptions.value.findIndex((e) => String(e.id) === String(ev.id))
+}
 
 const displayText = computed(() => {
   if (selectedEvent.value) return props.eventLabelFn(selectedEvent.value)
@@ -46,7 +67,7 @@ function toggle() {
   if (props.disabled || props.loading) return
   open.value = !open.value
   if (open.value) {
-    highlightedIndex.value = props.events.findIndex((e) => String(e.id) === String(props.modelValue))
+    highlightedIndex.value = flatOptions.value.findIndex((e) => String(e.id) === String(props.modelValue))
     if (highlightedIndex.value < 0) highlightedIndex.value = 0
     updatePanelPosition()
   }
@@ -73,7 +94,7 @@ function onKeydown(e) {
   }
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, props.events.length - 1)
+    highlightedIndex.value = Math.min(highlightedIndex.value + 1, flatOptions.value.length - 1)
     return
   }
   if (e.key === 'ArrowUp') {
@@ -83,7 +104,7 @@ function onKeydown(e) {
   }
   if (e.key === 'Enter') {
     e.preventDefault()
-    const ev = props.events[highlightedIndex.value]
+    const ev = flatOptions.value[highlightedIndex.value]
     if (ev) select(ev)
     return
   }
@@ -103,8 +124,10 @@ onUnmounted(() => {
   document.removeEventListener('click', onClickOutside, true)
 })
 
-watch(() => props.events.length, () => {
-  if (highlightedIndex.value >= props.events.length) highlightedIndex.value = Math.max(0, props.events.length - 1)
+watch(() => flatOptions.value.length, () => {
+  if (highlightedIndex.value >= flatOptions.value.length) {
+    highlightedIndex.value = Math.max(0, flatOptions.value.length - 1)
+  }
 })
 </script>
 
@@ -138,23 +161,45 @@ watch(() => props.events.length, () => {
             role="listbox"
             tabindex="-1"
           >
-            <button
-              v-for="(ev, idx) in events"
-              :key="ev.id"
-              type="button"
-              role="option"
-              class="event-select-option"
-              :class="{
-                selected: String(ev.id) === String(modelValue),
-                highlighted: idx === highlightedIndex,
-              }"
-              :aria-selected="String(ev.id) === String(modelValue)"
-              @click="select(ev)"
-              @mouseenter="highlightedIndex = idx"
-            >
-              <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
-            </button>
-            <p v-if="!loading && events.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
+            <template v-if="eventSections.nearest.length">
+              <p class="event-select-section-title"><I18nText k="wizard.eventSelectNearest" /></p>
+              <button
+                v-for="ev in eventSections.nearest"
+                :key="'near-' + ev.id"
+                type="button"
+                role="option"
+                class="event-select-option"
+                :class="{
+                  selected: String(ev.id) === String(modelValue),
+                  highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                }"
+                :aria-selected="String(ev.id) === String(modelValue)"
+                @click="select(ev)"
+                @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
+              >
+                <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+              </button>
+            </template>
+            <template v-for="group in eventSections.countryGroups" :key="'country-' + group.country">
+              <p class="event-select-section-title">{{ countrySectionLabel(group.country) }}</p>
+              <button
+                v-for="ev in group.events"
+                :key="'country-' + group.country + '-' + ev.id"
+                type="button"
+                role="option"
+                class="event-select-option"
+                :class="{
+                  selected: String(ev.id) === String(modelValue),
+                  highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                }"
+                :aria-selected="String(ev.id) === String(modelValue)"
+                @click="select(ev)"
+                @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
+              >
+                <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+              </button>
+            </template>
+            <p v-if="!loading && flatOptions.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
           </div>
         </Transition>
       </Teleport>
@@ -244,6 +289,18 @@ watch(() => props.events.length, () => {
 }
 @keyframes event-select-spin {
   to { transform: rotate(360deg); }
+}
+.event-select-section-title {
+  margin: 0.5rem 0.35rem 0.25rem;
+  padding: 0.35rem 0.65rem 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.event-select-section-title:first-child {
+  margin-top: 0.15rem;
 }
 .event-select-panel {
   overflow-y: auto;

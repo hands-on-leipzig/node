@@ -8,6 +8,7 @@ import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
+import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -94,6 +95,7 @@ watch(
         <div class="detail-heading">
           <h2 class="detail-title">{{ group.label || group.name || group.ref }}</h2>
           <p v-if="group.ref" class="detail-ref">{{ group.ref }}</p>
+          <DetailEnrollmentBadges :card="group" />
         </div>
       </div>
 
