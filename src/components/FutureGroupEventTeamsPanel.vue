@@ -12,6 +12,7 @@ import {
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 import { extractEventList, normalizeEvents, formatEventOptionLabel } from '@/utils/events'
+import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 
 const props = defineProps({
   groupId: { type: [String, Number], required: true },
@@ -211,6 +212,7 @@ function primaryEventIdForSubmit() {
 }
 
 async function submit() {
+  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
   const eventId = primaryEventIdForSubmit()
   if (!props.groupId || !eventId) return
 
@@ -242,6 +244,7 @@ async function submit() {
 }
 
 function togglePanel() {
+  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
   panelOpen.value = !panelOpen.value
   if (panelOpen.value && events.value.length === 0) {
     loadEvents()
@@ -267,9 +270,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="future-event-teams">
+  <div
+    class="future-event-teams"
+    :class="{ 'future-event-teams--disabled': !DETAIL_EVENT_ACTIONS_ENABLED }"
+    :aria-disabled="!DETAIL_EVENT_ACTIONS_ENABLED || undefined"
+  >
     <h3 class="detail-section-title"><I18nText k="groupDetail.eventTeamsTitle" /></h3>
+    <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
+      <I18nText k="detail.eventSectionComingSoon" />
+    </p>
 
+    <div class="future-event-teams-body" :inert="!DETAIL_EVENT_ACTIONS_ENABLED">
     <div v-if="hasEventRegistration" class="future-event-status future-event-status--active">
       <div class="future-event-status-main">
         <i class="bi bi-calendar-check" aria-hidden="true" />
@@ -301,7 +312,7 @@ onMounted(() => {
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
 
-    <button type="button" class="future-event-panel-toggle" :aria-expanded="panelOpen" @click="togglePanel">
+    <button type="button" class="future-event-panel-toggle" :aria-expanded="panelOpen" :disabled="!DETAIL_EVENT_ACTIONS_ENABLED" @click="togglePanel">
       <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
       <span>
         <I18nText v-if="isInitialRegistration" k="groupDetail.eventTeamsPanelRegister" />
@@ -343,6 +354,7 @@ onMounted(() => {
               active: selectedTeamCount === count,
               'needs-pupils-upgrade': teamPillNeedsMorePupils(count),
             }"
+            :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
             @click="selectTeamCount(count)"
           >
             <span class="future-event-team-count-pill-main">
@@ -416,6 +428,7 @@ onMounted(() => {
                     :model-value="entry.eventId"
                     :placeholder="t('wizard.onSiteEventPlaceholder')"
                     :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
+                    :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
                     @update:model-value="selectTeamEvent(idx, $event)"
                   />
                 </div>
@@ -428,7 +441,7 @@ onMounted(() => {
           <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
         </p>
 
-        <button type="button" class="detail-btn detail-btn-primary" :disabled="!canSubmit" @click="submit">
+        <button type="button" class="detail-btn detail-btn-primary" :disabled="!DETAIL_EVENT_ACTIONS_ENABLED || !canSubmit" @click="submit">
           <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true" />
           <i v-else class="bi bi-plus-circle" aria-hidden="true" />
           <I18nText v-if="submitting" k="groupDetail.registering" />
@@ -446,12 +459,32 @@ onMounted(() => {
         <I18nText k="groupDetail.registerEventSuccess" />
       </p>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .future-event-teams {
   margin-bottom: 0;
+}
+.future-event-teams--disabled .future-event-teams-body {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  pointer-events: none;
+  user-select: none;
+}
+.detail-section-disabled-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-text-muted));
+}
+.future-event-panel-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .future-event-status {
   display: flex;

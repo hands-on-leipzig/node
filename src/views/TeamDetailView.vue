@@ -10,6 +10,7 @@ import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
+import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 
 const route = useRoute()
 const router = useRouter()
@@ -298,6 +299,7 @@ async function loadEvents() {
 }
 
 async function submitRegisterForEvent() {
+  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
   const eventId = registerEventId.value?.trim()
   if (!id.value || !eventId) return
   registeringEvent.value = true
@@ -329,17 +331,18 @@ function eventLabel(ev) {
 
 /** Request change of event (e.g. contact/organizer). Placeholder for now. */
 function requestEventChange() {
+  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
   // TODO: open contact form or mailto
   if (import.meta.env.DEV) console.info('Request event change for team', id.value)
 }
 
 onMounted(async () => {
   await fetchTeam()
-  loadEvents()
+  if (DETAIL_EVENT_ACTIONS_ENABLED) loadEvents()
 })
 watch(id, async () => {
   await fetchTeam()
-  loadEvents()
+  if (DETAIL_EVENT_ACTIONS_ENABLED) loadEvents()
 })
 
 watch(
@@ -422,43 +425,53 @@ watch(
       </section>
 
       <!-- 3b) Event (right column): current event or enroll -->
-      <section class="detail-section">
+      <section
+        class="detail-section detail-section-event"
+        :class="{ 'detail-section--disabled': !DETAIL_EVENT_ACTIONS_ENABLED }"
+        :aria-disabled="!DETAIL_EVENT_ACTIONS_ENABLED || undefined"
+      >
         <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
-        <template v-if="team.event && (team.event.label || team.event.ref)">
-          <p class="detail-event-current">{{ team.event.label || team.event.ref }}</p>
-          <button type="button" class="detail-btn" @click="requestEventChange">
-            <i class="bi bi-pencil-square"></i>
-            <I18nText k="teamDetail.requestEventChange" />
-          </button>
-        </template>
-        <template v-else>
-          <p class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
-          <p class="detail-hint detail-hint-sm"><I18nText k="teamDetail.registerForEventHint" /></p>
-          <div class="detail-register-event">
-            <EventSelectDropdown
-              :title="t('wizard.eventSelectSimple')"
-              :events="events"
-              :loading="eventsLoading"
-              :model-value="registerEventId"
-              :placeholder="t('teamDetail.selectEvent')"
-              :event-label-fn="eventLabel"
-              @update:model-value="registerEventId = $event"
-            />
-            <button
-              type="button"
-              class="detail-btn detail-btn-primary"
-              :disabled="!registerEventId || registeringEvent"
-              @click="submitRegisterForEvent"
-            >
-              <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
-              <i v-else class="bi bi-calendar-check"></i>
-              <I18nText v-if="registeringEvent" k="teamDetail.registering" />
-              <I18nText v-else k="teamDetail.registerForEventButton" />
+        <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
+          <I18nText k="detail.eventSectionComingSoon" />
+        </p>
+        <div class="detail-section-event-body" :inert="!DETAIL_EVENT_ACTIONS_ENABLED">
+          <template v-if="team.event && (team.event.label || team.event.ref)">
+            <p class="detail-event-current">{{ team.event.label || team.event.ref }}</p>
+            <button type="button" class="detail-btn" disabled @click="requestEventChange">
+              <i class="bi bi-pencil-square"></i>
+              <I18nText k="teamDetail.requestEventChange" />
             </button>
-          </div>
-          <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
-          <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> <I18nText k="teamDetail.registerEventSuccess" /></p>
-        </template>
+          </template>
+          <template v-else>
+            <p class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
+            <p class="detail-hint detail-hint-sm"><I18nText k="teamDetail.registerForEventHint" /></p>
+            <div class="detail-register-event">
+              <EventSelectDropdown
+                :title="t('wizard.eventSelectSimple')"
+                :events="events"
+                :loading="eventsLoading"
+                :model-value="registerEventId"
+                :placeholder="t('teamDetail.selectEvent')"
+                :event-label-fn="eventLabel"
+                :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
+                @update:model-value="registerEventId = $event"
+              />
+              <button
+                type="button"
+                class="detail-btn detail-btn-primary"
+                disabled
+                @click="submitRegisterForEvent"
+              >
+                <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
+                <i v-else class="bi bi-calendar-check"></i>
+                <I18nText v-if="registeringEvent" k="teamDetail.registering" />
+                <I18nText v-else k="teamDetail.registerForEventButton" />
+              </button>
+            </div>
+            <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
+            <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> <I18nText k="teamDetail.registerEventSuccess" /></p>
+          </template>
+        </div>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
@@ -549,15 +562,6 @@ watch(
         <p v-if="!(team.co_coaches && team.co_coaches.length)" class="detail-empty-hint"><I18nText k="detail.noData" /></p>
         <p v-else class="detail-coaches">
           <span v-for="(c, i) in team.co_coaches" :key="'c-' + i">{{ c.name || [c.firstname, c.lastname].filter(Boolean).join(' ') }}{{ c.email ? ' (' + c.email + ')' : '' }}</span>
-        </p>
-      </section>
-
-      <!-- 5) Note (always shown, placeholder when missing) -->
-      <section class="detail-section">
-        <h3 class="detail-section-title"><I18nText k="detail.note" /></h3>
-        <p class="detail-notes">
-          <template v-if="team.note_public">{{ team.note_public }}</template>
-          <I18nText v-else k="detail.noData" />
         </p>
       </section>
       </div>
@@ -675,11 +679,6 @@ watch(
 }
 .detail-address:last-child {
   margin-bottom: 0;
-}
-.detail-notes {
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-  margin: 0;
 }
 .detail-co-coaches-wrap {
   scroll-margin-top: 5rem;
@@ -836,6 +835,21 @@ watch(
 }
 .detail-hint-sm {
   margin-bottom: 0.5rem;
+}
+.detail-section--disabled .detail-section-event-body {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  pointer-events: none;
+  user-select: none;
+}
+.detail-section-disabled-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-text-muted));
 }
 .detail-event-current {
   font-weight: 500;

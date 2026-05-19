@@ -217,7 +217,9 @@ const futureTeamEventsAllSelected = computed(() => {
   if (futureTeamEvents.value.length === 0) return false
   return futureTeamEvents.value.every((entry) => {
     const evId = Number(entry?.eventId)
-    return Number.isFinite(evId) && evId > 0
+    const hasEvent = Number.isFinite(evId) && evId > 0
+    const hasName = String(entry?.name ?? '').trim().length > 0
+    return hasEvent && hasName
   })
 })
 
@@ -545,7 +547,7 @@ function syncFutureTeamEventsArray() {
   }
   const count = normalizeFutureEventTeamCount()
   while (futureTeamEvents.value.length < count) {
-    futureTeamEvents.value.push({ eventId: null })
+    futureTeamEvents.value.push({ eventId: null, name: '' })
   }
   futureTeamEvents.value = futureTeamEvents.value.slice(0, count)
 }
@@ -570,7 +572,11 @@ function selectFutureTeamEvent(teamIndex, eventId) {
   const idx = Number(teamIndex)
   if (!Number.isFinite(idx) || idx < 0) return
   if (!futureTeamEvents.value[idx]) return
-  futureTeamEvents.value[idx] = { eventId: eventId ? Number(eventId) : null }
+  const prev = futureTeamEvents.value[idx]
+  futureTeamEvents.value[idx] = {
+    eventId: eventId ? Number(eventId) : null,
+    name: String(prev?.name ?? '').trim(),
+  }
   updateDerivedFutureEventId()
 }
 
@@ -654,7 +660,9 @@ const futureTeamEventSummaries = computed(() =>
       if (!Number.isFinite(evId) || evId <= 0) return null
       const ev = futureEventsNearest.value.find((item) => String(item.id) === String(evId))
       const evLabel = ev ? (ev.label || ev.name || ev.title || ev.ref) : `#${evId}`
-      return `${t('wizard.teamSingular')} ${idx + 1}: ${evLabel}`
+      const teamName = String(entry?.name ?? '').trim()
+      const prefix = teamName || `${t('wizard.teamSingular')} ${idx + 1}`
+      return `${prefix}: ${evLabel}`
     })
     .filter(Boolean),
 )
@@ -1366,7 +1374,7 @@ function applyVoucherPreset(raw) {
     const teamCount = Number.isFinite(Number(futureEventTeamCount.value)) && Number(futureEventTeamCount.value) > 0
       ? Number(futureEventTeamCount.value)
       : 1
-    futureTeamEvents.value = Array.from({ length: teamCount }, () => ({ eventId: evId }))
+    futureTeamEvents.value = Array.from({ length: teamCount }, () => ({ eventId: evId, name: '' }))
   }
   const invId = Number(data.invoiceAddressId)
   if (Number.isFinite(invId) && invId > 0) {
@@ -1566,8 +1574,9 @@ async function submit() {
         const teamEventsPayload = futureTeamEvents.value
           .map((entry, index) => {
             const evId = Number(entry?.eventId)
-            if (!Number.isFinite(evId) || evId <= 0) return null
-            return { index: index + 1, eventId: evId }
+            const name = String(entry?.name ?? '').trim()
+            if (!Number.isFinite(evId) || evId <= 0 || !name) return null
+            return { index: index + 1, eventId: evId, name }
           })
           .filter(Boolean)
         if (teamEventsPayload.length) {
@@ -2224,6 +2233,19 @@ watch(
                         <div v-if="futureEventTeamCount > 1" class="wizard-event-team-combined-meta">
                           <span class="wizard-event-team-name">{{ t('wizard.teamSingular') }} {{ idx + 1 }}</span>
                         </div>
+                        <div class="wizard-event-team-combined-body">
+                          <div class="wizard-event-team-name-field">
+                          <label class="wizard-event-label">
+                            <I18nText :k="futureEventTeamCount > 1 ? 'wizard.futureEventTeamNameLabel' : 'wizard.futureEventTeamNameLabelSolo'" />
+                          </label>
+                          <input
+                            v-model="entry.name"
+                            type="text"
+                            class="flat wizard-event-team-name-input"
+                            :placeholder="t('wizard.futureEventTeamNamePlaceholder')"
+                            autocomplete="off"
+                          >
+                        </div>
                         <div class="wizard-event-team-combined-dropdown">
                           <EventSelectDropdown
                             :title="futureEventTeamCount > 1 ? t('wizard.onSiteEventDropdownTitleTeam', { team: idx + 1 }) : ''"
@@ -2234,6 +2256,7 @@ watch(
                             :event-label-fn="futureEventOptionLabel"
                             @update:model-value="selectFutureTeamEvent(idx, $event)"
                           />
+                        </div>
                         </div>
                       </div>
                     </div>
@@ -2944,6 +2967,21 @@ watch(
   .wizard-event-team-combined-grid--solo {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.wizard-event-team-combined-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.wizard-event-team-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.wizard-event-team-name-input {
+  width: 100%;
 }
 .wizard-event-team-combined-meta {
   display: flex;

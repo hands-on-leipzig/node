@@ -8,6 +8,7 @@ import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
+import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -143,11 +144,19 @@ watch(
             <I18nText v-else k="detail.noData" />
           </dd>
           <dt><I18nText k="detail.event" /></dt>
-          <dd>
-            <template v-if="cls.event && (cls.event.label || cls.event.ref)">{{
-              cls.event.label || cls.event.ref
-            }}</template>
-            <I18nText v-else k="detail.noData" />
+          <dd
+            class="detail-meta-event"
+            :class="{ 'detail-meta-event--disabled': !DETAIL_EVENT_ACTIONS_ENABLED }"
+          >
+            <div class="detail-meta-event-inner" :inert="!DETAIL_EVENT_ACTIONS_ENABLED">
+              <template v-if="cls.event && (cls.event.label || cls.event.ref)">{{
+                cls.event.label || cls.event.ref
+              }}</template>
+              <I18nText v-else k="detail.noData" />
+            </div>
+            <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
+              <I18nText k="detail.eventSectionComingSoon" />
+            </p>
           </dd>
           <dt><I18nText k="detail.ort" /></dt>
           <dd>
@@ -317,6 +326,21 @@ watch(
 }
 .detail-address:last-child {
   margin-bottom: 0;
+}
+.detail-meta-event--disabled .detail-meta-event-inner {
+  opacity: 0.5;
+  filter: grayscale(0.35);
+  pointer-events: none;
+  user-select: none;
+}
+.detail-section-disabled-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-text-muted));
 }
 .detail-notes {
   font-size: var(--text-base);

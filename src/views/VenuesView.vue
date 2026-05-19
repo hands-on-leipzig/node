@@ -164,12 +164,24 @@ onMounted(() => {
             <I18nText k="auth.logout" />
           </button>
         </div>
-        <h1 class="venues-title"><I18nText k="venues.title" /></h1>
-        <p class="venues-lead"><I18nText k="venues.lead" /></p>
-        <div v-if="!coachAccess" class="venues-hero-actions">
-          <button type="button" class="btn btn-primary venues-cta" @click="doLogin">
-            <I18nText k="venues.ctaRegister" />
-          </button>
+        <div class="venues-hero-layout">
+          <div class="venues-hero-main">
+            <h1 class="venues-title"><I18nText k="venues.title" /></h1>
+            <p class="venues-lead"><I18nText k="venues.lead" /></p>
+            <div v-if="!coachAccess" class="venues-hero-actions">
+              <button type="button" class="btn btn-primary venues-cta" @click="doLogin">
+                <I18nText k="venues.ctaRegister" />
+              </button>
+            </div>
+          </div>
+          <div class="venues-hero-logo-wrap" aria-hidden="true">
+            <img
+              src="/FIRSTLego_IconVert_RGB.png"
+              alt=""
+              class="venues-hero-logo"
+              decoding="async"
+            >
+          </div>
         </div>
       </section>
 
@@ -349,12 +361,54 @@ onMounted(() => {
   margin: 0 0 0.75rem;
   line-height: 1.2;
 }
+.venues-hero-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 1.25rem 1.75rem;
+}
+.venues-hero-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .venues-lead {
+  flex: 1;
   font-size: var(--text-lg);
   color: var(--color-text-muted);
   max-width: 42rem;
   line-height: 1.55;
   margin: 0 0 1.25rem;
+}
+.venues-hero-logo-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 100%;
+  padding: 0.15rem 0;
+}
+.venues-hero-logo {
+  height: 100%;
+  width: auto;
+  max-width: min(7.5rem, 28vw);
+  object-fit: contain;
+  object-position: center;
+}
+@media (max-width: 640px) {
+  .venues-hero-layout {
+    flex-direction: column;
+  }
+  .venues-hero-logo-wrap {
+    align-self: flex-end;
+    min-height: 0;
+    height: 4.5rem;
+  }
+  .venues-hero-logo {
+    height: 100%;
+    max-width: 4rem;
+  }
 }
 .venues-hero-actions {
   display: flex;

@@ -18,6 +18,14 @@ export function useTeklaShipmentSchedule(cardRef, showRef) {
         schedule.earliestDate = new Date(ms).toISOString().slice(0, 10)
       }
     }
+    if (!schedule.earliestDate && schedule.standardDate) {
+      schedule.earliestDate = schedule.standardDate
+    }
+    if (schedule.earliestDate && schedule.standardDate) {
+      schedule.isCustom = schedule.earliestDate !== schedule.standardDate
+    } else {
+      schedule.isCustom = false
+    }
     return schedule
   })
 }

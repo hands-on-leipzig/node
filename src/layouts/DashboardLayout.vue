@@ -11,7 +11,7 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
-import { listTeams, listClasses, listGroups, parseNodeListPayload } from '@/services/draht'
+import { listTeams, listClasses, listGroups, parseNodeListPayload, isFutureEnrollmentEntry } from '@/services/draht'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const route = useRoute()
@@ -93,10 +93,10 @@ async function loadSidebarLists() {
         || t('nav.sidebarGroupsLoadFailed')
       console.warn('[sidebar] listGroups failed', err)
     }
-    if (teams.value.length > 0 || classes.value.length > 0) {
+    if (foundersTeams.value.length > 0 || classes.value.length > 0) {
       foundersSectionOpen.value = true
     }
-    if (groups.value.length > 0) {
+    if (groups.value.length > 0 || futureTeams.value.length > 0) {
       futureSectionOpen.value = true
     }
     if (import.meta.env.DEV) {
@@ -263,8 +263,10 @@ const userInitials = computed(() => {
   return name.slice(0, 2).toUpperCase()
 })
 
-const hasFoundersEnrollments = computed(() => teams.value.length > 0 || classes.value.length > 0)
-const hasFutureEnrollments = computed(() => groups.value.length > 0)
+const foundersTeams = computed(() => teams.value.filter((t) => !isFutureEnrollmentEntry(t)))
+const futureTeams = computed(() => teams.value.filter((t) => isFutureEnrollmentEntry(t)))
+const hasFoundersEnrollments = computed(() => foundersTeams.value.length > 0 || classes.value.length > 0)
+const hasFutureEnrollments = computed(() => groups.value.length > 0 || futureTeams.value.length > 0)
 
 const SIDEBAR_SECTIONS_STORAGE_KEY = 'handson.sidebarSections'
 
@@ -365,7 +367,7 @@ const { canInstall, promptInstall } = usePwaInstall()
               class="sidebar-section-entries"
             >
                 <button
-                  v-for="team in teams"
+                  v-for="team in foundersTeams"
                   :key="'team-' + team.id"
                   type="button"
                   class="sidebar-item sidebar-entry"
@@ -434,6 +436,24 @@ const { canInstall, promptInstall } = usePwaInstall()
                   <span class="sidebar-item-text">
                     <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
                     <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
+                  </span>
+                </button>
+                <button
+                  v-for="team in futureTeams"
+                  :key="'future-team-' + team.id"
+                  type="button"
+                  class="sidebar-item sidebar-entry"
+                  :class="{ active: isTeamActive(team.id) }"
+                  :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  @click="goTeam(team.id)"
+                >
+                  <span class="sidebar-item-icon">
+                    <i class="bi bi-person-fill" aria-hidden="true"></i>
+                  </span>
+                  <span class="sidebar-item-text">
+                    <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
+                    <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
                   </span>
                 </button>
               </div>

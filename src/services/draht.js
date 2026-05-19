@@ -287,10 +287,26 @@ export function extractNodeListArray(res) {
   return []
 }
 
+/** Dolibarr program ids for Future edition (5+ / 8+). */
+export const FUTURE_PROGRAM_IDS = [6, 7]
+
+/** @param {unknown} program */
+export function isFutureProgram(program) {
+  const p = Number(program)
+  return p === 6 || p === 7
+}
+
+/** Future group or Future event team (program 6/7). */
+export function isFutureEnrollmentEntry(row) {
+  if (!row || typeof row !== 'object') return false
+  if (row.edition === 'future') return true
+  return isFutureProgram(row.program)
+}
+
 /**
  * One list row from GET /teams|/classes|/groups (id + display fields).
  * @param {unknown} row
- * @returns {{ id: number, name: string, organization: string|null, ref: string|null }|null}
+ * @returns {{ id: number, name: string, organization: string|null, ref: string|null, program: number|null, edition: 'future'|'founders'|null }|null}
  */
 export function normalizeNodeListRow(row) {
   if (!row || typeof row !== 'object') return null
@@ -298,11 +314,18 @@ export function normalizeNodeListRow(row) {
   const id = idRaw != null && idRaw !== '' ? Number(idRaw) : NaN
   if (!Number.isFinite(id) || id <= 0) return null
   const name = String(row.name ?? row.label ?? row.ref ?? '').trim()
+  const programRaw = row.program ?? row.fk_program
+  const program = programRaw != null && programRaw !== '' ? Number(programRaw) : null
+  const edition = row.edition === 'future' || row.edition === 'founders'
+    ? row.edition
+    : (program != null && isFutureProgram(program) ? 'future' : null)
   return {
     id,
     name: name || `#${id}`,
     organization: row.organization ?? row.org ?? null,
     ref: row.ref != null ? String(row.ref) : null,
+    program: Number.isFinite(program) ? program : null,
+    edition,
   }
 }
 

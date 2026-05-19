@@ -175,17 +175,9 @@ watch(
           </p>
         </section>
 
-        <section class="detail-section">
-          <h3 class="detail-section-title"><I18nText k="detail.note" /></h3>
-          <p class="detail-notes">
-            <template v-if="group.note_public">{{ group.note_public }}</template>
-            <I18nText v-else k="detail.noData" />
-          </p>
-        </section>
-
         <section id="group-co-coaches-anchor" class="detail-section detail-co-coaches-wrap">
           <h3 class="detail-section-title"><I18nText k="detail.coCoaches" /></h3>
-          <p v-if="!(group.co_coaches && group.co_coaches.length)" class="detail-notes">
+          <p v-if="!(group.co_coaches && group.co_coaches.length)" class="detail-empty-hint">
             <I18nText k="detail.noData" />
           </p>
           <p v-else class="detail-coaches">
@@ -222,7 +214,7 @@ watch(
 .detail-address-label { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); margin: 0 0 0.25rem; }
 .detail-address { font-size: var(--text-base); color: var(--color-text); margin: 0 0 0.75rem; white-space: pre-line; }
 .detail-address:last-child { margin-bottom: 0; }
-.detail-notes { font-size: var(--text-base); color: var(--color-text-muted); margin: 1rem 0 0; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.detail-empty-hint { font-size: var(--text-base); color: var(--color-text-muted); margin: 0; }
 .detail-co-coaches-wrap { margin-top: 0.25rem; }
 .detail-coaches { margin: 0; font-size: var(--text-base); color: var(--color-text); }
 .detail-coaches span + span::before { content: ', '; }
