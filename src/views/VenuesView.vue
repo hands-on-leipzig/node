@@ -11,6 +11,7 @@ import {
 import { fetchPublicVenues } from '@/services/publicVenues'
 import VenuesMap from '@/components/VenuesMap.vue'
 import VenueDetailModal from '@/components/VenueDetailModal.vue'
+import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import {
   venueMatchesFilters,
   clusterVenuesForMap,
@@ -176,7 +177,7 @@ onMounted(() => {
           </div>
           <div class="venues-hero-logo-wrap" aria-hidden="true">
             <img
-              src="/FIRSTLego_IconVert_RGB.png"
+              :src="logoFll"
               alt=""
               class="venues-hero-logo"
               decoding="async"

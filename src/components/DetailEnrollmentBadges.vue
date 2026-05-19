@@ -19,10 +19,9 @@ const badges = computed(() => resolveEnrollmentDisplay(props.card)?.badges ?? []
       v-for="(badge, idx) in badges"
       :key="`${badge.key}-${idx}`"
       class="detail-enrollment-badge"
-      :class="`detail-enrollment-badge--${badge.tone}`"
       role="listitem"
     >
-      <I18nText :k="badge.key" />
+      <I18nText :k="badge.key" :values="badge.values" />
     </span>
   </div>
 </template>
@@ -31,46 +30,22 @@ const badges = computed(() => resolveEnrollmentDisplay(props.card)?.badges ?? []
 .detail-enrollment-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.45rem;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
 }
+
 .detail-enrollment-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  padding: 0.32rem 0.72rem;
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
   line-height: 1.25;
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg-inner);
-  color: var(--color-text);
-}
-.detail-enrollment-badge--founders {
-  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--liquid-border));
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--liquid-tile-bg-inner));
-}
-.detail-enrollment-badge--future {
-  border-color: color-mix(in srgb, #1565c0 40%, var(--liquid-border));
-  background: color-mix(in srgb, #1565c0 12%, var(--liquid-tile-bg-inner));
-}
-.detail-enrollment-badge--explore {
-  border-color: color-mix(in srgb, #2e7d32 40%, var(--liquid-border));
-  background: color-mix(in srgb, #2e7d32 14%, var(--liquid-tile-bg-inner));
-}
-.detail-enrollment-badge--challenge {
-  border-color: color-mix(in srgb, #c62828 38%, var(--liquid-border));
-  background: color-mix(in srgb, #c62828 12%, var(--liquid-tile-bg-inner));
-}
-.detail-enrollment-badge--future5,
-.detail-enrollment-badge--future8 {
-  border-color: color-mix(in srgb, #1565c0 40%, var(--liquid-border));
-  background: color-mix(in srgb, #1565c0 14%, var(--liquid-tile-bg-inner));
-}
-.detail-enrollment-badge--format {
-  border-color: color-mix(in srgb, var(--color-text-muted) 28%, var(--liquid-border));
-  background: color-mix(in srgb, var(--color-text-muted) 8%, var(--liquid-tile-bg-inner));
-  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 </style>

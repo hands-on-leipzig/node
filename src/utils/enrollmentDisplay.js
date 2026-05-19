@@ -81,13 +81,13 @@ export function resolveEnrollmentDisplay(card) {
   const entry = programId != null ? BY_PROGRAM[programId] : null
 
   if (entry) {
-    return {
-      badges: [
-        { key: entry.editionKey, tone: entry.edition },
-        { key: entry.variantKey, tone: entry.variantTone },
-        { key: entry.formatKey, tone: 'format' },
-      ],
-    }
+    const badges = [
+      { key: entry.editionKey, tone: entry.edition },
+      { key: entry.variantKey, tone: entry.variantTone },
+      { key: entry.formatKey, tone: 'format' },
+    ]
+    appendRegisteredPupilsBadge(badges, card)
+    return { badges }
   }
 
   const element = String(card.element || '').toLowerCase()
@@ -102,12 +102,28 @@ export function resolveEnrollmentDisplay(card) {
   if (!formatKey) return null
 
   const edition = element === 'gruppe' ? 'future' : 'founders'
-  return {
-    badges: [
-      { key: edition === 'future' ? 'dashboard.editionFuture' : 'dashboard.editionFounders', tone: edition },
-      { key: formatKey, tone: 'format' },
-    ],
-  }
+  const badges = [
+    { key: edition === 'future' ? 'dashboard.editionFuture' : 'dashboard.editionFounders', tone: edition },
+    { key: formatKey, tone: 'format' },
+  ]
+  appendRegisteredPupilsBadge(badges, card)
+  return { badges }
+}
+
+/**
+ * @param {Array<{ key: string, tone: string, values?: Record<string, unknown> }>} badges
+ * @param {Record<string, unknown>} card
+ */
+function appendRegisteredPupilsBadge(badges, card) {
+  const element = String(card.element || '').toLowerCase()
+  if (element !== 'gruppe') return
+  const n = Number(card.registeredPupils)
+  if (!Number.isFinite(n) || n <= 0) return
+  badges.push({
+    key: 'detail.registeredPupilsBadge',
+    tone: 'pupils',
+    values: { count: n },
+  })
 }
 
 /**

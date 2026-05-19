@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
     vueDevTools(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['JOIN_favicon.png', 'JOIN_v1.0.png', 'pwa-192.png', 'pwa-512.png', 'apple-touch-icon.png'],
+      includeAssets: ['JOIN_favicon.png', 'pwa-192.png', 'pwa-512.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'JOIN – Coach Dashboard',
         short_name: 'JOIN',

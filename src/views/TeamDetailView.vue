@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { getTeam, updateTeamPlayers, updateTeamVersandaufschub, updateTeamLabel } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
@@ -24,6 +24,8 @@ const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: ''
 const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
+const savingTeamName = ref(false)
+const teamNameError = ref('')
 
 const id = computed(() => route.params.id)
 
@@ -148,6 +150,20 @@ function cancelAddPlayer() {
   newPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
 }
 
+async function saveTeamName(label) {
+  if (!id.value) return
+  savingTeamName.value = true
+  teamNameError.value = ''
+  try {
+    const res = await updateTeamLabel(id.value, { label })
+    team.value = res.data
+  } catch (e) {
+    teamNameError.value = e.response?.data?.message || e.message || t('detail.teamNameSaveFailed')
+  } finally {
+    savingTeamName.value = false
+  }
+}
+
 async function saveVersandaufschub(dateStrOrNull) {
   if (!id.value) return
   try {
@@ -247,7 +263,15 @@ watch(
     </div>
     <template v-else-if="team">
       <!-- 1) Name of tekla + number -->
-      <DetailTeklaHeader :card="team" kind="team" />
+      <DetailTeklaHeader
+        :card="team"
+        kind="team"
+        editable-team-name
+        :saving-team-name="savingTeamName"
+        :team-name-error="teamNameError"
+        @save-team-name="saveTeamName"
+        @clear-team-name-error="teamNameError = ''"
+      />
 
       <!-- 2) Timeline -->
       <TeklaTimeline

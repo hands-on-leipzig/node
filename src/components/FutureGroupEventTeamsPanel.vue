@@ -645,9 +645,9 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.12rem;
-  min-width: 4.5rem;
-  padding: 0.45rem 0.75rem;
+  gap: 0.15rem;
+  min-width: 5.25rem;
+  padding: 0.5rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-bg);
@@ -685,9 +685,11 @@ onMounted(() => {
   white-space: nowrap;
 }
 .future-event-team-count-pill-hint {
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
   color: color-mix(in srgb, var(--color-accent) 75%, var(--color-text-muted));
 }
 .future-event-team-expand-hint {

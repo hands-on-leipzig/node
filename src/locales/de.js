@@ -254,6 +254,7 @@ export default {
         "backToDashboard": "Zurück zum Dashboard",
         "notFound": "Nicht gefunden.",
         "coach": "Coach:in",
+        "registeredPupilsBadge": "{count} Teilnehmende",
         "invoiceStatusPaid": "Bezahlt",
         "invoiceStatusOpen": "Offen",
         "invoiceStatusNotNeeded": "Nicht nötig",
@@ -299,6 +300,10 @@ export default {
         "add": "Hinzufügen",
         "savePlayers": "Teilnehmende speichern",
         "edit": "Bearbeiten",
+        "editTeamName": "Teamnamen bearbeiten",
+        "teamNamePlaceholder": "Teamname",
+        "teamNameRequired": "Teamname ist erforderlich",
+        "teamNameSaveFailed": "Teamname konnte nicht gespeichert werden",
         "remove": "Entfernen",
         "coCoaches": "Co-Coaches"
     },

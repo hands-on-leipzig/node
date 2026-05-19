@@ -254,6 +254,7 @@ export default {
         "backToDashboard": "Back to dashboard",
         "notFound": "Not found.",
         "coach": "Coach",
+        "registeredPupilsBadge": "{count} participants",
         "invoiceStatusPaid": "Paid",
         "invoiceStatusOpen": "Open",
         "invoiceStatusNotNeeded": "Not needed",
@@ -299,6 +300,10 @@ export default {
         "add": "Add",
         "savePlayers": "Save participants",
         "edit": "Edit",
+        "editTeamName": "Edit team name",
+        "teamNamePlaceholder": "Team name",
+        "teamNameRequired": "Team name is required",
+        "teamNameSaveFailed": "Could not save team name",
         "remove": "Remove",
         "coCoaches": "Co-coaches"
     },

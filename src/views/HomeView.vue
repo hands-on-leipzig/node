@@ -11,6 +11,8 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
+import logoJoin from '@/assets/JOIN_v1.0.png'
+import logoHot from '@/assets/hot.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,7 +89,7 @@ function doLogin() {
     <div class="hero">
       <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-logo">
-        <img src="/JOIN_v1.0.png" alt="JOIN" class="logo-img logo-img--join" />
+        <img :src="logoJoin" alt="JOIN" class="logo-img logo-img--join" />
       </div>
       <p class="hero-partner">
         <span class="hero-partner-label"><I18nText k="common.organizedBy" /></span>
@@ -97,7 +99,7 @@ function doLogin() {
           rel="noopener noreferrer"
           class="hero-partner-link"
         >
-          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="hero-partner-logo" />
+          <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="hero-partner-logo" />
         </a>
       </p>
       <h1><I18nText k="common.appName" /></h1>

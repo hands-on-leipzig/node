@@ -14,6 +14,9 @@ import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups, parseNodeListPayload, isFutureEnrollmentEntry } from '@/services/draht'
 import { resolveSidebarAccentTone } from '@/utils/enrollmentDisplay'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import logoJoin from '@/assets/JOIN_v1.0.png'
+import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
+import logoHot from '@/assets/hot.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -324,7 +327,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     ></div>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="sidebar-brand" @click="closeSidebar">
-        <img src="/JOIN_v1.0.png" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
+        <img :src="logoJoin" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
       </RouterLink>
       <nav class="sidebar-nav">
         <RouterLink
@@ -458,7 +461,7 @@ const { canInstall, promptInstall } = usePwaInstall()
       </nav>
       <div class="sidebar-partner">
         <img
-          src="/FIRSTLego_IconVert_RGB.png"
+          :src="logoFll"
           alt="FIRST LEGO League"
           class="sidebar-partner-logo sidebar-partner-logo--fll"
           decoding="async"
@@ -469,7 +472,7 @@ const { canInstall, promptInstall } = usePwaInstall()
           rel="noopener noreferrer"
           class="sidebar-partner-link"
         >
-          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
+          <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
         </a>
       </div>
       <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">

@@ -536,6 +536,13 @@ export function updateTeamPlayers(teamId, payload) {
 }
 
 /**
+ * Update team name. Payload: { label: string }. Returns updated team card.
+ */
+export function updateTeamLabel(teamId, payload) {
+  return api.put('/teams/' + encodeURIComponent(teamId) + '/label', payload)
+}
+
+/**
  * Update team versandaufschub. Payload: { versandaufschub: "Y-m-d" | null }. Returns updated team card.
  */
 export function updateTeamVersandaufschub(teamId, payload) {
