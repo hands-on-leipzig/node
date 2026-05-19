@@ -3,6 +3,12 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollFuture, getAddresses, validateVoucher, extractAddressesFromResponse, isDolibarrRowId } from '@/services/draht'
+import {
+  emptyAddressState,
+  buildNewAddressPayload,
+  ADDRESS_MODE_INVOICE,
+  ADDRESS_MODE_DELIVERY,
+} from '@/utils/addressForm'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
@@ -43,12 +49,6 @@ const teamCount = ref(1)
 /** { players: [{ firstname, name, gender, birthdayStr }] }[] */
 const eventTeams = ref([])
 
-const emptyAddressState = () => ({
-  useExisting: true,
-  addressId: '',
-  new: { street: '', postalCode: '', city: '', country: '' },
-})
-
 const form = ref({
   name: '',
   schoolType: '',
@@ -56,8 +56,8 @@ const form = ref({
   zip: '',
   organization: '',
   voucher: '',
-  deliveryAddress: emptyAddressState(),
-  invoiceAddress: emptyAddressState(),
+  deliveryAddress: emptyAddressState(ADDRESS_MODE_DELIVERY),
+  invoiceAddress: emptyAddressState(ADDRESS_MODE_INVOICE),
 })
 
 const { isPrivateInstitution } = usePrivateInstitutionOrganization(form)
@@ -246,25 +246,18 @@ function teamsNext() {
   step.value = 'form'
 }
 
-function buildAddressPayload(addr) {
+function buildAddressPayload(addr, mode) {
   if (addr.useExisting && isDolibarrRowId(addr.addressId)) {
     return { addressId: String(Number(String(addr.addressId).trim())) }
   }
-  const n = addr.new || {}
-  if (!n.street && !n.city && !n.country) return undefined
-  return {
-    street: n.street?.trim() || undefined,
-    postalCode: n.postalCode?.trim() || undefined,
-    city: n.city?.trim() || undefined,
-    country: n.country?.trim() || undefined,
-  }
+  return buildNewAddressPayload(addr, mode)
 }
 
 function buildInvoiceAddressPayload() {
   if (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value)) {
     return { addressId: String(Number(String(voucherInvoiceId.value).trim())) }
   }
-  return buildAddressPayload(form.value.invoiceAddress)
+  return buildAddressPayload(form.value.invoiceAddress, ADDRESS_MODE_INVOICE)
 }
 
 /** Snapshot + refs for order lines (prices from catalog later) */
@@ -352,7 +345,7 @@ async function submit() {
       zip: form.value.zip.trim() || undefined,
       organization: form.value.organization.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
-      deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
+      deliveryAddress: buildAddressPayload(form.value.deliveryAddress, ADDRESS_MODE_DELIVERY),
       invoiceAddress: buildInvoiceAddressPayload(),
       consentDataProcessing: true,
       consentTerms: true,
@@ -378,8 +371,8 @@ async function submit() {
       zip: '',
       organization: '',
       voucher: '',
-      deliveryAddress: emptyAddressState(),
-      invoiceAddress: emptyAddressState(),
+      deliveryAddress: emptyAddressState(ADDRESS_MODE_DELIVERY),
+      invoiceAddress: emptyAddressState(ADDRESS_MODE_INVOICE),
     }
     consentDataProcessing.value = false
     consentTerms.value = false
@@ -652,6 +645,7 @@ const stepIndex = computed(() => {
 
         <AddressSelector
           v-model="form.deliveryAddress"
+          mode="delivery"
           :addresses="addresses"
           :label="t('enroll.deliveryAddress')"
           id-prefix="future-delivery"
@@ -669,6 +663,7 @@ const stepIndex = computed(() => {
         <AddressSelector
           v-else
           v-model="form.invoiceAddress"
+          mode="invoice"
           :addresses="addresses"
           :label="t('enroll.invoiceAddress')"
           id-prefix="future-invoice"

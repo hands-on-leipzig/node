@@ -3,6 +3,14 @@ import { computed, ref, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomSelect from '@/components/CustomSelect.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import {
+  emptyAddressNewFields,
+  ADDRESS_MODE_INVOICE,
+  invoiceCountryUsesRegisteredAsCompany,
+  invoiceCountryUsesVatId,
+  invoiceNeedsRegisteredAsCompany,
+  invoiceNeedsVatId,
+} from '@/utils/addressForm'
 
 const { t, locale } = useI18n()
 
@@ -10,7 +18,13 @@ const props = defineProps({
   modelValue: {
     type: Object,
     required: true,
-    // { useExisting: boolean, addressId: string, new: { street, postalCode, city, country } }
+    // { useExisting: boolean, addressId: string, new: { ... } }
+  },
+  /** invoice: institution + contact person; delivery: name + optional address lines */
+  mode: {
+    type: String,
+    default: ADDRESS_MODE_INVOICE,
+    validator: (v) => v === 'invoice' || v === 'delivery',
   },
   addresses: {
     type: Array,
@@ -66,6 +80,17 @@ const addressOptions = computed(() =>
 
 /** Strict boolean — avoids radios stuck when useExisting is undefined/null. */
 const isExistingMode = computed(() => props.modelValue.useExisting !== false)
+const isInvoiceMode = computed(() => props.mode === 'invoice')
+const isDeliveryMode = computed(() => props.mode === 'delivery')
+
+const invoiceNewFields = computed(() => props.modelValue.new || {})
+const showVatIdField = computed(
+  () => isInvoiceMode.value && invoiceNeedsVatId(invoiceNewFields.value),
+)
+const showRegisteredAsCompanyField = computed(
+  () => isInvoiceMode.value && invoiceNeedsRegisteredAsCompany(invoiceNewFields.value),
+)
+
 const streetContextReady = computed(() => {
   const country = (props.modelValue.new?.country || '').trim()
   const zip = (props.modelValue.new?.postalCode || '').trim()
@@ -86,7 +111,7 @@ const countryOptions = computed(() => {
 function setMode(useExisting) {
   const wantExisting = !!useExisting
   const prev = props.modelValue
-  const newBlock = prev.new || { street: '', postalCode: '', city: '', country: '' }
+  const newBlock = { ...emptyAddressNewFields(props.mode), ...(prev.new || {}) }
 
   let addressId = prev.addressId
   if (wantExisting) {
@@ -115,6 +140,36 @@ function setNewField(field, value) {
   })
 }
 
+function patchInvoiceCountryDependentFields(newBlock, country) {
+  const next = { ...newBlock }
+  if (!invoiceCountryUsesVatId(country)) {
+    next.vatId = ''
+  }
+  if (!invoiceCountryUsesRegisteredAsCompany(country)) {
+    next.registeredAsCompany = null
+  }
+  return next
+}
+
+function setNewYesNoField(field, value) {
+  const parsed = value === 'yes' ? true : value === 'no' ? false : null
+  const next = { ...(props.modelValue.new || {}), [field]: parsed }
+  if (field === 'netInvoiceDesired' && parsed !== true) {
+    next.vatId = ''
+  }
+  emit('update:modelValue', {
+    ...props.modelValue,
+    new: next,
+  })
+}
+
+function yesNoGroupValue(field) {
+  const v = props.modelValue.new?.[field]
+  if (v === true) return 'yes'
+  if (v === false) return 'no'
+  return ''
+}
+
 function clearAutocompleteState() {
   zipSuggestions.value = []
   streetSuggestions.value = []
@@ -138,7 +193,11 @@ function normalizeCountryForZipLookup(rawCountry, rawZip) {
 }
 
 function onCountryChange(value) {
-  setNewField('country', value)
+  const base = { ...(props.modelValue.new || {}), country: value }
+  emit('update:modelValue', {
+    ...props.modelValue,
+    new: patchInvoiceCountryDependentFields(base, value),
+  })
   zipSuggestions.value = []
   streetSuggestions.value = []
   const currentZip = props.modelValue.new?.postalCode || ''
@@ -380,8 +439,47 @@ onBeforeUnmount(() => {
     </template>
     <template v-else>
       <div class="address-fields">
+        <template v-if="isInvoiceMode">
+          <div class="field">
+            <label :for="idPrefix + '-institution'">
+              <I18nText k="enroll.institution" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
+            <input
+              :id="idPrefix + '-institution'"
+              type="text"
+              required
+              :value="modelValue.new?.institution"
+              @input="setNewField('institution', $event.target.value)"
+            />
+          </div>
+          <div class="field">
+            <label :for="idPrefix + '-contactPerson'"><I18nText k="enroll.contactPerson" /></label>
+            <input
+                :id="idPrefix + '-contactPerson'"
+                type="text"
+                :value="modelValue.new?.contactPerson"
+                @input="setNewField('contactPerson', $event.target.value)"
+            />
+          </div>
+        </template>
+        <template v-else-if="isDeliveryMode">
+          <div class="field">
+            <label :for="idPrefix + '-name'">
+              <I18nText k="enroll.deliveryName" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
+            <input
+              :id="idPrefix + '-name'"
+              type="text"
+              required
+              :value="modelValue.new?.name"
+              @input="setNewField('name', $event.target.value)"
+            />
+          </div>
+        </template>
         <div class="field field-select">
-          <label :for="idPrefix + '-country'"><I18nText k="enroll.country" /></label>
+          <label :for="idPrefix + '-country'">
+            <I18nText k="enroll.country" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+          </label>
           <CustomSelect
             :id="idPrefix + '-country'"
             :model-value="(modelValue.new?.country || '').toLowerCase()"
@@ -392,11 +490,14 @@ onBeforeUnmount(() => {
         </div>
         <div class="field-row">
           <div class="field">
-            <label :for="idPrefix + '-postalCode'"><I18nText k="enroll.postalCode" /></label>
+            <label :for="idPrefix + '-postalCode'">
+              <I18nText k="enroll.postalCode" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
             <div class="autocomplete-wrap">
               <input
                 :id="idPrefix + '-postalCode'"
                 type="text"
+                required
                 :value="modelValue.new?.postalCode"
                 @input="onZipInput($event.target.value)"
               />
@@ -418,29 +519,32 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="field field-flex">
-            <label :for="idPrefix + '-city'"><I18nText k="enroll.city" /></label>
+            <label :for="idPrefix + '-city'">
+              <I18nText k="enroll.city" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
             <input
               :id="idPrefix + '-city'"
               type="text"
+              required
               :value="modelValue.new?.city"
               @input="setNewField('city', $event.target.value)"
             />
           </div>
         </div>
         <div class="field">
-          <label :for="idPrefix + '-street'"><I18nText k="enroll.street" /></label>
+          <label :for="idPrefix + '-street'">
+            <I18nText k="enroll.street" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+          </label>
           <div class="autocomplete-wrap">
             <input
               :id="idPrefix + '-street'"
               type="text"
+              required
               :disabled="!streetContextReady"
-              :placeholder="streetContextReady ? '' : t('enroll.postalCode')"
+              :placeholder="streetContextReady ? '' : t('enroll.street')"
               :value="modelValue.new?.street"
               @input="onStreetInput($event.target.value)"
             />
-            <div v-if="!streetContextReady" class="autocomplete-state">
-              <i class="bi bi-info-circle" /> <I18nText k="enroll.selectCountry" /> + <I18nText k="enroll.postalCode" />
-            </div>
             <div v-if="streetLoading" class="autocomplete-state">
               <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
             </div>
@@ -458,6 +562,132 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
+        <template v-if="isInvoiceMode">
+          <div class="field">
+            <label :for="idPrefix + '-addressLine3-invoice'"><I18nText k="enroll.addressLine3" /></label>
+            <input
+              :id="idPrefix + '-addressLine3-invoice'"
+              type="text"
+              :value="modelValue.new?.addressLine3"
+              @input="setNewField('addressLine3', $event.target.value)"
+            />
+          </div>
+        </template>
+        <template v-else-if="isDeliveryMode">
+          <div class="field">
+            <label :for="idPrefix + '-addressLine2'"><I18nText k="enroll.addressLine2" /></label>
+            <input
+              :id="idPrefix + '-addressLine2'"
+              type="text"
+              :value="modelValue.new?.addressLine2"
+              @input="setNewField('addressLine2', $event.target.value)"
+            />
+          </div>
+          <div class="field">
+            <label :for="idPrefix + '-addressLine3-delivery'"><I18nText k="enroll.addressLine3" /></label>
+            <input
+              :id="idPrefix + '-addressLine3-delivery'"
+              type="text"
+              :value="modelValue.new?.addressLine3"
+              @input="setNewField('addressLine3', $event.target.value)"
+            />
+          </div>
+        </template>
+        <template v-if="isInvoiceMode">
+          <div class="field">
+            <label :for="idPrefix + '-leitwegId'"><I18nText k="enroll.leitwegId" /></label>
+            <input
+              :id="idPrefix + '-leitwegId'"
+              type="text"
+              :value="modelValue.new?.leitwegId"
+              @input="setNewField('leitwegId', $event.target.value)"
+            />
+          </div>
+          <div class="field">
+            <label :for="idPrefix + '-supplierNumber'"><I18nText k="enroll.supplierNumber" /></label>
+            <input
+              :id="idPrefix + '-supplierNumber'"
+              type="text"
+              :value="modelValue.new?.supplierNumber"
+              @input="setNewField('supplierNumber', $event.target.value)"
+            />
+          </div>
+          <div class="field">
+            <label :for="idPrefix + '-orderReference'"><I18nText k="enroll.orderReference" /></label>
+            <input
+              :id="idPrefix + '-orderReference'"
+              type="text"
+              :value="modelValue.new?.orderReference"
+              @input="setNewField('orderReference', $event.target.value)"
+            />
+          </div>
+          <div class="field">
+            <span class="field-label-block">
+              <I18nText k="enroll.netInvoiceDesired" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </span>
+            <div class="yes-no-group" role="radiogroup" :aria-label="t('enroll.netInvoiceDesired')">
+              <button
+                type="button"
+                role="radio"
+                class="yes-no-btn"
+                :class="{ active: yesNoGroupValue('netInvoiceDesired') === 'yes' }"
+                :aria-checked="yesNoGroupValue('netInvoiceDesired') === 'yes'"
+                @click="setNewYesNoField('netInvoiceDesired', 'yes')"
+              >
+                <I18nText k="enroll.yes" />
+              </button>
+              <button
+                type="button"
+                role="radio"
+                class="yes-no-btn"
+                :class="{ active: yesNoGroupValue('netInvoiceDesired') === 'no' }"
+                :aria-checked="yesNoGroupValue('netInvoiceDesired') === 'no'"
+                @click="setNewYesNoField('netInvoiceDesired', 'no')"
+              >
+                <I18nText k="enroll.no" />
+              </button>
+            </div>
+          </div>
+          <div v-if="showVatIdField" class="field">
+            <label :for="idPrefix + '-vatId'">
+              <I18nText k="enroll.vatId" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
+            <input
+              :id="idPrefix + '-vatId'"
+              type="text"
+              required
+              :value="modelValue.new?.vatId"
+              @input="setNewField('vatId', $event.target.value)"
+            />
+          </div>
+          <div v-if="showRegisteredAsCompanyField" class="field">
+            <span class="field-label-block">
+              <I18nText k="enroll.registeredAsCompany" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </span>
+            <div class="yes-no-group" role="radiogroup" :aria-label="t('enroll.registeredAsCompany')">
+              <button
+                type="button"
+                role="radio"
+                class="yes-no-btn"
+                :class="{ active: yesNoGroupValue('registeredAsCompany') === 'yes' }"
+                :aria-checked="yesNoGroupValue('registeredAsCompany') === 'yes'"
+                @click="setNewYesNoField('registeredAsCompany', 'yes')"
+              >
+                <I18nText k="enroll.yes" />
+              </button>
+              <button
+                type="button"
+                role="radio"
+                class="yes-no-btn"
+                :class="{ active: yesNoGroupValue('registeredAsCompany') === 'no' }"
+                :aria-checked="yesNoGroupValue('registeredAsCompany') === 'no'"
+                @click="setNewYesNoField('registeredAsCompany', 'no')"
+              >
+                <I18nText k="enroll.no" />
+              </button>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
   </div>
@@ -601,7 +831,64 @@ onBeforeUnmount(() => {
   color: var(--color-text-muted);
   margin-bottom: 0.35rem;
 }
-.address-fields input {
+.field-required {
+  color: var(--color-accent, #2563eb);
+  font-weight: 600;
+}
+.address-subsection-title {
+  margin: 1.25rem 0 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.field-label-block {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: 0.35rem;
+}
+.yes-no-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  max-width: 16rem;
+}
+.yes-no-btn {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  min-height: var(--touch);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.yes-no-btn:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+}
+.yes-no-btn.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+.yes-no-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+.address-fields input:not([type='radio']):not([type='checkbox']) {
   width: 100%;
   padding: 0.75rem 1rem;
   min-height: var(--touch);

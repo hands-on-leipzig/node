@@ -3,6 +3,12 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { enrollTeam, getAddresses, validateVoucher, extractAddressesFromResponse, isDolibarrRowId } from '@/services/draht'
+import {
+  emptyAddressState,
+  buildNewAddressPayload,
+  ADDRESS_MODE_INVOICE,
+  ADDRESS_MODE_DELIVERY,
+} from '@/utils/addressForm'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
@@ -16,12 +22,6 @@ const program = route.query.program != null && route.query.program !== ''
   : null
 const programId = Number.isFinite(program) && program > 0 ? program : null
 
-const emptyAddressState = () => ({
-  useExisting: true,
-  addressId: '',
-  new: { street: '', postalCode: '', city: '', country: '' },
-})
-
 const form = ref({
   name: '',
   schoolOrClub: '',
@@ -31,8 +31,8 @@ const form = ref({
   state: '',
   organization: '',
   voucher: '',
-  deliveryAddress: emptyAddressState(),
-  invoiceAddress: emptyAddressState(),
+  deliveryAddress: emptyAddressState(ADDRESS_MODE_DELIVERY),
+  invoiceAddress: emptyAddressState(ADDRESS_MODE_INVOICE),
 })
 
 const consentDataProcessing = ref(false)
@@ -167,25 +167,18 @@ async function onVoucherBlur() {
   }
 }
 
-function buildAddressPayload(addr) {
+function buildAddressPayload(addr, mode) {
   if (addr.useExisting && isDolibarrRowId(addr.addressId)) {
     return { addressId: String(Number(String(addr.addressId).trim())) }
   }
-  const n = addr.new || {}
-  if (!n.street && !n.city && !n.country) return undefined
-  return {
-    street: n.street?.trim() || undefined,
-    postalCode: n.postalCode?.trim() || undefined,
-    city: n.city?.trim() || undefined,
-    country: n.country?.trim() || undefined,
-  }
+  return buildNewAddressPayload(addr, mode)
 }
 
 function buildInvoiceAddressPayload() {
   if (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value)) {
     return { addressId: String(Number(String(voucherInvoiceId.value).trim())) }
   }
-  return buildAddressPayload(form.value.invoiceAddress)
+  return buildAddressPayload(form.value.invoiceAddress, ADDRESS_MODE_INVOICE)
 }
 
 async function submit() {
@@ -214,7 +207,7 @@ async function submit() {
       state: form.value.state?.trim() || undefined,
       organization: form.value.organization?.trim() || undefined,
       voucher: form.value.voucher.trim() || undefined,
-      deliveryAddress: buildAddressPayload(form.value.deliveryAddress),
+      deliveryAddress: buildAddressPayload(form.value.deliveryAddress, ADDRESS_MODE_DELIVERY),
       invoiceAddress: buildInvoiceAddressPayload(),
       consentDataProcessing: true,
       consentTerms: true,
@@ -237,8 +230,8 @@ async function submit() {
       state: '',
       organization: '',
       voucher: '',
-      deliveryAddress: emptyAddressState(),
-      invoiceAddress: emptyAddressState(),
+      deliveryAddress: emptyAddressState(ADDRESS_MODE_DELIVERY),
+      invoiceAddress: emptyAddressState(ADDRESS_MODE_INVOICE),
     }
     consentDataProcessing.value = false
     consentTerms.value = false
@@ -360,6 +353,7 @@ function onFormFieldFocus(e) {
 
       <AddressSelector
         v-model="form.deliveryAddress"
+        mode="delivery"
         :addresses="addresses"
         :label="t('enroll.deliveryAddress')"
         id-prefix="team-delivery"
@@ -377,6 +371,7 @@ function onFormFieldFocus(e) {
       <AddressSelector
         v-else
         v-model="form.invoiceAddress"
+        mode="invoice"
         :addresses="addresses"
         :label="t('enroll.invoiceAddress')"
         id-prefix="team-invoice"

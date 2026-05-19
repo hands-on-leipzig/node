@@ -8,7 +8,7 @@ import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
-import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
+import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -88,16 +88,7 @@ watch(
       {{ error }}
     </div>
     <template v-else-if="group">
-      <div class="detail-header">
-        <div class="detail-icon detail-icon-group">
-          <i class="bi bi-stars"></i>
-        </div>
-        <div class="detail-heading">
-          <h2 class="detail-title">{{ group.label || group.name || group.ref }}</h2>
-          <p v-if="group.ref" class="detail-ref">{{ group.ref }}</p>
-          <DetailEnrollmentBadges :card="group" />
-        </div>
-      </div>
+      <DetailTeklaHeader :card="group" kind="group" />
 
       <TeklaTimeline
         v-if="timelineSteps.length"
@@ -199,12 +190,6 @@ watch(
 .detail-error { color: var(--color-error, #dc2626); }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.detail-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
-.detail-icon { width: 3rem; height: 3rem; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
-.detail-icon-group { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-.detail-heading { min-width: 0; }
-.detail-title { font-size: var(--text-2xl); font-weight: 600; color: var(--color-text); margin: 0 0 0.25rem; }
-.detail-ref { font-size: var(--text-base); color: var(--color-text-muted); margin: 0; }
 .detail-section { margin-bottom: 1.5rem; padding: 1rem 0; border-top: 1px solid var(--color-border); }
 .detail-section-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 0.75rem; }
 .detail-meta { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1.5rem; margin: 0; }

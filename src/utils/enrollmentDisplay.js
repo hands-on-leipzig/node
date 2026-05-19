@@ -109,3 +109,49 @@ export function resolveEnrollmentDisplay(card) {
     ],
   }
 }
+
+/**
+ * Sidebar left-border accent: challenge | explore | future5 | future8
+ * @param {Record<string, unknown>|null|undefined} row List row (program, element, edition)
+ * @returns {'challenge'|'explore'|'future5'|'future8'}
+ */
+/**
+ * Detail page headline (matches sidebar: team name, or „Klasse“ / „Gruppe“).
+ *
+ * @param {Record<string, unknown>|null|undefined} card
+ * @param {'team'|'class'|'group'} kind
+ * @returns {{ i18nKey: string|null, text: string, ref: string }}
+ */
+export function resolveDetailHeadline(card, kind) {
+  const ref =
+    card?.ref != null && String(card.ref).trim() !== ''
+      ? String(card.ref).trim()
+      : card?.id != null
+        ? `#${card.id}`
+        : ''
+
+  if (kind === 'class') {
+    return { i18nKey: 'dashboard.class', text: '', ref }
+  }
+  if (kind === 'group') {
+    return { i18nKey: 'dashboard.coCoachTypeGroup', text: '', ref }
+  }
+
+  const name = String(card?.label ?? card?.name ?? '').trim()
+  if (name) {
+    return { i18nKey: null, text: name, ref }
+  }
+  return { i18nKey: 'dashboard.team', text: '', ref }
+}
+
+export function resolveSidebarAccentTone(row) {
+  const programId = normalizeProgramId(row)
+  const entry = programId != null ? BY_PROGRAM[programId] : null
+  if (entry?.variantTone === 'challenge' || entry?.variantTone === 'explore' || entry?.variantTone === 'future5' || entry?.variantTone === 'future8') {
+    return entry.variantTone
+  }
+  const element = String(row?.element ?? '').toLowerCase()
+  if (element === 'gruppe') return 'future8'
+  if (element === 'klazi') return 'explore'
+  return 'explore'
+}

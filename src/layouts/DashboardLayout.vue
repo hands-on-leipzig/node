@@ -12,6 +12,7 @@ import {
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups, parseNodeListPayload, isFutureEnrollmentEntry } from '@/services/draht'
+import { resolveSidebarAccentTone } from '@/utils/enrollmentDisplay'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const route = useRoute()
@@ -111,26 +112,28 @@ async function loadSidebarLists() {
   }
 }
 
-function teamPrimaryLabel(team) {
-  return team.name || t('dashboard.team')
+/** @param {'team'|'class'|'group'} kind */
+function sidebarTeklaBoldLabel(item, kind) {
+  if (kind === 'class') return t('dashboard.class')
+  if (kind === 'group') return t('dashboard.coCoachTypeGroup')
+  return String(item?.name ?? '').trim() || t('dashboard.team')
 }
-function teamSecondaryLabel(team) {
-  if (team.ref) return String(team.ref)
-  return team.id != null ? '#' + team.id : ''
+
+function sidebarTeklaRefLabel(item) {
+  if (item?.ref) return String(item.ref)
+  return item?.id != null ? `#${item.id}` : ''
 }
-function classPrimaryLabel(cls) {
-  return cls.name || t('dashboard.class')
+
+function sidebarTeklaAccent(item) {
+  return resolveSidebarAccentTone(item)
 }
-function classSecondaryLabel(cls) {
-  if (cls.ref) return String(cls.ref)
-  return cls.id != null ? '#' + cls.id : ''
-}
-function groupPrimaryLabel(group) {
-  return group.name || t('dashboard.editionFuture')
-}
-function groupSecondaryLabel(group) {
-  if (group.ref) return String(group.ref)
-  return group.id != null ? '#' + group.id : ''
+
+function sidebarTeklaAriaLabel(item, kind) {
+  const bold = sidebarTeklaBoldLabel(item, kind)
+  const ref = sidebarTeklaRefLabel(item)
+  if (kind === 'team') return t('nav.sidebarOpenTeam', { name: bold })
+  if (kind === 'class') return t('nav.sidebarOpenClass', { name: bold })
+  return t('nav.sidebarOpenGroup', { name: bold })
 }
 function goTeam(id) {
   closeSidebar()
@@ -255,14 +258,6 @@ function goSettings() {
   router.push({ name: 'settings' })
 }
 
-const userInitials = computed(() => {
-  const name = user.value?.name
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
-})
-
 const foundersTeams = computed(() => teams.value.filter((t) => !isFutureEnrollmentEntry(t)))
 const futureTeams = computed(() => teams.value.filter((t) => isFutureEnrollmentEntry(t)))
 const hasFoundersEnrollments = computed(() => foundersTeams.value.length > 0 || classes.value.length > 0)
@@ -370,36 +365,36 @@ const { canInstall, promptInstall } = usePwaInstall()
                   v-for="team in foundersTeams"
                   :key="'team-' + team.id"
                   type="button"
-                  class="sidebar-item sidebar-entry"
-                  :class="{ active: isTeamActive(team.id) }"
-                  :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-                  :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  class="sidebar-tekla-tile"
+                  :class="[
+                    { active: isTeamActive(team.id) },
+                    `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
+                  ]"
+                  :title="sidebarTeklaAriaLabel(team, 'team')"
+                  :aria-label="sidebarTeklaAriaLabel(team, 'team')"
                   @click="goTeam(team.id)"
                 >
-                  <span class="sidebar-item-icon">
-                    <i class="bi bi-person-fill" aria-hidden="true"></i>
-                  </span>
-                  <span class="sidebar-item-text">
-                    <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
-                    <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
+                  <span class="sidebar-tekla-tile-text">
+                    <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(team, 'team') }}</span>
+                    <span v-if="sidebarTeklaRefLabel(team)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(team) }}</span>
                   </span>
                 </button>
                 <button
                   v-for="cls in classes"
                   :key="'class-' + cls.id"
                   type="button"
-                  class="sidebar-item sidebar-entry"
-                  :class="{ active: isClassActive(cls.id) }"
-                  :title="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
-                  :aria-label="t('nav.sidebarOpenClass', { name: classPrimaryLabel(cls) })"
+                  class="sidebar-tekla-tile"
+                  :class="[
+                    { active: isClassActive(cls.id) },
+                    `sidebar-tekla-tile--${sidebarTeklaAccent(cls)}`,
+                  ]"
+                  :title="sidebarTeklaAriaLabel(cls, 'class')"
+                  :aria-label="sidebarTeklaAriaLabel(cls, 'class')"
                   @click="goClass(cls.id)"
                 >
-                  <span class="sidebar-item-icon">
-                    <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
-                  </span>
-                  <span class="sidebar-item-text">
-                    <span class="sidebar-item-label">{{ classPrimaryLabel(cls) }}</span>
-                    <span v-if="classSecondaryLabel(cls)" class="sidebar-item-sublabel">{{ classSecondaryLabel(cls) }}</span>
+                  <span class="sidebar-tekla-tile-text">
+                    <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(cls, 'class') }}</span>
+                    <span v-if="sidebarTeklaRefLabel(cls)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(cls) }}</span>
                   </span>
                 </button>
             </div>
@@ -424,36 +419,36 @@ const { canInstall, promptInstall } = usePwaInstall()
                   v-for="group in groups"
                   :key="'group-' + group.id"
                   type="button"
-                  class="sidebar-item sidebar-entry"
-                  :class="{ active: isGroupActive(group.id) }"
-                  :title="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
-                  :aria-label="t('nav.sidebarOpenGroup', { name: groupPrimaryLabel(group) })"
+                  class="sidebar-tekla-tile"
+                  :class="[
+                    { active: isGroupActive(group.id) },
+                    `sidebar-tekla-tile--${sidebarTeklaAccent(group)}`,
+                  ]"
+                  :title="sidebarTeklaAriaLabel(group, 'group')"
+                  :aria-label="sidebarTeklaAriaLabel(group, 'group')"
                   @click="goGroup(group.id)"
                 >
-                  <span class="sidebar-item-icon">
-                    <i class="bi bi-stars" aria-hidden="true"></i>
-                  </span>
-                  <span class="sidebar-item-text">
-                    <span class="sidebar-item-label">{{ groupPrimaryLabel(group) }}</span>
-                    <span v-if="groupSecondaryLabel(group)" class="sidebar-item-sublabel">{{ groupSecondaryLabel(group) }}</span>
+                  <span class="sidebar-tekla-tile-text">
+                    <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(group, 'group') }}</span>
+                    <span v-if="sidebarTeklaRefLabel(group)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(group) }}</span>
                   </span>
                 </button>
                 <button
                   v-for="team in futureTeams"
                   :key="'future-team-' + team.id"
                   type="button"
-                  class="sidebar-item sidebar-entry"
-                  :class="{ active: isTeamActive(team.id) }"
-                  :title="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
-                  :aria-label="t('nav.sidebarOpenTeam', { name: teamPrimaryLabel(team) })"
+                  class="sidebar-tekla-tile"
+                  :class="[
+                    { active: isTeamActive(team.id) },
+                    `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
+                  ]"
+                  :title="sidebarTeklaAriaLabel(team, 'team')"
+                  :aria-label="sidebarTeklaAriaLabel(team, 'team')"
                   @click="goTeam(team.id)"
                 >
-                  <span class="sidebar-item-icon">
-                    <i class="bi bi-person-fill" aria-hidden="true"></i>
-                  </span>
-                  <span class="sidebar-item-text">
-                    <span class="sidebar-item-label">{{ teamPrimaryLabel(team) }}</span>
-                    <span v-if="teamSecondaryLabel(team)" class="sidebar-item-sublabel">{{ teamSecondaryLabel(team) }}</span>
+                  <span class="sidebar-tekla-tile-text">
+                    <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(team, 'team') }}</span>
+                    <span v-if="sidebarTeklaRefLabel(team)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(team) }}</span>
                   </span>
                 </button>
               </div>
@@ -462,67 +457,22 @@ const { canInstall, promptInstall } = usePwaInstall()
         </template>
       </nav>
       <div class="sidebar-partner">
-        <p class="sidebar-partner-label"><I18nText k="common.organizedBy" /></p>
+        <img
+          src="/FIRSTLego_IconVert_RGB.png"
+          alt="FIRST LEGO League"
+          class="sidebar-partner-logo sidebar-partner-logo--fll"
+          decoding="async"
+        >
         <a
           href="https://www.hands-on-technology.org"
           target="_blank"
           rel="noopener noreferrer"
           class="sidebar-partner-link"
         >
-          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo" />
+          <img src="@/assets/hot.png" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
         </a>
       </div>
       <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">
-        <div class="sidebar-prefs">
-          <div class="sidebar-prefs-block">
-            <span class="sidebar-prefs-heading"><I18nText k="common.theme" /></span>
-            <div class="sidebar-prefs-row" role="group" :aria-label="t('common.theme')">
-              <button
-                type="button"
-                class="sidebar-pref-btn"
-                :class="{ active: theme === 'light' }"
-                :aria-pressed="theme === 'light'"
-                @click="setTheme('light')"
-              >
-                <i class="bi bi-sun-fill" aria-hidden="true" />
-                <span><I18nText k="common.light" /></span>
-              </button>
-              <button
-                type="button"
-                class="sidebar-pref-btn"
-                :class="{ active: theme === 'dark' }"
-                :aria-pressed="theme === 'dark'"
-                @click="setTheme('dark')"
-              >
-                <i class="bi bi-moon-fill" aria-hidden="true" />
-                <span><I18nText k="common.dark" /></span>
-              </button>
-            </div>
-          </div>
-          <div class="sidebar-prefs-block">
-            <span class="sidebar-prefs-heading"><I18nText k="common.language" /></span>
-            <div class="sidebar-prefs-row" role="group" :aria-label="t('common.language')">
-              <button
-                type="button"
-                class="sidebar-pref-btn"
-                :class="{ active: locale === 'de' }"
-                :aria-pressed="locale === 'de'"
-                @click="switchToDe"
-              >
-                DE
-              </button>
-              <button
-                type="button"
-                class="sidebar-pref-btn"
-                :class="{ active: locale === 'en' }"
-                :aria-pressed="locale === 'en'"
-                @click="switchToEn"
-              >
-                EN
-              </button>
-            </div>
-          </div>
-        </div>
         <button
           v-if="isGuestShell && !isAuthenticated()"
           type="button"
@@ -547,20 +497,14 @@ const { canInstall, promptInstall } = usePwaInstall()
             class="profile-trigger sidebar-item"
             aria-haspopup="true"
             :aria-expanded="profileMenuOpen"
+            :aria-label="t('common.settings')"
             @click="openProfileMenu"
           >
-            <span class="profile-avatar">
-              <img
-                v-if="user?.picture"
-                :src="user.picture"
-                alt=""
-                class="profile-avatar-img"
-              />
-              <span v-else class="profile-avatar-initials">{{ userInitials }}</span>
+            <span class="sidebar-item-icon profile-settings-icon" aria-hidden="true">
+              <i class="bi bi-gear-fill" />
             </span>
-            <span class="sidebar-item-label profile-sidebar-name">
-              <template v-if="user?.name">{{ user.name }}</template>
-              <I18nText v-else k="common.coach" />
+            <span class="sidebar-item-label">
+              <I18nText k="common.settings" />
             </span>
           </button>
           <Transition name="profile-menu">
@@ -571,9 +515,59 @@ const { canInstall, promptInstall } = usePwaInstall()
                   <I18nText v-else k="common.coach" />
                 </span>
               </div>
+              <div class="profile-menu-prefs">
+                <div class="profile-menu-prefs-block">
+                  <span class="profile-menu-label"><I18nText k="common.theme" /></span>
+                  <div class="profile-menu-prefs-row" role="group" :aria-label="t('common.theme')">
+                    <button
+                      type="button"
+                      class="profile-pref-btn"
+                      :class="{ active: theme === 'light' }"
+                      :aria-pressed="theme === 'light'"
+                      @click="setTheme('light')"
+                    >
+                      <i class="bi bi-sun-fill" aria-hidden="true" />
+                      <span><I18nText k="common.light" /></span>
+                    </button>
+                    <button
+                      type="button"
+                      class="profile-pref-btn"
+                      :class="{ active: theme === 'dark' }"
+                      :aria-pressed="theme === 'dark'"
+                      @click="setTheme('dark')"
+                    >
+                      <i class="bi bi-moon-fill" aria-hidden="true" />
+                      <span><I18nText k="common.dark" /></span>
+                    </button>
+                  </div>
+                </div>
+                <div class="profile-menu-prefs-block">
+                  <span class="profile-menu-label"><I18nText k="common.language" /></span>
+                  <div class="profile-menu-prefs-row" role="group" :aria-label="t('common.language')">
+                    <button
+                      type="button"
+                      class="profile-pref-btn"
+                      :class="{ active: locale === 'de' }"
+                      :aria-pressed="locale === 'de'"
+                      @click="switchToDe"
+                    >
+                      DE
+                    </button>
+                    <button
+                      type="button"
+                      class="profile-pref-btn"
+                      :class="{ active: locale === 'en' }"
+                      :aria-pressed="locale === 'en'"
+                      @click="switchToEn"
+                    >
+                      EN
+                    </button>
+                  </div>
+                </div>
+              </div>
               <button type="button" class="profile-menu-item" role="menuitem" @click="goSettings">
-                <i class="bi bi-gear"></i>
-                <span><I18nText k="common.settings" /></span>
+                <i class="bi bi-person-lines-fill"></i>
+                <span><I18nText k="settings.profileTitle" /></span>
               </button>
               <button type="button" class="profile-menu-item" role="menuitem" disabled>
                 <i class="bi bi-question-circle"></i>
@@ -725,17 +719,13 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 .sidebar-partner {
   margin: 0.75rem 0.5rem 0;
-  padding: 0.65rem 0.35rem 0;
+  padding: 0.85rem 0.5rem 0.4rem;
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
   text-align: center;
-}
-.sidebar-partner-label {
-  margin: 0 0 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-subtle);
 }
 .sidebar-partner-link {
   display: block;
@@ -743,15 +733,23 @@ const { canInstall, promptInstall } = usePwaInstall()
   line-height: 0;
 }
 .sidebar-partner-logo {
-  width: 100%;
-  height: auto;
-  max-height: 3.25rem;
   object-fit: contain;
   object-position: center;
-  opacity: 0.95;
   transition: opacity 0.15s;
 }
-.sidebar-partner-link:hover .sidebar-partner-logo {
+.sidebar-partner-logo--fll {
+  width: auto;
+  max-width: 100%;
+  max-height: 4.5rem;
+  opacity: 0.98;
+}
+.sidebar-partner-logo--hot {
+  width: 100%;
+  height: auto;
+  max-height: 4.85rem;
+  opacity: 0.95;
+}
+.sidebar-partner-link:hover .sidebar-partner-logo--hot {
   opacity: 1;
 }
 
@@ -872,7 +870,8 @@ const { canInstall, promptInstall } = usePwaInstall()
 .sidebar-section-entries {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem 0.35rem;
 }
 .sidebar-section-hint {
   margin: 0.35rem 0.5rem 0.5rem;
@@ -924,40 +923,80 @@ const { canInstall, promptInstall } = usePwaInstall()
 .sidebar-list-loading .spin {
   animation: spin 0.8s linear infinite;
 }
-.sidebar-entry {
+.sidebar-tekla-tile {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.65rem 0.55rem 0.7rem;
+  border: 1px solid var(--liquid-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
+  background: var(--liquid-tile-bg-inner);
+  box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.05);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.05);
   cursor: pointer;
-  font-size: var(--text-base);
   font-family: inherit;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  text-align: left;
-  align-self: stretch;
-}
-.sidebar-entry .bi {
-  font-size: 1.25rem;
-  opacity: 0.9;
-}
-.sidebar-entry:hover {
-  background: var(--color-bg-hover);
+  font-size: var(--text-sm);
   color: var(--color-text);
-  border-color: var(--color-border);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.sidebar-entry:focus-visible {
+.sidebar-tekla-tile--challenge {
+  border-left-color: #c62828;
+}
+.sidebar-tekla-tile--explore {
+  border-left-color: #2e7d32;
+}
+.sidebar-tekla-tile--future8 {
+  border-left-color: #1565c0;
+}
+.sidebar-tekla-tile--future5 {
+  border-left-color: #e6a800;
+}
+.sidebar-tekla-tile:hover {
+  background: color-mix(in srgb, var(--liquid-tile-bg-inner) 88%, var(--color-bg-hover));
+  box-shadow: var(--shadow-md), var(--liquid-shadow-inset);
+}
+.sidebar-tekla-tile:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
-.sidebar-entry.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border-color: var(--color-border);
+.sidebar-tekla-tile.active {
+  background: color-mix(in srgb, var(--color-accent-soft) 55%, var(--liquid-tile-bg-inner));
+  box-shadow: var(--shadow-md), var(--liquid-shadow-inset);
 }
-.sidebar-entry.active .bi {
-  opacity: 1;
+.sidebar-tekla-tile-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+  min-width: 0;
+  width: 100%;
 }
-.sidebar-entry.active .sidebar-item-sublabel {
-  color: inherit;
-  opacity: 0.85;
+.sidebar-tekla-tile-title {
+  font-weight: 700;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.sidebar-tekla-tile-ref {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.sidebar-tekla-tile.active .sidebar-tekla-tile-ref {
+  color: color-mix(in srgb, var(--color-text) 72%, var(--color-text-muted));
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -978,60 +1017,58 @@ const { canInstall, promptInstall } = usePwaInstall()
 .sidebar-bottom--guest {
   gap: 0.75rem;
 }
-.sidebar-prefs {
+.profile-settings-icon .bi {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+.profile-trigger:hover .profile-settings-icon .bi {
+  opacity: 1;
+  color: var(--color-accent);
+}
+.profile-menu-prefs {
+  padding: 0.35rem 1rem 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  padding: 0 0.15rem;
+  gap: 0.55rem;
 }
-.sidebar-prefs-block {
+.profile-menu-prefs-block {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
-.sidebar-prefs-heading {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-subtle);
-}
-.sidebar-prefs-row {
+.profile-menu-prefs-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
 }
-.sidebar-pref-btn {
+.profile-pref-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  min-height: 2.5rem;
-  padding: 0.45rem 0.55rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--liquid-border);
   border-radius: var(--radius);
   background: var(--liquid-tile-bg-inner);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(calc(var(--liquid-saturate) * 0.9));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(calc(var(--liquid-saturate) * 0.9));
-  box-shadow: var(--liquid-shadow-inset);
   font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.sidebar-pref-btn:hover {
+.profile-pref-btn:hover {
   background: var(--color-bg-hover);
-  border-color: var(--liquid-border);
 }
-.sidebar-pref-btn.active {
+.profile-pref-btn.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow: 0 2px 10px rgba(255, 122, 0, 0.28);
 }
-.sidebar-pref-btn .bi {
+.profile-pref-btn .bi {
   font-size: 1rem;
   flex-shrink: 0;
 }
@@ -1079,45 +1116,6 @@ const { canInstall, promptInstall } = usePwaInstall()
   background: var(--color-bg-hover);
   color: var(--color-text);
   border-color: var(--color-border);
-}
-.profile-avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  flex-shrink: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--color-bg-muted);
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-  aspect-ratio: 1;
-}
-.profile-trigger:hover .profile-avatar {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-.profile-sidebar-name {
-  font-weight: 600;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-.profile-trigger .profile-avatar {
-  margin: 0;
-}
-.profile-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.profile-avatar-initials {
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 .profile-menu {
   position: absolute;
@@ -1322,8 +1320,11 @@ const { canInstall, promptInstall } = usePwaInstall()
   .sidebar-brand-logo--join {
     max-height: 2.75rem;
   }
-  .sidebar-partner-logo {
-    max-height: 2.5rem;
+  .sidebar-partner-logo--fll {
+    max-height: 3.75rem;
+  }
+  .sidebar-partner-logo--hot {
+    max-height: 4rem;
   }
   .content {
     padding: 1rem;

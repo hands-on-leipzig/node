@@ -2,15 +2,13 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, getEventsNearest, registerTeamForEvent, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
+import { getTeam, updateTeamPlayers, updateTeamVersandaufschub } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
-import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import DetailEnrollmentBadges from '@/components/DetailEnrollmentBadges.vue'
-import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
+import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,14 +24,6 @@ const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: ''
 const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
-
-// Event nachmelden
-const events = ref([])
-const eventsLoading = ref(false)
-const registerEventId = ref('')
-const registeringEvent = ref(false)
-const registerEventError = ref(null)
-const registerEventSuccess = ref(false)
 
 const id = computed(() => route.params.id)
 
@@ -87,40 +77,6 @@ function playerMeta(p) {
     parts.push(d.toLocaleDateString(locale.value === 'de' ? 'de-DE' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }))
   }
   return parts.length ? parts.join(' · ') : ''
-}
-
-function extractEventList(data) {
-  if (Array.isArray(data)) return data
-  if (!data || typeof data !== 'object') return []
-  const isMapObject = (obj) => obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).length > 0
-  if (isMapObject(data) && !('data' in data) && !('events' in data) && !('items' in data) && !('results' in data) && !('list' in data)) {
-    return Object.values(data)
-  }
-  const direct = data.data ?? data.events ?? data.items ?? data.results ?? data.list
-  if (Array.isArray(direct)) return direct
-  if (isMapObject(direct)) return Object.values(direct)
-  if (direct && typeof direct === 'object') {
-    const nested = direct.data ?? direct.events ?? direct.items ?? direct.results ?? direct.list
-    if (Array.isArray(nested)) return nested
-    if (isMapObject(nested)) return Object.values(nested)
-  }
-  return []
-}
-
-function normalizeEvents(rawList) {
-  return rawList
-    .map((entry) => {
-      const base = entry?.event && typeof entry.event === 'object' ? { ...entry.event, ...entry } : entry
-      const id = base?.id ?? base?.eventId ?? base?.event_id ?? base?.rowid ?? base?.fk_event ?? base?.value
-      if (id == null || id === '') return null
-      const label = base?.label ?? base?.name ?? base?.title ?? base?.ref ?? base?.eventLabel ?? base?.event_name
-      return {
-        ...base,
-        id: String(id),
-        label: label != null ? String(label) : `Event ${id}`,
-      }
-    })
-    .filter(Boolean)
 }
 
 function toBirthdayStr(ts) {
@@ -262,88 +218,14 @@ async function fetchTeam() {
   }
 }
 
-async function loadEvents() {
-  eventsLoading.value = true
-  events.value = []
-  registerEventError.value = null
-  try {
-    const country = String(
-      team.value?.country
-      || team.value?.land
-      || team.value?.schoolCountry
-      || team.value?.school_country
-      || team.value?.overview?.delivery_address?.country
-      || team.value?.overview?.billing_address?.country
-      || ''
-    ).trim().toLowerCase() || undefined
-    const zip = String(
-      team.value?.zip
-      || team.value?.plz
-      || team.value?.postalCode
-      || team.value?.postal_code
-      || team.value?.overview?.delivery_address?.zip
-      || team.value?.overview?.billing_address?.zip
-      || ''
-    ).trim() || undefined
-    const rawProgram = team.value?.program?.id ?? team.value?.program_id ?? team.value?.programId ?? team.value?.program ?? undefined
-    const program = (typeof rawProgram === 'object' ? rawProgram?.id : rawProgram) ?? undefined
-    const res = await getEventsNearest(country, zip, program)
-    const data = res.data
-    const list = extractEventList(data)
-    events.value = normalizeEvents(list)
-  } catch (_) {
-    events.value = []
-  } finally {
-    eventsLoading.value = false
-  }
-}
-
-async function submitRegisterForEvent() {
-  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
-  const eventId = registerEventId.value?.trim()
-  if (!id.value || !eventId) return
-  registeringEvent.value = true
-  registerEventError.value = null
-  registerEventSuccess.value = false
-  try {
-    const res = await registerTeamForEvent(id.value, eventId)
-    team.value = res.data
-    registerEventId.value = ''
-    registerEventSuccess.value = true
-    setTimeout(() => { registerEventSuccess.value = false }, 3000)
-  } catch (e) {
-    registerEventError.value = e.response?.data?.message || e.message || t('teamDetail.registerEventFailed')
-  } finally {
-    registeringEvent.value = false
-  }
-}
-
-/** Event display label with optional capacity (from flow API). */
-function eventLabel(ev) {
-  const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
-  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
-  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
-  if (typeof used === 'number' && typeof max === 'number') {
-    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
-  }
-  return name
-}
-
-/** Request change of event (e.g. contact/organizer). Placeholder for now. */
-function requestEventChange() {
-  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
-  // TODO: open contact form or mailto
-  if (import.meta.env.DEV) console.info('Request event change for team', id.value)
-}
-
-onMounted(async () => {
-  await fetchTeam()
-  if (DETAIL_EVENT_ACTIONS_ENABLED) loadEvents()
+const registeredEventLabel = computed(() => {
+  const ev = team.value?.event
+  if (!ev) return ''
+  return ev.label || ev.ref || (ev.id != null ? `Event ${ev.id}` : '')
 })
-watch(id, async () => {
-  await fetchTeam()
-  if (DETAIL_EVENT_ACTIONS_ENABLED) loadEvents()
-})
+
+onMounted(fetchTeam)
+watch(id, fetchTeam)
 
 watch(
   () => route.query.focus,
@@ -365,16 +247,7 @@ watch(
     </div>
     <template v-else-if="team">
       <!-- 1) Name of tekla + number -->
-      <div class="detail-header">
-        <div class="detail-icon detail-icon-team">
-          <i class="bi bi-person-fill"></i>
-        </div>
-        <div class="detail-heading">
-          <h2 class="detail-title">{{ team.label || team.name || team.ref }}</h2>
-          <p v-if="team.ref" class="detail-ref">{{ team.ref }}</p>
-          <DetailEnrollmentBadges :card="team" />
-        </div>
-      </div>
+      <DetailTeklaHeader :card="team" kind="team" />
 
       <!-- 2) Timeline -->
       <TeklaTimeline
@@ -424,54 +297,11 @@ watch(
         </dl>
       </section>
 
-      <!-- 3b) Event (right column): current event or enroll -->
-      <section
-        class="detail-section detail-section-event"
-        :class="{ 'detail-section--disabled': !DETAIL_EVENT_ACTIONS_ENABLED }"
-        :aria-disabled="!DETAIL_EVENT_ACTIONS_ENABLED || undefined"
-      >
+      <!-- 3b) Event (right column): registered event only -->
+      <section class="detail-section detail-section-event">
         <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
-        <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
-          <I18nText k="detail.eventSectionComingSoon" />
-        </p>
-        <div class="detail-section-event-body" :inert="!DETAIL_EVENT_ACTIONS_ENABLED">
-          <template v-if="team.event && (team.event.label || team.event.ref)">
-            <p class="detail-event-current">{{ team.event.label || team.event.ref }}</p>
-            <button type="button" class="detail-btn" disabled @click="requestEventChange">
-              <i class="bi bi-pencil-square"></i>
-              <I18nText k="teamDetail.requestEventChange" />
-            </button>
-          </template>
-          <template v-else>
-            <p class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
-            <p class="detail-hint detail-hint-sm"><I18nText k="teamDetail.registerForEventHint" /></p>
-            <div class="detail-register-event">
-              <EventSelectDropdown
-                :title="t('wizard.eventSelectSimple')"
-                :events="events"
-                :loading="eventsLoading"
-                :model-value="registerEventId"
-                :placeholder="t('teamDetail.selectEvent')"
-                :event-label-fn="eventLabel"
-                :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
-                @update:model-value="registerEventId = $event"
-              />
-              <button
-                type="button"
-                class="detail-btn detail-btn-primary"
-                disabled
-                @click="submitRegisterForEvent"
-              >
-                <i v-if="registeringEvent" class="bi bi-arrow-repeat spin"></i>
-                <i v-else class="bi bi-calendar-check"></i>
-                <I18nText v-if="registeringEvent" k="teamDetail.registering" />
-                <I18nText v-else k="teamDetail.registerForEventButton" />
-              </button>
-            </div>
-            <p v-if="registerEventError" class="detail-message detail-message-error"><i class="bi bi-exclamation-circle"></i> {{ registerEventError }}</p>
-            <p v-if="registerEventSuccess" class="detail-message detail-message-success"><i class="bi bi-check-circle-fill"></i> <I18nText k="teamDetail.registerEventSuccess" /></p>
-          </template>
-        </div>
+        <p v-if="registeredEventLabel" class="detail-event-current">{{ registeredEventLabel }}</p>
+        <p v-else class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
@@ -595,40 +425,6 @@ watch(
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-.detail-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.detail-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-.detail-icon-team {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-.detail-heading {
-  min-width: 0;
-}
-.detail-title {
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 0.25rem;
-}
-.detail-ref {
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-  margin: 0;
 }
 .detail-section {
   margin-bottom: 1.5rem;
@@ -836,48 +632,11 @@ watch(
 .detail-hint-sm {
   margin-bottom: 0.5rem;
 }
-.detail-section--disabled .detail-section-event-body {
-  opacity: 0.5;
-  filter: grayscale(0.35);
-  pointer-events: none;
-  user-select: none;
-}
-.detail-section-disabled-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: var(--radius);
-  border: 1px dashed var(--color-border);
-  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-text-muted));
-}
 .detail-event-current {
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--color-text);
-  margin: 0 0 0.75rem;
-}
-.detail-register-event {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.detail-event-dropdowns {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.detail-event-select {
-  min-width: 14rem;
-  padding: 0.5rem 0.75rem;
-  font-size: var(--text-base);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-.detail-event-select:focus {
-  border-color: var(--color-accent);
-  outline: none;
+  margin: 0;
 }
 .detail-field-hint,
 .detail-message {

@@ -118,7 +118,24 @@ function normalizeAddressItem(raw) {
   const postalCode = firstDefined(raw.postalCode, raw.zip, raw.zipcode, raw.cp) || ''
   const city = firstDefined(raw.city, raw.town) || ''
   const country = firstDefined(raw.country, raw.countryCode, raw.country_code, raw.countrycode) || ''
-  const label = firstDefined(raw.label, raw.name, raw.title) || ''
+  const label = firstDefined(raw.label, raw.name, raw.title, raw.institution) || ''
+  const line2 = firstDefined(raw.addressLine2, raw.line2, raw.contactPerson) || ''
+  const line3 = firstDefined(raw.addressLine3, raw.line3) || ''
+  const institution = firstDefined(raw.institution, raw.label, raw.name) || ''
+  const contactPerson = firstDefined(raw.contactPerson, raw.line2) || ''
+  const deliveryName = firstDefined(raw.name, raw.label) || ''
+  const leitwegId = firstDefined(raw.leitwegId, raw.idprof4) || ''
+  const supplierNumber = firstDefined(raw.supplierNumber, raw.idprof5) || ''
+  const orderReference = firstDefined(raw.orderReference, raw.auftragsreferenz, raw.idprof6) || ''
+  const vatId = firstDefined(raw.vatId, raw.tva_intra) || ''
+  let netInvoiceDesired = raw.netInvoiceDesired
+  if (netInvoiceDesired === undefined && raw.tva_assuj !== undefined && raw.tva_assuj !== '') {
+    netInvoiceDesired = Number(raw.tva_assuj) === 0
+  }
+  let registeredAsCompany = raw.registeredAsCompany
+  if (registeredAsCompany === undefined && raw.particulier !== undefined && raw.particulier !== '') {
+    registeredAsCompany = Number(raw.particulier) === 0
+  }
   return {
     id: String(Number(String(idRaw).trim())),
     label: String(label || '').trim(),
@@ -126,6 +143,19 @@ function normalizeAddressItem(raw) {
     postalCode: String(postalCode || '').trim(),
     city: String(city || '').trim(),
     country: String(country || '').trim().toLowerCase(),
+    line2: String(line2 || '').trim(),
+    line3: String(line3 || '').trim(),
+    institution: String(institution || '').trim(),
+    contactPerson: String(contactPerson || '').trim(),
+    name: String(deliveryName || '').trim(),
+    addressLine2: String(line2 || '').trim(),
+    addressLine3: String(line3 || '').trim(),
+    leitwegId: String(leitwegId || '').trim(),
+    supplierNumber: String(supplierNumber || '').trim(),
+    orderReference: String(orderReference || '').trim(),
+    vatId: String(vatId || '').trim(),
+    netInvoiceDesired: netInvoiceDesired === true || netInvoiceDesired === false ? netInvoiceDesired : null,
+    registeredAsCompany: registeredAsCompany === true || registeredAsCompany === false ? registeredAsCompany : null,
   }
 }
 

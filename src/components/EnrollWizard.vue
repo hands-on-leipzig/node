@@ -14,6 +14,12 @@ import {
   listAddressBookGrouped,
   isDolibarrRowId,
 } from '@/services/draht'
+import {
+  emptyAddressState,
+  buildNewAddressPayload,
+  ADDRESS_MODE_INVOICE,
+  ADDRESS_MODE_DELIVERY,
+} from '@/utils/addressForm'
 import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
@@ -38,12 +44,6 @@ const previousHtmlOverflow = ref('')
 const { t, locale } = useI18n()
 const router = useRouter()
 const FUTURE_GROUP_5_ENABLED = false
-
-const emptyAddressState = () => ({
-  useExisting: true,
-  addressId: '',
-  new: { street: '', postalCode: '', city: '', country: '' },
-})
 
 // Step 0a: FLL experience (before voucher)
 const introSubStep = ref('fll') // 'fll' | 'voucher'
@@ -120,8 +120,8 @@ const founderTeamEventId = ref(null)
 const founderEventsNearest = ref([])
 const founderEventsNearestLoading = ref(false)
 // Step 6
-const deliveryAddress = ref(emptyAddressState())
-const invoiceAddress = ref(emptyAddressState())
+const deliveryAddress = ref(emptyAddressState(ADDRESS_MODE_DELIVERY))
+const invoiceAddress = ref(emptyAddressState(ADDRESS_MODE_INVOICE))
 /** Options for delivery selector (contacts only when API returns split lists). */
 const deliveryAddresses = ref([])
 /** Options for invoice selector (third parties only when API returns split lists). */
@@ -401,10 +401,15 @@ function quoteLineProductName(line) {
   return String(line?.productRef ?? '').trim()
 }
 
+function seasonSetCompareEntry(setCount) {
+  return pricingQuote.value?.compareSeasonSets?.[String(Number(setCount))] ?? null
+}
+
 function formatSeasonSetOptionPrice(setCount) {
-  const cmp = pricingQuote.value?.compareSeasonSets?.[String(Number(setCount))]
-  const amount = cmp?.seasonSetsGrossEur ?? 0
-  if (pricingLoading.value && !Number.isFinite(amount)) return '…'
+  const cmp = seasonSetCompareEntry(setCount)
+  const amount = cmp?.seasonSetsGrossEur
+  if (pricingLoading.value && (cmp == null || !Number.isFinite(Number(amount)))) return '…'
+  if (!Number.isFinite(Number(amount))) return ''
   return formatWizardEur(amount)
 }
 
@@ -910,8 +915,8 @@ function openWizard() {
   wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
-  deliveryAddress.value = emptyAddressState()
-  invoiceAddress.value = emptyAddressState()
+  deliveryAddress.value = emptyAddressState(ADDRESS_MODE_DELIVERY)
+  invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
   deliveryAddressDifferent.value = false
   consentDataProcessing.value = false
   consentTerms.value = false
@@ -1244,13 +1249,11 @@ async function loadAddresses() {
   }
 }
 
-function buildAddressPayload(addr) {
+function buildAddressPayload(addr, mode) {
   if (addr.useExisting && isDolibarrRowId(addr.addressId)) {
     return { addressId: String(Number(String(addr.addressId).trim())) }
   }
-  const n = addr.new || {}
-  if (!n.street && !n.city && !n.country) return undefined
-  return { street: n.street?.trim() || undefined, postalCode: n.postalCode?.trim() || undefined, city: n.city?.trim() || undefined, country: n.country?.trim() || undefined }
+  return buildNewAddressPayload(addr, mode)
 }
 
 function buildInvoicePayload() {
@@ -1260,12 +1263,12 @@ function buildInvoicePayload() {
   if (isDolibarrRowId(voucherPresetInvoiceId.value)) {
     return { addressId: String(Number(String(voucherPresetInvoiceId.value).trim())) }
   }
-  return buildAddressPayload(invoiceAddress.value)
+  return buildAddressPayload(invoiceAddress.value, ADDRESS_MODE_INVOICE)
 }
 
 function buildDeliveryPayload() {
   if (!deliveryAddressDifferent.value) return buildInvoicePayload()
-  return buildAddressPayload(deliveryAddress.value)
+  return buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
 }
 
 /** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
@@ -1277,7 +1280,7 @@ function isDeliveryAddressValid() {
 function isInvoiceAddressValid() {
   if (voucherType.value === '1') return isDolibarrRowId(voucherInvoiceId.value)
   if (isDolibarrRowId(voucherPresetInvoiceId.value)) return true
-  return !!buildAddressPayload(invoiceAddress.value)
+  return !!buildAddressPayload(invoiceAddress.value, ADDRESS_MODE_INVOICE)
 }
 
 function areAddressesValid() {
@@ -1439,22 +1442,72 @@ function firstIncompleteEnrollmentStep() {
   return 1
 }
 
-async function onVoucherBlur() {
+let voucherValidateTimer = null
+let voucherValidateSeq = 0
+
+function clearVoucherValidationState() {
+  voucherValid.value = null
+  voucherMessage.value = ''
+  voucherType.value = null
+  voucherInvoiceId.value = null
+  voucherInvoiceName.value = null
+  voucherPresetInvoiceId.value = null
+  voucherPresetInvoiceName.value = null
+  presetSeasonSetCount.value = null
+  wizardSeasonSetCount.value = 1
+  presetRegisterEventTeams.value = null
+  presetEventTeamCount.value = null
+}
+
+function scheduleVoucherValidation(delayMs = 450) {
+  if (voucherValidateTimer) clearTimeout(voucherValidateTimer)
+  voucherValidateTimer = setTimeout(() => {
+    voucherValidateTimer = null
+    validateVoucherCode()
+  }, delayMs)
+}
+
+function onVoucherInput() {
+  clearVoucherValidationState()
   const code = voucher.value?.trim()
   if (!code) {
-    voucherValid.value = null
-    voucherMessage.value = ''
-    voucherType.value = null
-    voucherInvoiceId.value = null
-    voucherInvoiceName.value = null
-    voucherPresetInvoiceId.value = null
-    voucherPresetInvoiceName.value = null
-    presetSeasonSetCount.value = null
-    wizardSeasonSetCount.value = 1
-    presetRegisterEventTeams.value = null
-    presetEventTeamCount.value = null
+    if (voucherValidateTimer) {
+      clearTimeout(voucherValidateTimer)
+      voucherValidateTimer = null
+    }
     return
   }
+  scheduleVoucherValidation()
+}
+
+function onVoucherBlur() {
+  const code = voucher.value?.trim()
+  if (!code) {
+    clearVoucherValidationState()
+    if (voucherValidateTimer) {
+      clearTimeout(voucherValidateTimer)
+      voucherValidateTimer = null
+    }
+    return
+  }
+  if (voucherValidateTimer) {
+    clearTimeout(voucherValidateTimer)
+    voucherValidateTimer = null
+    validateVoucherCode()
+    return
+  }
+  if (voucherValid.value === null && !voucherChecking.value) {
+    validateVoucherCode()
+  }
+}
+
+async function validateVoucherCode() {
+  const code = voucher.value?.trim()
+  if (!code) {
+    clearVoucherValidationState()
+    return
+  }
+  const seq = ++voucherValidateSeq
   voucherChecking.value = true
   voucherValid.value = null
   voucherMessage.value = ''
@@ -1469,6 +1522,7 @@ async function onVoucherBlur() {
   presetEventTeamCount.value = null
   try {
     const result = await validateVoucher(code)
+    if (seq !== voucherValidateSeq) return
     voucherValid.value = result.valid
     voucherMessage.value = result.message || (result.valid ? t('enroll.voucherValid') : t('enroll.voucherInvalid'))
     const body = result.data && typeof result.data === 'object' ? result.data : null
@@ -1516,11 +1570,12 @@ async function onVoucherBlur() {
       })
     }
   } catch (err) {
+    if (seq !== voucherValidateSeq) return
     voucherValid.value = false
     voucherMessage.value = t('enroll.voucherInvalid')
     console.warn('[EnrollWizard][voucher] validate: request failed', { code, err })
   } finally {
-    voucherChecking.value = false
+    if (seq === voucherValidateSeq) voucherChecking.value = false
   }
 }
 
@@ -1687,6 +1742,7 @@ watch(() => props.open, (isOpen) => {
 })
 
 onBeforeUnmount(() => {
+  if (voucherValidateTimer) clearTimeout(voucherValidateTimer)
   if (typeof document !== 'undefined') {
     document.body.style.overflow = previousBodyOverflow.value
     document.documentElement.style.overflow = previousHtmlOverflow.value
@@ -1747,7 +1803,6 @@ watch(
     <div class="wizard-modal liquid-surface-scope" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div class="wizard-hero">
         <div class="wizard-hero-content">
-          <p class="wizard-eyebrow"><I18nText k="wizard.stepEdition" /></p>
           <h2 id="wizard-title"><I18nText k="wizard.ctaTitle" /></h2>
           <p class="wizard-hero-text"><I18nText k="dashboard.intro" /></p>
           <div v-if="summaryItems.length" class="wizard-path">
@@ -1855,21 +1910,26 @@ watch(
                 </button>
               </div>
               <div v-else-if="hasVoucherCode === 'yes'" class="wizard-voucher-code-form">
-                <div class="field" :class="{ filled: isFilled(voucher) }">
-                  <label><I18nText k="enroll.voucherCodeLabel" /></label>
+                <div class="wizard-form-field wizard-voucher-field">
+                  <label class="wizard-form-field-label"><I18nText k="enroll.voucherCodeLabel" /></label>
                   <input
                     v-model="voucher"
                     type="text"
+                    class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                    :class="{ 'liquid-surface-control--invalid': voucherValid === false }"
                     :placeholder="t('enroll.placeholderVoucherCode')"
+                    autocomplete="off"
+                    autocapitalize="characters"
+                    spellcheck="false"
                     autofocus
-                    @input="voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null"
+                    @input="onVoucherInput"
                     @blur="onVoucherBlur"
-                  />
+                  >
                   <p v-if="voucherChecking" class="field-hint checking"><i class="bi bi-arrow-repeat spin"></i> <I18nText k="enroll.voucherChecking" /></p>
                   <p v-else-if="voucherValid === true" class="field-hint valid"><i class="bi bi-check-circle-fill"></i> {{ voucherMessage }}</p>
                   <p v-else-if="voucherValid === false" class="field-hint invalid"><i class="bi bi-exclamation-circle-fill"></i> {{ voucherMessage }}</p>
                 </div>
-                <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; voucherValid = null; voucherMessage = ''; voucherType = null; voucherInvoiceId = null; voucherInvoiceName = null; voucherPresetInvoiceId = null; voucherPresetInvoiceName = null; presetSeasonSetCount = null; presetRegisterEventTeams = null; presetEventTeamCount = null">
+                <button type="button" class="btn btn-ghost wizard-back-link" @click="hasVoucherCode = null; voucher = ''; clearVoucherValidationState()">
                   <i class="bi bi-arrow-left"></i> <I18nText k="wizard.voucherCodeBack" />
                 </button>
               </div>
@@ -2234,14 +2294,14 @@ watch(
                           <span class="wizard-event-team-name">{{ t('wizard.teamSingular') }} {{ idx + 1 }}</span>
                         </div>
                         <div class="wizard-event-team-combined-body">
-                          <div class="wizard-event-team-name-field">
-                          <label class="wizard-event-label">
+                          <div class="wizard-event-team-name-field wizard-form-field">
+                            <label class="wizard-form-field-label">
                             <I18nText :k="futureEventTeamCount > 1 ? 'wizard.futureEventTeamNameLabel' : 'wizard.futureEventTeamNameLabelSolo'" />
                           </label>
                           <input
                             v-model="entry.name"
                             type="text"
-                            class="flat wizard-event-team-name-input"
+                            class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue wizard-event-team-name-input"
                             :placeholder="t('wizard.futureEventTeamNamePlaceholder')"
                             autocomplete="off"
                           >
@@ -2263,6 +2323,7 @@ watch(
                   </div>
                 </div>
                 <button
+                  v-if="futureOnSiteEvent !== 'yes'"
                   type="button"
                   class="wizard-option wizard-option-card"
                   :class="{ active: futureOnSiteEvent === 'later' }"
@@ -2288,6 +2349,7 @@ watch(
               <AddressSelector
                 v-else
                 v-model="invoiceAddress"
+                mode="invoice"
                 :addresses="invoiceAddresses"
                 :label="t('enroll.invoiceAddress')"
                 :show-label="false"
@@ -2299,7 +2361,7 @@ watch(
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" mode="delivery" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             </div>
           </div>
 
@@ -2403,6 +2465,7 @@ watch(
               <AddressSelector
                 v-else
                 v-model="invoiceAddress"
+                mode="invoice"
                 :addresses="invoiceAddresses"
                 :label="t('enroll.invoiceAddress')"
                 :show-label="false"
@@ -2414,7 +2477,7 @@ watch(
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" mode="delivery" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             </div>
           </div>
 
@@ -2833,35 +2896,12 @@ watch(
   gap: 1.5rem;
   width: 100%;
 }
-.wizard-voucher-code-form .field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.wizard-voucher-code-form .wizard-voucher-field {
   margin-bottom: 0;
-}
-.wizard-voucher-code-form .field label {
-  position: static;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--color-text);
-  margin-bottom: 0.25rem;
-}
-.wizard-voucher-code-form .field input {
-  width: 100%;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-lg);
-  font-size: 1.05rem;
-  box-sizing: border-box;
-  background: var(--liquid-tile-bg-inner);
-  box-shadow: var(--liquid-shadow-inset);
-}
-.wizard-voucher-code-form .field input:focus {
-  border-color: var(--color-accent);
-  outline: none;
+  max-width: 100%;
 }
 .wizard-voucher-code-form .field-hint {
-  margin: 0;
+  margin: 0.35rem 0 0;
 }
 .wizard-step-onsite-event {
   max-width: 32rem;
@@ -2979,6 +3019,9 @@ watch(
   flex-direction: column;
   gap: 0.35rem;
   min-width: 0;
+}
+.wizard-event-team-combined-body .wizard-event-team-name-field.wizard-form-field {
+  margin-bottom: 0;
 }
 .wizard-event-team-name-input {
   width: 100%;

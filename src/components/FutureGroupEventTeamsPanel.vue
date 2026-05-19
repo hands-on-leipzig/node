@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { getEventsNearest, registerGroupForEvent } from '@/services/draht'
@@ -53,8 +54,13 @@ const maxTeamsByPupils = computed(() =>
 
 const maxTeamsSelectable = computed(() => futureMaxSelectableEventTeams())
 
+const enrolledTeams = computed(() => {
+  const list = props.group?.eventTeams
+  return Array.isArray(list) ? list.filter((t) => t && t.id != null) : []
+})
+
 const hasEventRegistration = computed(
-  () => currentEventTeamCount.value > 0 && props.group?.event && (props.group.event.label || props.group.event.ref || props.group.event.id),
+  () => enrolledTeams.value.length > 0 || currentEventTeamCount.value > 0,
 )
 
 const currentEventLabel = computed(() => {
@@ -65,10 +71,30 @@ const currentEventLabel = computed(() => {
 
 const unitEur = computed(() => Number(props.group?.eventTeamUnitEur) || FUTURE_TEAM_EVENT_UNIT_EUR)
 
-const currentEventCostEur = computed(() => currentEventTeamCount.value * unitEur.value)
+function teamDisplayName(team) {
+  const label = String(team?.label || '').trim()
+  if (label) return label
+  const ref = String(team?.ref || '').trim()
+  if (ref) return ref
+  return team?.id != null ? `Team ${team.id}` : ''
+}
+
+function teamEventLabel(team) {
+  const ev = team?.event
+  if (!ev) return '—'
+  return ev.label || ev.ref || (ev.id != null ? `Event ${ev.id}` : '—')
+}
 
 /** Initial registration (no teams yet). */
 const isInitialRegistration = computed(() => !hasEventRegistration.value)
+
+/** Erstanmeldung aktiv; Nachmeldung nur wenn global freigeschaltet. */
+const registrationActionsEnabled = computed(
+  () => isInitialRegistration.value || DETAIL_EVENT_ACTIONS_ENABLED,
+)
+const addMoreTeamsDisabled = computed(
+  () => !isInitialRegistration.value && !DETAIL_EVENT_ACTIONS_ENABLED,
+)
 
 const maxAdditionalTeams = computed(() =>
   Math.max(0, maxTeamsSelectable.value - currentEventTeamCount.value),
@@ -212,7 +238,7 @@ function primaryEventIdForSubmit() {
 }
 
 async function submit() {
-  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
+  if (!registrationActionsEnabled.value) return
   const eventId = primaryEventIdForSubmit()
   if (!props.groupId || !eventId) return
 
@@ -244,7 +270,7 @@ async function submit() {
 }
 
 function togglePanel() {
-  if (!DETAIL_EVENT_ACTIONS_ENABLED) return
+  if (!registrationActionsEnabled.value) return
   panelOpen.value = !panelOpen.value
   if (panelOpen.value && events.value.length === 0) {
     loadEvents()
@@ -270,49 +296,39 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="future-event-teams"
-    :class="{ 'future-event-teams--disabled': !DETAIL_EVENT_ACTIONS_ENABLED }"
-    :aria-disabled="!DETAIL_EVENT_ACTIONS_ENABLED || undefined"
-  >
+  <div class="future-event-teams">
     <h3 class="detail-section-title"><I18nText k="groupDetail.eventTeamsTitle" /></h3>
-    <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
-      <I18nText k="detail.eventSectionComingSoon" />
-    </p>
 
-    <div class="future-event-teams-body" :inert="!DETAIL_EVENT_ACTIONS_ENABLED">
-    <div v-if="hasEventRegistration" class="future-event-status future-event-status--active">
-      <div class="future-event-status-main">
-        <i class="bi bi-calendar-check" aria-hidden="true" />
-        <div>
-          <p class="future-event-status-headline">
-            <I18nText
-              k="groupDetail.eventTeamsStatusRegistered"
-              :values="{
-                count: currentEventTeamCount,
-                event: currentEventLabel,
-              }"
-            />
-          </p>
-          <p class="future-event-status-meta">
-            <I18nText
-              k="groupDetail.eventTeamsStatusMeta"
-              :values="{
-                pupils: registeredPupils,
-                maxTeams: maxTeamsByPupils,
-                cost: currentEventCostEur,
-              }"
-            />
-          </p>
-        </div>
-      </div>
-    </div>
+    <ul v-if="enrolledTeams.length" class="future-event-team-list">
+      <li v-for="team in enrolledTeams" :key="'enrolled-team-' + team.id">
+        <RouterLink
+          :to="{ name: 'team-detail', params: { id: String(team.id) } }"
+          class="future-event-team-row"
+        >
+          <span class="future-event-team-row-text">
+            <span class="future-event-team-row-name">{{ teamDisplayName(team) }}</span>
+            <span v-if="team.ref" class="future-event-team-row-ref">{{ team.ref }}</span>
+            <span class="future-event-team-row-event">{{ teamEventLabel(team) }}</span>
+          </span>
+          <i class="bi bi-chevron-right future-event-team-row-chevron" aria-hidden="true" />
+        </RouterLink>
+      </li>
+    </ul>
     <div v-else class="future-event-status future-event-status--empty">
       <i class="bi bi-calendar-x" aria-hidden="true" />
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
 
-    <button type="button" class="future-event-panel-toggle" :aria-expanded="panelOpen" :disabled="!DETAIL_EVENT_ACTIONS_ENABLED" @click="togglePanel">
+    <div
+      class="future-event-registration"
+      :class="{ 'future-event-registration--disabled': addMoreTeamsDisabled }"
+      :inert="addMoreTeamsDisabled || undefined"
+    >
+    <p v-if="addMoreTeamsDisabled" class="detail-section-disabled-hint">
+      <I18nText k="detail.eventSectionComingSoon" />
+    </p>
+
+    <button type="button" class="future-event-panel-toggle" :aria-expanded="panelOpen" :disabled="addMoreTeamsDisabled" @click="togglePanel">
       <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
       <span>
         <I18nText v-if="isInitialRegistration" k="groupDetail.eventTeamsPanelRegister" />
@@ -354,7 +370,7 @@ onMounted(() => {
               active: selectedTeamCount === count,
               'needs-pupils-upgrade': teamPillNeedsMorePupils(count),
             }"
-            :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
+            :disabled="addMoreTeamsDisabled"
             @click="selectTeamCount(count)"
           >
             <span class="future-event-team-count-pill-main">
@@ -428,7 +444,7 @@ onMounted(() => {
                     :model-value="entry.eventId"
                     :placeholder="t('wizard.onSiteEventPlaceholder')"
                     :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
-                    :disabled="!DETAIL_EVENT_ACTIONS_ENABLED"
+                    :disabled="addMoreTeamsDisabled"
                     @update:model-value="selectTeamEvent(idx, $event)"
                   />
                 </div>
@@ -441,7 +457,7 @@ onMounted(() => {
           <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
         </p>
 
-        <button type="button" class="detail-btn detail-btn-primary" :disabled="!DETAIL_EVENT_ACTIONS_ENABLED || !canSubmit" @click="submit">
+        <button type="button" class="detail-btn detail-btn-primary" :disabled="addMoreTeamsDisabled || !canSubmit" @click="submit">
           <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true" />
           <i v-else class="bi bi-plus-circle" aria-hidden="true" />
           <I18nText v-if="submitting" k="groupDetail.registering" />
@@ -467,7 +483,10 @@ onMounted(() => {
 .future-event-teams {
   margin-bottom: 0;
 }
-.future-event-teams--disabled .future-event-teams-body {
+.future-event-registration {
+  margin-top: 0.25rem;
+}
+.future-event-registration--disabled {
   opacity: 0.5;
   filter: grayscale(0.35);
   pointer-events: none;
@@ -485,6 +504,54 @@ onMounted(() => {
 .future-event-panel-toggle:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+.future-event-team-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.future-event-team-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.future-event-team-row:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-muted));
+}
+.future-event-team-row-text {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.future-event-team-row-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.future-event-team-row-ref {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.future-event-team-row-event {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.future-event-team-row-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
 }
 .future-event-status {
   display: flex;
