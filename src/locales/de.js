@@ -717,7 +717,7 @@ export default {
         "teamSingular": "Team",
         "teamsPlural": "Teams",
         "deliveryDifferentToggle": "Lieferadresse weicht von Rechnungsadresse ab",
-        "eventTeamAutoUpgraded": "Wir haben die Teilnehmendenzahl automatisch auf {pupils} erhöht, damit {teams} Teams angemeldet werden können.",
+        "eventTeamAutoUpgraded": "Wir haben die Gruppengröße automatisch auf {pupils} erhöht, damit {teams} Teams angemeldet werden können.",
         "eventTeamUpgradeNeeded": "Für {teams} Teams brauchst du mindestens {pupils} Teilnehmende. Möchtest du die Teilnehmendenzahl jetzt erhöhen?",
         "eventTeamUpgradeAction": "Teilnehmendenzahl erhöhen",
         "eventCapacity": "Auslastung",
