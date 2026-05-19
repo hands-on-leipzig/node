@@ -65,16 +65,11 @@ export function venueDisplayName(venue, locale) {
 export function venueCapacityLabel(venue, t) {
   const reg = venue.registered ?? 0
   const cap = venue.capacity
-  const isFuture = venue.offerCategory === 'future'
   if (cap != null && cap > 0) {
-    return isFuture
-      ? t('venues.capacityGroups', { registered: reg, capacity: cap })
-      : t('venues.capacityTeams', { registered: reg, capacity: cap })
+    return t('venues.capacityTeams', { registered: reg, capacity: cap })
   }
   if (reg > 0) {
-    return isFuture
-      ? t('venues.registeredGroups', { count: reg })
-      : t('venues.registeredTeams', { count: reg })
+    return t('venues.registeredTeams', { count: reg })
   }
   return ''
 }

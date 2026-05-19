@@ -1267,13 +1267,16 @@ function buildInvoicePayload() {
 }
 
 function buildDeliveryPayload() {
-  if (!deliveryAddressDifferent.value) return buildInvoicePayload()
+  if (!deliveryAddressDifferent.value) {
+    return { sameAsInvoice: true }
+  }
   return buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
 }
 
 /** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
 function isDeliveryAddressValid() {
-  return !!buildDeliveryPayload()
+  if (!deliveryAddressDifferent.value) return isInvoiceAddressValid()
+  return !!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
 }
 
 /** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
@@ -1613,6 +1616,7 @@ async function submit() {
         state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: buildDeliveryPayload(),
+        deliverySameAsInvoice: !deliveryAddressDifferent.value,
         invoiceAddress: buildInvoicePayload(),
         consentDataProcessing: true,
         consentTerms: true,
@@ -1675,6 +1679,7 @@ async function submit() {
         state: (formData.value.state || '').trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
+        deliverySameAsInvoice: !deliveryAddressDifferent.value,
         invoiceAddress: invoicePayload ?? undefined,
         consentDataProcessing: true,
         consentTerms: true,
