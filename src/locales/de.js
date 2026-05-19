@@ -605,6 +605,8 @@ export default {
         "stepVariant": "Variante",
         "stepTeamClass": "Team oder Klasse",
         "stepInstitution": "Angaben zur Institution",
+        "institutionLead": "Angaben zu deiner Institution und zum Standort — für alle Programme gleich.",
+        "institutionSupplement": "Abteilung / Kennzeichnung (optional)",
         "stepFoundersProgramAndType": "Programm und Format",
         "stepClassParticipants": "Anzahl Teilnehmende",
         "foundersStep2Lead": "Wähle Explore oder Challenge und danach Team oder Klasse.",

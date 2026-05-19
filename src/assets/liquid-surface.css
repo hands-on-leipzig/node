@@ -89,6 +89,56 @@ html[data-theme='dark'] .liquid-surface-scope {
   box-shadow: var(--liquid-shadow-inset);
 }
 
+/** Form controls (inputs, selects) — same glass rim + inset highlight as dashboard tiles */
+.liquid-surface-scope .liquid-surface-control {
+  background: var(--liquid-tile-bg);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
+  border: 1px solid var(--liquid-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--liquid-shadow);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.liquid-surface-scope .liquid-surface-control:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--liquid-border) 82%, var(--color-accent) 18%);
+}
+
+.liquid-surface-scope .liquid-surface-control:focus,
+.liquid-surface-scope .liquid-surface-control:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--liquid-border));
+  box-shadow:
+    var(--liquid-shadow),
+    0 0 0 2px color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+
+.liquid-surface-scope .liquid-surface-control:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.liquid-surface-scope .liquid-surface-control--accent-blue {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: #2563eb;
+}
+
+.liquid-surface-scope .liquid-surface-control--invalid,
+.liquid-surface-scope .wizard-form-field--invalid .liquid-surface-control {
+  border-color: #dc2626;
+  box-shadow:
+    var(--liquid-shadow),
+    0 0 0 2px rgba(220, 38, 38, 0.14);
+}
+
+.liquid-surface-scope button.liquid-surface-control.custom-select-trigger {
+  text-align: left;
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .liquid-surface-scope .liquid-surface {
     background: rgba(255, 252, 248, 0.94);

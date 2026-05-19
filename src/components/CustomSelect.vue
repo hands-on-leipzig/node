@@ -10,6 +10,10 @@ const props = defineProps({
   id: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   size: { type: String, default: 'md' }, // 'sm' | 'md'
+  /** Dashboard-style glass control (uses .liquid-surface-control from liquid-surface.css) */
+  surface: { type: Boolean, default: false },
+  /** Blue left accent rim (with surface), matches dashboard tile accent */
+  surfaceAccent: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -154,6 +158,7 @@ onUnmounted(() => {
       ref="triggerRef"
       type="button"
       class="custom-select-trigger"
+      :class="{ 'liquid-surface-control': surface, 'liquid-surface-control--accent-blue': surface && surfaceAccent }"
       :disabled="disabled"
       :aria-expanded="open"
       aria-haspopup="listbox"
@@ -227,19 +232,21 @@ onUnmounted(() => {
   font-size: var(--text-lg);
   font-family: inherit;
   color: var(--color-text);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--liquid-border, var(--color-border));
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
-.custom-select-trigger:hover:not(:disabled) {
+.custom-select-trigger:not(.liquid-surface-control) {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--liquid-border, var(--color-border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.custom-select-trigger:not(.liquid-surface-control):hover:not(:disabled) {
   border-color: var(--color-border-strong);
   background-color: var(--color-bg-muted);
 }
-.custom-select-trigger:focus {
+.custom-select-trigger:not(.liquid-surface-control):focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
@@ -248,7 +255,7 @@ onUnmounted(() => {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.custom-select.open .custom-select-trigger {
+.custom-select.open .custom-select-trigger:not(.liquid-surface-control) {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }

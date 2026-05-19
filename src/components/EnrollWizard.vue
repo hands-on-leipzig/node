@@ -143,6 +143,10 @@ const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
 )
 
+const foundersClassEnrollment = computed(
+  () => edition.value === 'founders' && foundersType.value === 'class',
+)
+
 const foundersNeedsSeasonSets = computed(
   () => edition.value === 'founders' && foundersVariant.value === 'challenge',
 )
@@ -150,7 +154,7 @@ const foundersNeedsSeasonSets = computed(
 const foundersSeasonSetsStep = computed(() => {
   if (!foundersNeedsSeasonSets.value) return -1
   if (foundersTeamHasParticipantsStep.value) return 7
-  if (foundersType.value === 'class') return 6
+  if (foundersClassEnrollment.value) return 5
   return -1
 })
 
@@ -158,6 +162,9 @@ const foundersAddressesStep = computed(() => {
   if (edition.value !== 'founders') return -1
   if (foundersTeamHasParticipantsStep.value) {
     return foundersNeedsSeasonSets.value ? 8 : 7
+  }
+  if (foundersClassEnrollment.value) {
+    return foundersNeedsSeasonSets.value ? 6 : 5
   }
   return foundersNeedsSeasonSets.value ? 7 : 6
 })
@@ -176,6 +183,9 @@ const lastStep = computed(() => {
   if (edition.value === 'future') return 8
   if (foundersTeamHasParticipantsStep.value) {
     return foundersNeedsSeasonSets.value ? 9 : 8
+  }
+  if (foundersClassEnrollment.value) {
+    return foundersNeedsSeasonSets.value ? 7 : 6
   }
   if (edition.value === 'founders') {
     return foundersNeedsSeasonSets.value ? 8 : 7
@@ -197,12 +207,6 @@ const maxFutureEventTeamsByPupils = computed(() => {
   if (!Number.isFinite(pupils) || pupils <= 0) return 0
   return Math.max(1, Math.floor(pupils / FUTURE_EVENT_TEAM_SIZE))
 })
-
-function futureTeamPillNeedsMorePupils(count) {
-  const n = Number(count)
-  if (!Number.isFinite(n) || n <= maxFutureEventTeamsByPupils.value) return false
-  return futureEventTeamCount.value !== n
-}
 
 const futureTeamPillsShowExpandHint = computed(() =>
   futureOnSiteEvent.value === 'yes'
@@ -275,10 +279,9 @@ const wizardProgressSteps = computed(() => {
     { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
     { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
     { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
-    { key: 'wizard.progressParticipants', active: s === 5, done: s > 5 },
   ]
   if (foundersNeedsSeasonSets.value) {
-    items.push({ key: 'wizard.progressSeasonSets', active: s === 6, done: s > 6 })
+    items.push({ key: 'wizard.progressSeasonSets', active: s === foundersSeasonSetsStep.value, done: s > foundersSeasonSetsStep.value })
   }
   items.push(
     { key: 'wizard.progressAddresses', active: s === addr, done: s > addr },
@@ -306,17 +309,17 @@ const stepTitle = computed(() => {
   }
   if (s === 5) {
     if (edition.value === 'future') return t('enrollFuture.stepSeasonSets')
-    if (edition.value === 'founders') {
-      if (foundersType.value === 'class') return t('wizard.stepClassParticipants')
-      return t('wizard.stepParticipants')
+    if (foundersClassEnrollment.value) {
+      return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
     }
+    if (edition.value === 'founders') return t('wizard.stepParticipants')
     return ''
   }
   if (s === 6) {
     if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
     if (ft) return t('wizard.stepEvent')
-    if (edition.value === 'founders' && foundersType.value === 'class') {
-      return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
+    if (foundersClassEnrollment.value) {
+      return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
     }
     return ''
   }
@@ -325,9 +328,7 @@ const stepTitle = computed(() => {
     if (ft) {
       return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
     }
-    if (edition.value === 'founders' && foundersType.value === 'class') {
-      return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
-    }
+    if (foundersClassEnrollment.value) return t('wizard.stepOrder')
     return ''
   }
   if (s === 8) {
@@ -335,7 +336,6 @@ const stepTitle = computed(() => {
     if (ft) {
       return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
     }
-    if (edition.value === 'founders' && foundersType.value === 'class') return t('wizard.stepOrder')
     return ''
   }
   if (s === 9 && ft && foundersNeedsSeasonSets.value) return t('wizard.stepOrder')
@@ -430,13 +430,7 @@ const pricingQuotePayload = computed(() => {
     payload.foundersType = foundersType.value
     const isTeam = foundersType.value === 'team'
     payload.program = foundersVariant.value === 'explore' ? (isTeam ? 1 : 4) : (isTeam ? 2 : 5)
-    if (foundersType.value === 'class') {
-      const pt = Number(formData.value.playersTotal)
-      if (Number.isFinite(pt) && pt > 0) {
-        payload.playersTotal = pt
-        payload.registeredPupils = pt
-      }
-    } else {
+    if (foundersType.value !== 'class') {
       const pc = founderTeamPlayers.value.filter((p) => p.firstname || p.name || p.gender || p.birthdayStr).length
       payload.participantCount = pc
       payload.registeredPupils = pc
@@ -1025,6 +1019,13 @@ function canNext() {
       const w = Number(wizardSeasonSetCount.value)
       return [0, 1, 2].includes(w)
     }
+    if (foundersClassEnrollment.value) {
+      if (foundersNeedsSeasonSets.value) {
+        const w = Number(wizardSeasonSetCount.value)
+        return [0, 1, 2].includes(w)
+      }
+      return areAddressesValid()
+    }
     if (edition.value === 'founders') return hasRequiredParticipantFields()
     return true
   }
@@ -1041,12 +1042,8 @@ function canNext() {
       return true
     }
     if (ft) return true
-    if (edition.value === 'founders' && foundersType.value === 'class') {
-      if (foundersNeedsSeasonSets.value) {
-        const w = Number(wizardSeasonSetCount.value)
-        return [0, 1, 2].includes(w)
-      }
-      return areAddressesValid()
+    if (foundersClassEnrollment.value) {
+      return foundersNeedsSeasonSets.value ? areAddressesValid() : false
     }
     return false
   }
@@ -1059,15 +1056,12 @@ function canNext() {
       }
       return areAddressesValid()
     }
-    if (edition.value === 'founders' && foundersType.value === 'class') {
-      return foundersNeedsSeasonSets.value ? areAddressesValid() : false
-    }
+    if (foundersClassEnrollment.value) return false
     return false
   }
   if (s === 8) {
     if (edition.value === 'future') return false
     if (ft) return foundersNeedsSeasonSets.value ? areAddressesValid() : false
-    if (edition.value === 'founders' && foundersType.value === 'class') return false
     return false
   }
   if (s === 9) {
@@ -1081,7 +1075,7 @@ function next() {
     step4ValidationAttempted.value = true
     return
   }
-  if (step.value === participantsStepIndex.value && !hasRequiredParticipantFields()) {
+  if (step.value === participantsStepIndex.value && foundersTeamHasParticipantsStep.value && !hasRequiredParticipantFields()) {
     step4ValidationAttempted.value = true
     return
   }
@@ -1107,7 +1101,15 @@ function next() {
     if (founderTeamPlayers.value.length === 0) addFounderParticipant()
     loadFounderTeamEventsNearest()
   }
-  if (step.value < lastStep.value) step.value++
+  if (step.value < lastStep.value) {
+    if (step.value === institutionStepIndex.value && foundersClassEnrollment.value) {
+      step.value = foundersNeedsSeasonSets.value
+        ? foundersSeasonSetsStep.value
+        : foundersAddressesStep.value
+    } else {
+      step.value++
+    }
+  }
   step4ValidationAttempted.value = false
 }
 
@@ -1134,7 +1136,24 @@ function prev() {
     presetEventTeamCount.value = null
     return
   }
-  if (step.value > 1) step.value--
+  if (step.value > 1) {
+    if (foundersClassEnrollment.value) {
+      if (step.value === foundersOrderStep.value) {
+        step.value = foundersAddressesStep.value
+      } else if (step.value === foundersAddressesStep.value && foundersNeedsSeasonSets.value) {
+        step.value = foundersSeasonSetsStep.value
+      } else if (
+        step.value === foundersSeasonSetsStep.value
+        || (step.value === foundersAddressesStep.value && !foundersNeedsSeasonSets.value)
+      ) {
+        step.value = institutionStepIndex.value
+      } else {
+        step.value--
+      }
+    } else {
+      step.value--
+    }
+  }
 }
 
 function handleBrowserBack() {
@@ -1402,9 +1421,11 @@ function firstIncompleteEnrollmentStep() {
     if (!foundersVariant.value) return 2
     if (!foundersType.value) return 3
     if (!hasRequiredInstitutionFields()) return 4
-    if (!hasRequiredParticipantFields()) return 5
-    if (foundersTeamHasParticipantsStep.value) return 6
-    if (foundersNeedsSeasonSets.value) return 6
+    if (foundersTeamHasParticipantsStep.value) {
+      if (!hasRequiredParticipantFields()) return 5
+      return 6
+    }
+    if (foundersNeedsSeasonSets.value) return foundersSeasonSetsStep.value
     return foundersAddressesStep.value
   }
   return 1
@@ -1603,13 +1624,6 @@ async function submit() {
         const evId = Number(founderTeamEventId.value)
         if (Number.isFinite(evId) && evId > 0) payload.eventId = evId
       }
-      if (!isTeam) {
-        const v = formData.value.playersTotal
-        if (v !== '' && v != null) {
-          const n = parseInt(String(v).trim(), 10)
-          if (Number.isFinite(n)) payload.playersTotal = n
-        }
-      }
       let res
       if (isTeam) res = await enrollTeam(payload)
       else res = await enrollClass(payload)
@@ -1721,7 +1735,7 @@ watch(
 
 <template>
   <div v-if="open" class="wizard-backdrop" @click.self="close">
-    <div class="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
+    <div class="wizard-modal liquid-surface-scope" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div class="wizard-hero">
         <div class="wizard-hero-content">
           <p class="wizard-eyebrow"><I18nText k="wizard.stepEdition" /></p>
@@ -1921,57 +1935,107 @@ watch(
             </div>
           </div>
 
-          <!-- Step 3 (Future) / Step 4 (Founders): Institution -->
-          <div v-show="(step === 3 && edition === 'future') || (step === 4 && edition === 'founders')" class="wizard-step wizard-step-form wizard-step-animate">
+          <!-- Step 3 (Future) / Step 4 (Founders): Institution (same layout for all programs) -->
+          <div
+            v-show="(step === 3 && edition === 'future') || (step === 4 && edition === 'founders')"
+            class="wizard-step wizard-step-form wizard-step-institution wizard-step-animate"
+          >
             <p class="wizard-form-section-title"><I18nText k="wizard.stepInstitution" /></p>
-            <p class="wizard-hint wizard-hint-compact"><I18nText k="wizard.requiredLegend" /></p>
-            <template v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'">
-              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('schoolType') }">
-                <label><I18nText k="enroll.schoolType" /> <span class="required">*</span></label>
+            <div class="wizard-institution-intro">
+              <p class="wizard-institution-intro-text"><I18nText k="wizard.institutionLead" /></p>
+              <p class="wizard-institution-intro-meta"><I18nText k="wizard.requiredLegend" /></p>
+            </div>
+            <div
+              v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'"
+              class="wizard-institution-fields"
+            >
+              <div
+                class="wizard-form-field"
+                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('schoolType') }"
+              >
+                <label class="wizard-form-field-label" for="wizard-institution-type">
+                  <I18nText k="enroll.schoolType" /> <span class="required">*</span>
+                </label>
                 <CustomSelect
+                  id="wizard-institution-type"
                   v-model="formData.schoolType"
+                  surface
+                  surface-accent
                   :options="schoolTypeWizardOptions"
                   :placeholder="t('schoolTypes.none')"
                 />
-                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('schoolType')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('schoolType')" class="wizard-form-field-error">
+                  <I18nText k="common.requiredField" />
+                </p>
               </div>
               <div
-                class="field"
-                :class="{
-                  filled: isFilled(formData.organization) || isPrivateInstitution,
-                  invalid: step4ValidationAttempted && isInstitutionFieldMissing('organization'),
-                }"
+                class="wizard-form-field"
+                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('organization') }"
               >
-                <input v-model="formData.organization" type="text" placeholder=" " :disabled="isPrivateInstitution" />
-                <label><I18nText k="enroll.schoolName" /> <span class="required">*</span></label>
-                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('organization')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+                <label class="wizard-form-field-label" for="wizard-institution-name">
+                  <I18nText k="enroll.schoolName" /> <span class="required">*</span>
+                </label>
+                <input
+                  id="wizard-institution-name"
+                  v-model="formData.organization"
+                  type="text"
+                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                  :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('organization') }"
+                  :disabled="isPrivateInstitution"
+                  autocomplete="organization"
+                >
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('organization')" class="wizard-form-field-error">
+                  <I18nText k="common.requiredField" />
+                </p>
               </div>
-              <div v-if="foundersType === 'team'" class="field" :class="{ filled: isFilled(formData.schoolOrClub) }">
-                <input v-model="formData.schoolOrClub" type="text" placeholder=" " />
-                <label><I18nText k="enrollTeam.schoolClub" /></label>
-              </div>
-              <div class="field field-select" :class="{ invalid: step4ValidationAttempted && isInstitutionFieldMissing('country') }">
-                <label><I18nText k="enroll.schoolCountry" /> <span class="required">*</span></label>
+              <div
+                class="wizard-form-field"
+                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('country') }"
+              >
+                <label class="wizard-form-field-label" for="wizard-institution-country">
+                  <I18nText k="enroll.schoolCountry" /> <span class="required">*</span>
+                </label>
                 <CustomSelect
+                  id="wizard-institution-country"
                   v-model="formData.country"
+                  surface
+                  surface-accent
                   :options="countryWizardSelectOptions"
                   :placeholder="t('enroll.selectCountry')"
                 />
-                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="wizard-form-field-error">
+                  <I18nText k="common.requiredField" />
+                </p>
               </div>
-              <div class="field" :class="{ filled: isFilled(formData.zip), invalid: step4ValidationAttempted && isInstitutionFieldMissing('zip') }">
-                <input v-model="formData.zip" type="text" placeholder=" " />
-                <label><I18nText k="enroll.schoolZip" /> <span class="required">*</span></label>
-                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="field-hint invalid"><I18nText k="common.requiredField" /></p>
+              <div
+                class="wizard-form-field"
+                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('zip') }"
+              >
+                <label class="wizard-form-field-label" for="wizard-institution-zip">
+                  <I18nText k="enroll.schoolZip" /> <span class="required">*</span>
+                </label>
+                <input
+                  id="wizard-institution-zip"
+                  v-model="formData.zip"
+                  type="text"
+                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                  :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('zip') }"
+                  inputmode="numeric"
+                  autocomplete="postal-code"
+                >
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="wizard-form-field-error">
+                  <I18nText k="common.requiredField" />
+                </p>
               </div>
-              <div v-if="formData.city || formData.state" class="wizard-place-display-wrap">
-                <span class="wizard-place-display">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
+              <div v-if="formData.city || formData.state" class="wizard-institution-place liquid-surface liquid-surface--radius-lg liquid-surface--accent liquid-surface--accent-blue">
+                <span class="wizard-institution-place-label"><I18nText k="enroll.location" /></span>
+                <span class="wizard-institution-place-value">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
-            </template>
+            </div>
           </div>
 
-          <!-- Step 4 (Future) / Step 5 (Founders): Pupils / class count / team + members -->
-          <div v-show="(step === 4 && edition === 'future') || (step === 5 && edition === 'founders')" class="wizard-step wizard-step-animate" :class="{ 'wizard-step-pupils': edition === 'future', 'wizard-step-form': edition !== 'future' }">
+          <!-- Step 4 (Future) / Step 5 (Founders team): pupils / team name + members -->
+          <div v-show="(step === 4 && edition === 'future') || (step === 5 && foundersTeamHasParticipantsStep)" class="wizard-step wizard-step-animate" :class="{ 'wizard-step-pupils': edition === 'future', 'wizard-step-form': edition !== 'future' }">
             <template v-if="edition === 'future'">
               <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
               <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
@@ -1993,14 +2057,7 @@ watch(
                 </button>
               </div>
             </template>
-            <template v-else-if="foundersType === 'class'">
-              <p class="wizard-form-section-title"><I18nText k="wizard.stepClassParticipants" /></p>
-              <div class="field" :class="{ filled: isFilled(formData.playersTotal) }">
-                <input v-model="formData.playersTotal" type="number" min="0" step="1" placeholder=" " />
-                <label><I18nText k="enrollClass.playersTotal" /></label>
-              </div>
-            </template>
-            <template v-else-if="foundersTeamHasParticipantsStep">
+            <template v-if="foundersTeamHasParticipantsStep">
               <div class="field" :class="{ filled: isFilled(formData.name), invalid: step4ValidationAttempted && isStep4RequiredFieldMissing('name') }">
                 <input v-model="formData.name" type="text" placeholder=" " />
                 <label>
@@ -2134,25 +2191,19 @@ watch(
                       :key="'future-event-team-' + count"
                       type="button"
                       class="wizard-event-team-count-pill"
-                      :class="{
-                        active: futureEventTeamCount === count,
-                        'needs-pupils-upgrade': futureTeamPillNeedsMorePupils(count),
-                      }"
+                      :class="{ active: futureEventTeamCount === count }"
                       @click="selectFutureEventTeamCount(count)"
                     >
-                      <span class="wizard-event-team-count-pill-main">
-                        {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
-                      </span>
-                      <span
-                        v-if="futureTeamPillNeedsMorePupils(count)"
-                        class="wizard-event-team-count-pill-hint"
-                      >
-                        <I18nText
-                          k="wizard.eventTeamCountNeedsPupils"
-                          :values="{ pupils: count * FUTURE_EVENT_TEAM_SIZE }"
-                        />
-                      </span>
+                      {{ count }} {{ count === 1 ? t('wizard.teamSingular') : t('wizard.teamsPlural') }}
                     </button>
+                  </div>
+                  <div v-if="futureTeamAutoUpgrade" class="wizard-event-team-upgrade">
+                    <p>
+                      <I18nText
+                        k="wizard.eventTeamAutoUpgraded"
+                        :args="{ teams: futureTeamAutoUpgrade.teams, pupils: futureTeamAutoUpgrade.pupils }"
+                      />
+                    </p>
                   </div>
                   <p v-if="futureTeamPillsShowExpandHint" class="wizard-hint wizard-event-team-expand-hint">
                     <I18nText k="wizard.onSiteEventTeamsExpandHint" />
@@ -2186,14 +2237,6 @@ watch(
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <div v-if="futureTeamAutoUpgrade" class="wizard-event-team-upgrade">
-                    <p>
-                      <I18nText
-                        k="wizard.eventTeamAutoUpgraded"
-                        :args="{ teams: futureTeamAutoUpgrade.teams, pupils: futureTeamAutoUpgrade.pupils }"
-                      />
-                    </p>
                   </div>
                 </div>
                 <button
@@ -2547,52 +2590,53 @@ watch(
 .wizard-close i {
   font-size: 1.35rem;
 }
-/* Scroll lives on .wizard-scroll; body is content only */
+/* Panel: header + scrollable body + pinned footer (no absolute overlay — works on short viewports) */
 .wizard-body {
-  flex: 1 0 auto;
-  min-height: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow: visible;
-  padding: 1.5rem 2rem 1rem;
+  padding: 1.5rem 2rem 1.25rem;
   display: flex;
   flex-direction: column;
 }
 .wizard-body--center-options {
-  justify-content: center;
+  justify-content: flex-start;
 }
 .wizard-panel-main {
-  --wizard-footer-safe: 6.5rem;
   flex: 1 1 auto;
   min-height: 0;
-  position: relative;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .wizard-scroll {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: max(var(--wizard-footer-safe), calc(env(safe-area-inset-bottom, 0px) + 5.5rem));
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text-muted) 35%, transparent) transparent;
 }
 .wizard-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+  width: 6px;
+}
+.wizard-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-muted) 28%, transparent);
 }
 .wizard-step {
-  min-height: 8rem;
-  flex: 1;
+  min-height: 0;
+  flex: 0 1 auto;
 }
 .wizard-step:not(.wizard-step-form) {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: min(70vh, 100%);
 }
 .wizard-step:not(.wizard-step-form) .wizard-options {
   width: 100%;
@@ -2825,18 +2869,15 @@ watch(
   margin-bottom: 0.45rem;
 }
 .wizard-event-team-count-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
 .wizard-event-team-count-pill {
-  flex: 1 1 6.5rem;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
   min-height: 3.1rem;
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--liquid-border);
@@ -2844,6 +2885,9 @@ watch(
   background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
   font: inherit;
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-align: center;
   cursor: pointer;
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
   backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
@@ -2858,29 +2902,6 @@ watch(
   border-color: color-mix(in srgb, var(--color-accent) 42%, var(--liquid-border));
   background: var(--liquid-tile-bg-strong);
   box-shadow: var(--liquid-shadow), var(--liquid-shadow-inset);
-}
-.wizard-event-team-count-pill.needs-pupils-upgrade {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--liquid-border));
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--liquid-tile-bg-inner));
-  cursor: pointer;
-}
-.wizard-event-team-count-pill.needs-pupils-upgrade:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 52%, var(--liquid-border));
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--liquid-tile-bg));
-}
-.wizard-event-team-count-pill.needs-pupils-upgrade.active {
-  border-style: solid;
-}
-.wizard-event-team-count-pill-main {
-  font-weight: 600;
-  font-size: 0.98rem;
-}
-.wizard-event-team-count-pill-hint {
-  font-size: 0.72rem;
-  font-weight: 500;
-  line-height: 1.2;
-  color: color-mix(in srgb, var(--color-accent) 78%, var(--color-text-muted));
 }
 .wizard-event-team-expand-hint {
   margin: -0.35rem 0 0.75rem;
@@ -3037,6 +3058,132 @@ watch(
 .wizard-hint-compact {
   margin-top: 0;
   margin-bottom: 1rem;
+}
+.wizard-step-institution {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: 0.25rem;
+  padding-bottom: 0.5rem;
+}
+.wizard-step-institution .wizard-form-section-title,
+.wizard-step-institution .wizard-institution-intro,
+.wizard-step-institution .wizard-institution-fields {
+  width: 100%;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.wizard-step-institution .wizard-form-section-title,
+.wizard-step-institution .wizard-institution-intro {
+  text-align: center;
+}
+.wizard-institution-intro {
+  margin: 0 auto 1.35rem;
+  max-width: 28rem;
+}
+.wizard-institution-intro-text {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.wizard-institution-intro-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--color-text-subtle);
+}
+.wizard-institution-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.wizard-form-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-bottom: 1.25rem;
+}
+.wizard-form-field-label {
+  display: block;
+  margin: 0 0 0.45rem;
+  padding: 0;
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  pointer-events: auto;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+  font-family: inherit;
+}
+.wizard-form-field-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  min-height: 3rem;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+.wizard-form-field-input::placeholder {
+  color: var(--color-text-subtle);
+}
+.wizard-step-institution .wizard-form-field :deep(.custom-select) {
+  width: 100%;
+}
+.wizard-step-institution .wizard-form-field :deep(.custom-select-trigger) {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.8rem 2.5rem 0.8rem 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+.wizard-step-institution .wizard-form-field :deep(.custom-select-value) {
+  font-size: 1rem;
+}
+.wizard-form-field-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #dc2626;
+}
+.wizard-institution-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  margin: 0.15rem 0 0.5rem;
+  padding: 0.75rem 1rem;
+}
+.wizard-institution-place-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.wizard-institution-place-value {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+/* After generic .wizard-step-form .field floating rules — keep institution labels above controls */
+.wizard-step-institution .wizard-form-field > .wizard-form-field-label {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  pointer-events: auto;
 }
 .wizard-form-section-title {
   margin: 0.25rem 0 0.4rem;
@@ -3211,9 +3358,9 @@ watch(
   font-size: 1rem;
   color: var(--color-text);
 }
-.wizard-step-form input,
-.wizard-step-form textarea,
-.wizard-step-form select {
+.wizard-step-form .field input,
+.wizard-step-form .field textarea,
+.wizard-step-form .field select {
   width: 100%;
   padding: 1.4rem 1.1rem 0.85rem;
   border: none;
@@ -3226,13 +3373,13 @@ watch(
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
-.wizard-step-form textarea {
+.wizard-step-form .field textarea {
   min-height: 6.5rem;
   resize: vertical;
 }
-.wizard-step-form input:focus,
-.wizard-step-form textarea:focus,
-.wizard-step-form select:focus {
+.wizard-step-form .field input:focus,
+.wizard-step-form .field textarea:focus,
+.wizard-step-form .field select:focus {
   border-color: var(--color-accent);
   outline: none;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07), var(--liquid-shadow-inset);
@@ -3248,7 +3395,7 @@ watch(
 .wizard-step-form .field.invalid select {
   border-color: #dc2626;
 }
-.wizard-step-form label {
+.wizard-step-form .field > label {
   position: absolute;
   left: 1.1rem;
   top: 1.25rem;
@@ -3266,13 +3413,13 @@ watch(
   transform: none;
   pointer-events: auto;
 }
-.wizard-step-form .field.filled label,
-.wizard-step-form .field:focus-within label {
+.wizard-step-form .field.filled > label,
+.wizard-step-form .field:focus-within > label {
   top: 0.45rem;
   font-size: 0.8rem;
   color: var(--color-accent);
 }
-.wizard-step-form .field-select label {
+.wizard-step-form .field.field-select > label {
   position: static;
   transform: none;
   font-size: 1rem;
@@ -3439,7 +3586,7 @@ watch(
 }
 .wizard-back-link:hover { color: var(--color-text); }
 .wizard-message {
-  margin: 0 2rem 1rem;
+  margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   font-size: var(--text-sm);
@@ -3450,11 +3597,9 @@ watch(
 .wizard-message.error { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
 .wizard-message.success { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
 .wizard-footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   z-index: 40;
+  flex: 0 0 auto;
   flex-shrink: 0;
   padding: 0.85rem 2rem max(1rem, env(safe-area-inset-bottom, 0px));
   padding-top: 1rem;
@@ -3463,7 +3608,7 @@ watch(
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  background: color-mix(in srgb, var(--wizard-shell-fill) 82%, transparent);
+  background: color-mix(in srgb, var(--wizard-shell-fill) 92%, transparent);
   backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
   -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.06), var(--liquid-shadow-inset);
@@ -3600,8 +3745,18 @@ html[data-theme='dark'] .wizard-footer {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(248, 250, 252, 0.15);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
   font-size: 0.875rem;
   width: fit-content;
 }
@@ -3625,10 +3780,17 @@ html[data-theme='dark'] .wizard-footer {
   grid-template-columns: 2rem 1fr;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.65rem 0.8rem;
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.14);
-  border: 1px solid var(--liquid-border-soft);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.1),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(10px) saturate(1.15);
   -webkit-backdrop-filter: blur(10px) saturate(1.15);
   animation: wizardPopIn 0.4s ease;
@@ -3675,9 +3837,32 @@ html[data-theme='dark'] .wizard-footer {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@media (min-height: 721px) {
+  .wizard-body--center-options {
+    min-height: 100%;
+    justify-content: center;
+  }
+  .wizard-step-institution {
+    justify-content: center;
+  }
+}
+
+@media (max-height: 720px) {
+  .wizard-step:not(.wizard-step-form) {
+    min-height: 0;
+    align-items: flex-start;
+    padding-top: 0.5rem;
+  }
+}
+
 @media (max-width: 960px) {
+  .wizard-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+  }
   .wizard-modal {
     height: 100dvh;
+    max-height: 100dvh;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
   }
@@ -3687,7 +3872,9 @@ html[data-theme='dark'] .wizard-footer {
   }
   .wizard-panel {
     min-height: 0;
-    height: 100dvh;
+    height: 100%;
+    max-height: 100dvh;
+    flex: 1 1 auto;
   }
   .wizard-header {
     position: sticky;
@@ -3721,9 +3908,6 @@ html[data-theme='dark'] .wizard-footer {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
   }
-  .wizard-panel-main {
-    --wizard-footer-safe: 7.25rem;
-  }
   .wizard-message {
     margin-left: 1.25rem;
     margin-right: 1.25rem;
@@ -3735,7 +3919,7 @@ html[data-theme='dark'] .wizard-footer {
     justify-content: flex-start;
   }
   .wizard-step {
-    min-height: 5rem;
+    min-height: 0;
   }
   .wizard-options.wizard-options-grid {
     grid-template-columns: 1fr;
@@ -3795,21 +3979,30 @@ html[data-theme='dark'] .wizard-footer {
   .wizard-participant-remove {
     justify-self: end;
   }
-  .wizard-step-form input,
-  .wizard-step-form textarea,
-  .wizard-step-form select {
+  .wizard-step-form .field input,
+  .wizard-step-form .field textarea,
+  .wizard-step-form .field select {
     font-size: 1rem;
     padding: 1.2rem 0.9rem 0.72rem;
   }
-  .wizard-step-form label {
+  .wizard-step-form .field > label {
     left: 0.9rem;
     top: 1rem;
     font-size: 0.95rem;
   }
-  .wizard-step-form .field.filled label,
-  .wizard-step-form .field:focus-within label {
+  .wizard-step-form .field.filled > label,
+  .wizard-step-form .field:focus-within > label {
     top: 0.4rem;
     font-size: 0.74rem;
+  }
+  .wizard-step-institution .wizard-form-field-input,
+  .wizard-step-institution .wizard-form-field :deep(.custom-select-trigger) {
+    font-size: 1rem;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+  }
+  .wizard-step-institution .wizard-form-field :deep(.custom-select-trigger) {
+    padding-right: 2.5rem;
   }
   .wizard-cart-row {
     align-items: flex-start;

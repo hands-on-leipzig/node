@@ -52,12 +52,19 @@ const registrationWindow = ref({
   opensAt: null,
   openHour: 10,
   timezone: 'Europe/Berlin',
+  closedMessage: '',
+  controlMode: 'season',
 })
 
 const registrationAllowed = computed(() => !registrationWindow.value.loading && registrationWindow.value.allowed !== false)
 
 const registrationOpensMessage = computed(() => {
-  if (registrationAllowed.value || !registrationWindow.value.opensAt) return ''
+  if (registrationAllowed.value) return ''
+  const custom = (registrationWindow.value.closedMessage || '').trim()
+  if (custom) return custom
+  if (!registrationWindow.value.opensAt) {
+    return t('dashboard.registrationClosedHint')
+  }
   const d = new Date(registrationWindow.value.opensAt)
   if (Number.isNaN(d.getTime())) return ''
   const dateStr = new Intl.DateTimeFormat(locale.value === 'de' ? 'de-DE' : 'en-GB', {
@@ -81,6 +88,8 @@ async function loadRegistrationWindow() {
       opensAt: data.opensAt || null,
       openHour: Number.isFinite(Number(data.openHour)) ? Number(data.openHour) : 10,
       timezone: data.timezone || 'Europe/Berlin',
+      closedMessage: typeof data.closedMessage === 'string' ? data.closedMessage : '',
+      controlMode: data.controlMode || 'season',
     }
   } catch {
     registrationWindow.value = {
@@ -89,6 +98,8 @@ async function loadRegistrationWindow() {
       opensAt: null,
       openHour: 10,
       timezone: 'Europe/Berlin',
+      closedMessage: '',
+      controlMode: 'season',
     }
   }
 }
@@ -579,7 +590,7 @@ const hasDocumentTreeContent = computed(() => {
           </h2>
           <p class="dashboard-card-desc"><I18nText k="dashboard.intro" /></p>
           <p
-            v-if="!registrationWindow.loading && !registrationAllowed && registrationOpensMessage"
+            v-if="!registrationWindow.loading && !registrationAllowed && registrationOpensMessage.trim()"
             class="dashboard-registration-hint"
             role="status"
           >
