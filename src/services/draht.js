@@ -118,12 +118,13 @@ function normalizeAddressItem(raw) {
   const postalCode = firstDefined(raw.postalCode, raw.zip, raw.zipcode, raw.cp) || ''
   const city = firstDefined(raw.city, raw.town) || ''
   const country = firstDefined(raw.country, raw.countryCode, raw.country_code, raw.countrycode) || ''
-  const label = firstDefined(raw.label, raw.name, raw.title, raw.institution) || ''
-  const line2 = firstDefined(raw.addressLine2, raw.line2, raw.contactPerson) || ''
-  const line3 = firstDefined(raw.addressLine3, raw.line3) || ''
-  const institution = firstDefined(raw.institution, raw.label, raw.name) || ''
-  const contactPerson = firstDefined(raw.contactPerson, raw.line2) || ''
-  const deliveryName = firstDefined(raw.name, raw.label) || ''
+  const institution = String(firstDefined(raw.institution) || '').trim()
+  const contactPerson = String(firstDefined(raw.contactPerson) || '').trim()
+  const deliveryName = String(firstDefined(raw.name) || '').trim()
+  const line2 = String(firstDefined(raw.addressLine2, raw.line2) || '').trim()
+  const line3 = String(firstDefined(raw.addressLine3, raw.line3) || '').trim()
+  const label =
+    institution || deliveryName || String(firstDefined(raw.label, raw.title) || '').trim()
   const leitwegId = firstDefined(raw.leitwegId, raw.idprof4) || ''
   const supplierNumber = firstDefined(raw.supplierNumber, raw.idprof5) || ''
   const orderReference = firstDefined(raw.orderReference, raw.auftragsreferenz, raw.idprof6) || ''
