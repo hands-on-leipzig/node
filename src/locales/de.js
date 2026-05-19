@@ -519,7 +519,18 @@ export default {
         "consentTermsSuffix": "der FIRST LEGO League Saison 2026/27.",
         "consentTermsPdfTitle": "Teilnahmebedingungen",
         "consentNewsletter": "Mit der Anmeldung werde ich in den Verteiler für die monatlichen Updates zur FIRST LEGO League Saison aufgenommen. Die Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden.\n",
-        "consentRequired": "Bitte bestätigen Sie die Datenverarbeitung und die Geschäftsbedingungen."
+        "consentRequired": "Bitte bestätigen Sie die Datenverarbeitung und die Geschäftsbedingungen.",
+        "institution": "Name/Institution",
+        "contactPerson": "Ansprechperson",
+        "addressLine3": "3. Adresszeile",
+        "leitwegId": "Leitweg-ID (E-Rechnungsinfo BT-10)",
+        "supplierNumber": "Lieferanten-Nr. (E-Rechnungsinfo BT-29)",
+        "orderReference": "Bestell-Nr. (E-Rechnungsinfo BT-13)",
+        "netInvoiceDesired": "Nettorechnung gewünscht?",
+        "yes": "Ja",
+        "no": "Nein",
+        "registeredAsCompany": "Als Unternehmen registriert?",
+        "vatId": "Umsatzsteueridentifikations-Nr. (E-Rechnungsinfo BT-48)"
     },
     "settings": {
         "profileTitle": "Mein Profil",
