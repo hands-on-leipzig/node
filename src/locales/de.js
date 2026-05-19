@@ -73,6 +73,7 @@ export default {
         "finalTitle": "Finale",
         "colEvent": "Veranstaltung",
         "colDate": "Datum",
+        "dateTbd": "Termin wird noch bekannt gegeben",
         "colCapacity": "Kapazität",
         "capacityTeams": "{registered} / {capacity} Teams",
         "capacityGroups": "{registered} / {capacity} Gruppen",

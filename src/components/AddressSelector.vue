@@ -246,8 +246,10 @@ async function lookupZip(rawZip, country) {
       seen.add(key)
       return true
     }).slice(0, 6)
-    if (zipSuggestions.value.length === 1 && zipSuggestions.value[0].city) {
-      setNewField('city', zipSuggestions.value[0].city)
+    if (zipSuggestions.value.length === 1) {
+      const only = zipSuggestions.value[0]
+      if (only.city) setNewField('city', only.city)
+      if (only.state) setNewField('state', only.state)
     }
   } catch (_) {
     zipSuggestions.value = []
@@ -260,6 +262,7 @@ function applyZipSuggestion(item) {
   setNewField('postalCode', item.postalCode || props.modelValue.new?.postalCode || '')
   if (item.city) setNewField('city', item.city)
   if (item.country) setNewField('country', item.country)
+  if (item.state) setNewField('state', item.state)
   zipSuggestions.value = []
 }
 

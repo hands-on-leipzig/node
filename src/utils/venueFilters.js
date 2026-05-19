@@ -94,6 +94,22 @@ export function formatVenueDate(isoDate, locale) {
   })
 }
 
+/**
+ * Event date for venues list/detail; placeholder when no date is set yet.
+ *
+ * @param {string|null|undefined} isoDate
+ * @param {string} locale
+ * @param {string} [dateTbdText] i18n label, e.g. t('venues.dateTbd')
+ */
+export function formatVenueDateDisplay(isoDate, locale, dateTbdText = '') {
+  const raw = isoDate != null ? String(isoDate).trim() : ''
+  if (!raw) {
+    if (dateTbdText) return dateTbdText
+    return locale === 'de' ? 'wird noch bekannt gegeben' : 'To be announced'
+  }
+  return formatVenueDate(raw, locale)
+}
+
 export const OFFER_COLORS = {
   exhibition: '#2e7d32',
   competition: '#c62828',

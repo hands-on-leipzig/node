@@ -2,7 +2,7 @@
 import { computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VenueDetailMap from '@/components/VenueDetailMap.vue'
-import { venueDisplayName, venueCapacityLabel, formatVenueDate } from '@/utils/venueFilters'
+import { venueDisplayName, venueCapacityLabel, formatVenueDate, formatVenueDateDisplay } from '@/utils/venueFilters'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -86,11 +86,16 @@ onUnmounted(() => {
               <VenueDetailMap :lat="venue.lat" :lon="venue.lon" />
             </div>
             <aside class="venue-detail-modal-side">
-              <p v-if="venue.date" class="venue-detail-meta">
+              <p class="venue-detail-meta">
                 <i class="bi bi-calendar3" aria-hidden="true" />
-                {{ formatVenueDate(venue.date, locale) }}
-                <template v-if="venue.endDate && venue.endDate !== venue.date">
-                  – {{ formatVenueDate(venue.endDate, locale) }}
+                <template v-if="venue.date">
+                  {{ formatVenueDate(venue.date, locale) }}
+                  <template v-if="venue.endDate && venue.endDate !== venue.date">
+                    – {{ formatVenueDate(venue.endDate, locale) }}
+                  </template>
+                </template>
+                <template v-else>
+                  {{ formatVenueDateDisplay(venue.date, locale, t('venues.dateTbd')) }}
                 </template>
               </p>
               <p v-if="capacityText" class="venue-detail-meta">

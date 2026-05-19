@@ -303,11 +303,6 @@ watch(
             </template>
             <template v-else><I18nText k="detail.noData" /></template>
           </dd>
-          <dt><I18nText k="enroll.organization" /></dt>
-          <dd>
-            <template v-if="team.organization && team.organization.name">{{ team.organization.name }}</template>
-            <I18nText v-else k="detail.noData" />
-          </dd>
           <dt><I18nText k="detail.ort" /></dt>
           <dd>
             <template v-if="team.ort">{{ team.ort }}</template>

@@ -6,12 +6,12 @@ import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { getEventsNearest, registerGroupForEvent } from '@/services/draht'
 import {
   FUTURE_TEAM_EVENT_UNIT_EUR,
-  FUTURE_PUPIL_COUNTS,
   FUTURE_EVENT_TEAM_SIZE,
   futureMaxEventTeams,
   futureMaxSelectableEventTeams,
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
+import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { extractEventList, normalizeEvents, formatEventOptionLabel } from '@/utils/events'
 import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 
@@ -24,14 +24,16 @@ const emit = defineEmits(['updated'])
 
 const { t } = useI18n()
 
+/** null | 'yes' | 'later' — wie Wizard Schritt Event */
+const registrationChoice = ref(null)
 const panelOpen = ref(false)
 const events = ref([])
 const eventsLoading = ref(false)
 
 /** Total teams to register (initial) or additional teams (when already registered). */
 const selectedTeamCount = ref(1)
-/** Per-team event picks (wizard-style). */
-const teamEvents = ref([{ eventId: null }])
+/** Per-team event + name (wizard-style). */
+const teamEvents = ref([{ eventId: null, name: '' }])
 const teamAutoUpgrade = ref(null)
 
 const submitting = ref(false)
@@ -104,7 +106,7 @@ const teamOptionCounts = computed(() => {
   if (isInitialRegistration.value) {
     return Array.from(
       new Set(
-        FUTURE_PUPIL_COUNTS.map((n) => Math.floor(n / 8)).filter((n) => n > 0),
+        FUTURE_PUPIL_OPTIONS.map((n) => Math.floor(n / FUTURE_EVENT_TEAM_SIZE)).filter((n) => n > 0),
       ),
     ).sort((a, b) => a - b)
   }
@@ -136,19 +138,29 @@ const allTeamEventsSelected = computed(() => {
   if (teamEvents.value.length === 0) return false
   return teamEvents.value.every((entry) => {
     const id = Number(entry?.eventId)
-    return Number.isFinite(id) && id > 0
+    const hasEvent = Number.isFinite(id) && id > 0
+    const hasName = String(entry?.name ?? '').trim().length > 0
+    return hasEvent && hasName
   })
 })
 
+const showRegistrationForm = computed(
+  () => isInitialRegistration.value
+    ? registrationChoice.value === 'yes'
+    : panelOpen.value,
+)
+
 const canSubmit = computed(() => {
   if (submitting.value) return false
+  if (isInitialRegistration.value && registrationChoice.value !== 'yes') return false
   if (!selectedTeamCount.value || selectedTeamCount.value < 1) return false
   if (isInitialRegistration.value) {
     if (selectedTeamCount.value > maxTeamsByPupils.value && !teamAutoUpgrade.value) return false
     return allTeamEventsSelected.value
   }
   if (maxAdditionalTeams.value <= 0) return false
-  return selectedTeamCount.value <= maxAdditionalTeams.value
+  if (selectedTeamCount.value > maxAdditionalTeams.value) return false
+  return allTeamEventsSelected.value
 })
 
 function futureProgramId() {
@@ -196,8 +208,8 @@ function selectTeamCount(count) {
       syncTeamEventsArray()
       return
     }
-    const neededPupils = n * 8
-    if (!FUTURE_PUPIL_COUNTS.includes(neededPupils)) return
+    const neededPupils = n * FUTURE_EVENT_TEAM_SIZE
+    if (!FUTURE_PUPIL_OPTIONS.includes(neededPupils)) return
     selectedTeamCount.value = n
     teamAutoUpgrade.value = { teams: n, pupils: neededPupils }
     syncTeamEventsArray()
@@ -206,6 +218,7 @@ function selectTeamCount(count) {
 
   if (n <= maxAdditionalTeams.value) {
     selectedTeamCount.value = n
+    syncTeamEventsArray()
   }
 }
 
@@ -215,6 +228,7 @@ function syncTeamEventsArray() {
   while (teamEvents.value.length < count) {
     teamEvents.value.push({
       eventId: !isInitialRegistration.value && currentEventId > 0 ? currentEventId : null,
+      name: '',
     })
   }
   teamEvents.value = teamEvents.value.slice(0, count)
@@ -223,7 +237,25 @@ function syncTeamEventsArray() {
 function selectTeamEvent(teamIndex, eventId) {
   const idx = Number(teamIndex)
   if (!Number.isFinite(idx) || idx < 0 || !teamEvents.value[idx]) return
-  teamEvents.value[idx] = { eventId: eventId ? Number(eventId) : null }
+  const prev = teamEvents.value[idx]
+  teamEvents.value[idx] = {
+    eventId: eventId ? Number(eventId) : null,
+    name: String(prev?.name ?? '').trim(),
+  }
+}
+
+function chooseRegistration(mode) {
+  registrationChoice.value = mode
+  if (mode === 'yes') {
+    panelOpen.value = true
+    if (events.value.length === 0) loadEvents()
+    if (!Number.isFinite(Number(selectedTeamCount.value)) || selectedTeamCount.value < 1) {
+      selectedTeamCount.value = 1
+    }
+    syncTeamEventsArray()
+  } else {
+    panelOpen.value = false
+  }
 }
 
 function primaryEventIdForSubmit() {
@@ -237,10 +269,24 @@ function primaryEventIdForSubmit() {
   return ids[0]
 }
 
+function buildEventTeamsPayload() {
+  const rows = teamEvents.value
+    .map((entry) => {
+      const evId = Number(entry?.eventId)
+      const name = String(entry?.name ?? '').trim()
+      if (!Number.isFinite(evId) || evId <= 0 || !name) return null
+      return { eventId: evId, name }
+    })
+    .filter(Boolean)
+  if (isInitialRegistration.value) return rows
+  return rows.slice(-Math.max(1, Number(selectedTeamCount.value) || 1))
+}
+
 async function submit() {
   if (!registrationActionsEnabled.value) return
+  const eventTeamsPayload = buildEventTeamsPayload()
   const eventId = primaryEventIdForSubmit()
-  if (!props.groupId || !eventId) return
+  if (!props.groupId || !eventId || eventTeamsPayload.length === 0) return
 
   submitting.value = true
   submitError.value = null
@@ -250,13 +296,18 @@ async function submit() {
     const neededPupils = pupilsRequiredAfterSubmit.value
     const currentPupils = registeredPupils.value
     const payload = {
+      eventId,
+      eventTeamCount: totalTeams,
+      eventTeams: eventTeamsPayload,
       registeredPupils: neededPupils > currentPupils ? neededPupils : undefined,
     }
-    const res = await registerGroupForEvent(props.groupId, eventId, totalTeams, payload)
+    const res = await registerGroupForEvent(props.groupId, payload)
     emit('updated', res.data)
     submitSuccess.value = true
     selectedTeamCount.value = 1
     teamAutoUpgrade.value = null
+    registrationChoice.value = null
+    panelOpen.value = false
     syncTeamEventsArray()
     setTimeout(() => {
       submitSuccess.value = false
@@ -282,22 +333,54 @@ watch(
   () => {
     selectedTeamCount.value = 1
     teamAutoUpgrade.value = null
+    registrationChoice.value = null
+    panelOpen.value = false
     syncTeamEventsArray()
   },
 )
 
 watch(selectedTeamCount, () => {
-  if (isInitialRegistration.value) syncTeamEventsArray()
+  syncTeamEventsArray()
 })
 
 onMounted(() => {
   syncTeamEventsArray()
+  if (isInitialRegistration.value) {
+    loadEvents()
+  }
 })
 </script>
 
 <template>
   <div class="future-event-teams">
     <h3 class="detail-section-title"><I18nText k="groupDetail.eventTeamsTitle" /></h3>
+
+    <div
+      v-if="hasEventRegistration && currentEventLabel"
+      class="future-event-status future-event-status--active"
+    >
+      <div class="future-event-status-main">
+        <i class="bi bi-calendar-check" aria-hidden="true" />
+        <div>
+          <p class="future-event-status-headline">
+            <I18nText
+              k="groupDetail.eventTeamsStatusRegistered"
+              :values="{ count: enrolledTeams.length || currentEventTeamCount, event: currentEventLabel }"
+            />
+          </p>
+          <p class="future-event-status-meta">
+            <I18nText
+              k="groupDetail.eventTeamsStatusMeta"
+              :values="{
+                pupils: registeredPupils || '—',
+                maxTeams: maxTeamsByPupils,
+                cost: group.eventTeamTotalEur ?? estimatedSubmitCostEur,
+              }"
+            />
+          </p>
+        </div>
+      </div>
+    </div>
 
     <ul v-if="enrolledTeams.length" class="future-event-team-list">
       <li v-for="team in enrolledTeams" :key="'enrolled-team-' + team.id">
@@ -314,7 +397,7 @@ onMounted(() => {
         </RouterLink>
       </li>
     </ul>
-    <div v-else class="future-event-status future-event-status--empty">
+    <div v-else-if="!hasEventRegistration" class="future-event-status future-event-status--empty">
       <i class="bi bi-calendar-x" aria-hidden="true" />
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
@@ -328,23 +411,51 @@ onMounted(() => {
       <I18nText k="detail.eventSectionComingSoon" />
     </p>
 
-    <button type="button" class="future-event-panel-toggle" :aria-expanded="panelOpen" :disabled="addMoreTeamsDisabled" @click="togglePanel">
+    <template v-if="isInitialRegistration">
+      <p class="onsite-event-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
+      <p class="future-event-hint onsite-event-hint"><I18nText k="wizard.onSiteEventHint" /></p>
+      <div class="onsite-event-options">
+        <button
+          type="button"
+          class="onsite-event-option"
+          :class="{ active: registrationChoice === 'yes' }"
+          :disabled="addMoreTeamsDisabled"
+          @click="chooseRegistration('yes')"
+        >
+          <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventYes" /></span>
+          <span class="onsite-event-option-desc"><I18nText k="wizard.onSiteEventYesDesc" /></span>
+        </button>
+        <button
+          v-if="registrationChoice !== 'yes'"
+          type="button"
+          class="onsite-event-option"
+          :class="{ active: registrationChoice === 'later' }"
+          :disabled="addMoreTeamsDisabled"
+          @click="chooseRegistration('later')"
+        >
+          <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventSkip" /></span>
+          <span class="onsite-event-option-desc"><I18nText k="wizard.onSiteEventSkipDesc" /></span>
+        </button>
+      </div>
+    </template>
+
+    <button
+      v-else
+      type="button"
+      class="future-event-panel-toggle"
+      :aria-expanded="panelOpen"
+      :disabled="addMoreTeamsDisabled"
+      @click="togglePanel"
+    >
       <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
-      <span>
-        <I18nText v-if="isInitialRegistration" k="groupDetail.eventTeamsPanelRegister" />
-        <I18nText v-else k="groupDetail.eventTeamsPanelAddMore" />
-      </span>
+      <span><I18nText k="groupDetail.eventTeamsPanelAddMore" /></span>
     </button>
 
-    <div v-show="panelOpen" class="future-event-panel-body">
-      <p class="future-event-hint">
+    <div v-show="showRegistrationForm" class="future-event-panel-body">
+      <p class="future-event-hint wizard-event-team-hint">
         <I18nText
-          k="groupDetail.teamCountHint"
-          :values="{
-            pupils: registeredPupils || '—',
-            maxCurrent: maxTeamsByPupils,
-            maxSelectable: maxTeamsSelectable,
-          }"
+          k="wizard.onSiteEventTeamsSummary"
+          :values="{ pupils: registeredPupils || '—', maxTeams: maxTeamsByPupils }"
         />
       </p>
 
@@ -419,39 +530,51 @@ onMounted(() => {
           </p>
         </div>
 
-        <template v-if="isInitialRegistration">
-          <p v-if="selectedTeamCount > 1" class="future-event-label">
-            <I18nText k="wizard.onSiteEventPerTeam" />
-          </p>
-          <div v-if="selectedTeamCount > 0" class="future-event-team-rows">
+        <p v-if="selectedTeamCount > 1" class="future-event-label">
+          <I18nText k="wizard.onSiteEventPerTeam" />
+        </p>
+        <div v-if="selectedTeamCount > 0" class="future-event-team-rows">
             <div
               v-for="(entry, idx) in teamEvents"
               :key="'fe-event-row-' + idx"
-              class="future-event-team-card"
+              class="future-event-team-card future-event-team-card--wizard"
             >
               <div
-                class="future-event-team-grid"
+                class="future-event-team-grid future-event-team-grid--wizard"
                 :class="{ 'future-event-team-grid--solo': selectedTeamCount === 1 }"
               >
                 <div v-if="selectedTeamCount > 1" class="future-event-team-meta">
                   <span class="future-event-team-name">{{ t('wizard.teamSingular') }} {{ idx + 1 }}</span>
                 </div>
-                <div class="future-event-team-dropdown">
-                  <EventSelectDropdown
-                    :title="selectedTeamCount > 1 ? t('wizard.onSiteEventDropdownTitleTeam', { team: idx + 1 }) : ''"
-                    :events="events"
-                    :loading="eventsLoading"
-                    :model-value="entry.eventId"
-                    :placeholder="t('wizard.onSiteEventPlaceholder')"
-                    :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
-                    :disabled="addMoreTeamsDisabled"
-                    @update:model-value="selectTeamEvent(idx, $event)"
-                  />
+                <div class="future-event-team-combined-body">
+                  <label class="future-event-name-field">
+                    <span class="future-event-name-label">
+                      <I18nText :k="selectedTeamCount > 1 ? 'wizard.futureEventTeamNameLabel' : 'wizard.futureEventTeamNameLabelSolo'" />
+                    </span>
+                    <input
+                      v-model="entry.name"
+                      type="text"
+                      class="future-event-name-input"
+                      :placeholder="t('wizard.futureEventTeamNamePlaceholder')"
+                      autocomplete="off"
+                    >
+                  </label>
+                  <div class="future-event-team-dropdown">
+                    <EventSelectDropdown
+                      :title="selectedTeamCount > 1 ? t('wizard.onSiteEventDropdownTitleTeam', { team: idx + 1 }) : ''"
+                      :events="events"
+                      :loading="eventsLoading"
+                      :model-value="entry.eventId"
+                      :placeholder="t('wizard.onSiteEventPlaceholder')"
+                      :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
+                      :disabled="addMoreTeamsDisabled"
+                      @update:model-value="selectTeamEvent(idx, $event)"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </template>
 
         <p class="future-event-hint">
           <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
@@ -482,6 +605,90 @@ onMounted(() => {
 <style scoped>
 .future-event-teams {
   margin-bottom: 0;
+}
+.onsite-event-question {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.onsite-event-hint {
+  white-space: pre-line;
+  max-width: 40rem;
+}
+.onsite-event-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+.onsite-event-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.onsite-event-option:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+.onsite-event-option.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-muted));
+}
+.onsite-event-option-main {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.onsite-event-option-desc {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+.wizard-event-team-hint {
+  line-height: 1.45;
+  white-space: pre-line;
+}
+.future-event-team-grid--wizard {
+  display: grid;
+  gap: 0.65rem;
+}
+.future-event-team-combined-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.future-event-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.future-event-name-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.future-event-name-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-base);
+}
+.future-event-name-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 .future-event-registration {
   margin-top: 0.25rem;

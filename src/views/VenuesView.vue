@@ -17,7 +17,7 @@ import {
   clusterVenuesForMap,
   venueDisplayName,
   venueCapacityLabel,
-  formatVenueDate,
+  formatVenueDateDisplay,
   isFutureEditionVenue,
 } from '@/utils/venueFilters'
 
@@ -240,7 +240,7 @@ onMounted(() => {
                 <button type="button" class="venues-event-row" @click="openVenueDetail(ev)">
                 <span class="venues-event-name">{{ venueDisplayName(ev, locale) }}</span>
                 <span class="venues-event-meta">
-                  <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
+                  {{ formatVenueDateDisplay(ev.date, locale, t('venues.dateTbd')) }}
                   <template v-if="venueCapacityLabel(ev, t)"> · {{ venueCapacityLabel(ev, t) }}</template>
                   <template v-if="ev.program === 'future5'">
                     · <I18nText k="venues.futureTrack5" />
@@ -287,7 +287,7 @@ onMounted(() => {
                 <button type="button" class="venues-event-row" @click="openVenueDetail(ev)">
                   <span class="venues-event-name">{{ venueDisplayName(ev, locale) }}</span>
                   <span class="venues-event-meta">
-                    <template v-if="ev.date">{{ formatVenueDate(ev.date, locale) }}</template>
+                    {{ formatVenueDateDisplay(ev.date, locale, t('venues.dateTbd')) }}
                     <template v-if="venueCapacityLabel(ev, t)"> · {{ venueCapacityLabel(ev, t) }}</template>
                   </span>
                 </button>

@@ -605,12 +605,11 @@ export function updateClassVersandaufschub(classId, payload) {
   return api.put('/classes/' + encodeURIComponent(classId) + '/versandaufschub', payload)
 }
 
-export function registerGroupForEvent(groupId, eventId, eventTeamCount, options = {}) {
-  const body = { eventId, eventTeamCount }
-  if (options.registeredPupils != null && Number.isFinite(Number(options.registeredPupils))) {
-    body.registeredPupils = Number(options.registeredPupils)
-  }
-  return api.put('/groups/' + encodeURIComponent(groupId) + '/event', body)
+/**
+ * Register group for event(s). Payload: { eventId, eventTeamCount, registeredPupils?, eventTeams?: [{ eventId, name }] }.
+ */
+export function registerGroupForEvent(groupId, payload) {
+  return api.put('/groups/' + encodeURIComponent(groupId) + '/event', payload)
 }
 
 /**

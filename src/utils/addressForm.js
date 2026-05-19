@@ -27,7 +27,7 @@ export function emptyAddressNewFields(mode) {
     }
   }
   if (mode === ADDRESS_MODE_DELIVERY) {
-    return { ...base, name: '', addressLine2: '', addressLine3: '' }
+    return { ...base, name: '', addressLine2: '', addressLine3: '', state: '' }
   }
   return base
 }
@@ -142,6 +142,8 @@ export function buildNewAddressPayload(addr, mode) {
     if (addressLine2) payload.addressLine2 = addressLine2
     const addressLine3 = String(n.addressLine3 || '').trim()
     if (addressLine3) payload.addressLine3 = addressLine3
+    const state = String(n.state || '').trim()
+    if (state) payload.state = state
   }
   return payload
 }
