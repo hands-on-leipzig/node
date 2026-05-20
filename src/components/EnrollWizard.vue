@@ -1857,10 +1857,24 @@ watch(
       </div>
 
       <div class="wizard-panel">
-        <div class="wizard-header">
-          <button type="button" class="wizard-close" aria-label="Close" @click="close">
-            <i class="bi bi-x-lg"></i>
-          </button>
+        <div class="wizard-sticky-top">
+          <div class="wizard-header">
+            <!--<button type="button" class="wizard-close" aria-label="Close" @click="close">
+              <i class="bi bi-x-lg"></i>
+            </button>-->
+            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="prev">
+              <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
+            </button>
+            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== participantsStepIndex && !canNext()" @click="next">
+              <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
+            </button>
+            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid() || !consentDataProcessing || !consentTerms" @click="submit">
+              <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
+              <i v-else class="bi bi-check-lg"></i>
+              <I18nText v-if="submitting" k="wizard.submitting" />
+              <I18nText v-else k="wizard.submit" />
+            </button>
+          </div>
         </div>
 
         <div class="wizard-panel-main">
@@ -2598,21 +2612,6 @@ watch(
               <I18nText v-else k="wizard.success" />
             </div>
           </div>
-
-          <div class="wizard-footer">
-            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="prev">
-              <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
-            </button>
-            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== participantsStepIndex && !canNext()" @click="next">
-              <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
-            </button>
-            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid() || !consentDataProcessing || !consentTerms" @click="submit">
-              <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
-              <i v-else class="bi bi-check-lg"></i>
-              <I18nText v-if="submitting" k="wizard.submitting" />
-              <I18nText v-else k="wizard.submit" />
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -2646,19 +2645,19 @@ watch(
   overflow: hidden;
   animation: wizardFadeIn 0.35s ease;
 }
-.wizard-header {
+.wizard-sticky-top {
   flex-shrink: 0;
-  padding: 1rem 2rem 0.5rem;
+  z-index: 50;
+  background: color-mix(in srgb, var(--wizard-shell-fill) 96%, transparent);
+  backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
+  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   border-bottom: 1px solid var(--liquid-border);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1rem;
-  background: color-mix(in srgb, var(--wizard-shell-fill) 70%, transparent);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(1.1);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.45)) saturate(1.1);
 }
+html[data-theme='dark'] .wizard-sticky-top {
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
+}
+
 .wizard-panel-title {
   font-size: var(--text-lg);
   font-weight: 600;
@@ -2670,27 +2669,11 @@ watch(
   color: var(--color-text-muted);
   margin: 0;
 }
-.wizard-close {
-  width: 2.75rem;
-  height: 2.75rem;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.wizard-close:hover {
-  background: var(--liquid-tile-bg-inner);
-  color: var(--color-text);
-}
+
 .wizard-close i {
   font-size: 1.35rem;
 }
-/* Panel: header + scrollable body + pinned footer (no absolute overlay — works on short viewports) */
+/* Panel: sticky nav on top + scrollable step content below */
 .wizard-body {
   flex: 0 1 auto;
   min-height: 0;
@@ -3691,27 +3674,20 @@ watch(
 }
 .wizard-message.error { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
 .wizard-message.success { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
-.wizard-footer {
-  position: relative;
-  z-index: 40;
-  flex: 0 0 auto;
+.wizard-header {
   flex-shrink: 0;
-  padding: 0.85rem 2rem max(1rem, env(safe-area-inset-bottom, 0px));
-  padding-top: 1rem;
-  border-top: 1px solid var(--liquid-border);
+  padding: 1rem 2rem 0.75rem;
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  padding-bottom: 0.85rem;
+  border-top: none;
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  background: color-mix(in srgb, var(--wizard-shell-fill) 92%, transparent);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.06), var(--liquid-shadow-inset);
+  background: transparent;
 }
-html[data-theme='dark'] .wizard-footer {
-  box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.35), var(--liquid-shadow-inset);
-}
-.wizard-footer .btn {
+.wizard-header .btn {
   padding: 0.9rem 1.4rem;
   font-size: 1.05rem;
   font-weight: 500;
@@ -3724,18 +3700,18 @@ html[data-theme='dark'] .wizard-footer {
   gap: 0.5rem;
   transition: transform 0.2s, box-shadow 0.2s;
 }
-.wizard-footer .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.wizard-footer .btn-primary {
+.wizard-header .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.wizard-header .btn-primary {
   background: var(--color-accent);
   color: white;
   box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
 }
-.wizard-footer .btn-primary:hover:not(:disabled) {
+.wizard-header .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
 }
-.wizard-footer .btn-ghost { background: transparent; color: var(--color-text-muted); }
-.wizard-footer .btn-ghost:hover:not(:disabled) { color: var(--color-text); }
+.wizard-header .btn-ghost { background: transparent; color: var(--color-text-muted); }
+.wizard-header .btn-ghost:hover:not(:disabled) { color: var(--color-text); }
 
 .wizard-hero {
   padding: 3rem 2.5rem;
@@ -3971,20 +3947,15 @@ html[data-theme='dark'] .wizard-footer {
     max-height: 100dvh;
     flex: 1 1 auto;
   }
+
   .wizard-header {
-    position: sticky;
-    top: 0;
-    z-index: 35;
-    background: color-mix(in srgb, var(--wizard-shell-fill) 78%, transparent);
-    backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.1);
-    -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.1);
-    padding: 0.6rem 1rem 0.45rem;
+    padding: 0.45rem 1rem 0.65rem;
   }
   .wizard-close {
     width: 2.4rem;
     height: 2.4rem;
   }
-  .wizard-footer .btn {
+  .wizard-header .btn {
     min-height: 2.75rem;
   }
 }
@@ -3997,11 +3968,13 @@ html[data-theme='dark'] .wizard-footer {
   .wizard-modal {
     height: 100dvh;
   }
-  .wizard-header,
   .wizard-body,
-  .wizard-footer {
+  .wizard-header {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
+  }
+  .wizard-sticky-top {
+    padding-top: max(0.45rem, env(safe-area-inset-top, 0px));
   }
   .wizard-message {
     margin-left: 1.25rem;
@@ -4104,34 +4077,35 @@ html[data-theme='dark'] .wizard-footer {
     flex-wrap: wrap;
     gap: 0.2rem 0.75rem;
   }
-  .wizard-footer {
+  .wizard-header {
     gap: 0.5rem;
-    padding-top: 0.65rem;
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   }
-  .wizard-footer .btn {
+  .wizard-header .btn {
     flex: 1 1 0;
     justify-content: center;
     padding: 0.8rem 0.9rem;
     font-size: 0.95rem;
   }
-  .wizard-footer .btn .bi {
+  .wizard-header .btn .bi {
     font-size: 0.95rem;
   }
 }
 
 @media (max-width: 420px) {
-  .wizard-header,
   .wizard-body,
-  .wizard-footer {
+  .wizard-header {
     padding-left: 0.85rem;
     padding-right: 0.85rem;
   }
-  .wizard-footer {
-    flex-wrap: wrap;
+  .wizard-header {
+    flex-wrap: nowrap;
   }
-  .wizard-footer .btn {
-    width: 100%;
+  .wizard-header .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
   }
   .wizard-options-vertical {
     max-width: 100%;

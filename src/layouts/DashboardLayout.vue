@@ -172,16 +172,35 @@ function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
 }
 
-function openProfileMenu() {
-  profileMenuOpen.value = !profileMenuOpen.value
+let profileMenuHideTimer = null
+
+function showProfileMenu() {
+  if (profileMenuHideTimer) {
+    clearTimeout(profileMenuHideTimer)
+    profileMenuHideTimer = null
+  }
+  profileMenuOpen.value = true
 }
+
+function scheduleHideProfileMenu() {
+  if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
+  profileMenuHideTimer = setTimeout(() => {
+    profileMenuOpen.value = false
+    profileMenuHideTimer = null
+  }, 220)
+}
+
 function closeProfileMenu() {
+  if (profileMenuHideTimer) {
+    clearTimeout(profileMenuHideTimer)
+    profileMenuHideTimer = null
+  }
   profileMenuOpen.value = false
 }
 
 function handleClickOutside(e) {
   const el = e.target
-  if (!el.closest('.profile-trigger') && !el.closest('.profile-menu')) {
+  if (!el.closest('.sidebar-profile-wrap')) {
     closeProfileMenu()
   }
 }
@@ -221,6 +240,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   window.removeEventListener('popstate', handleBrowserBack)
+  if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
 })
 watch(
   () => route.path,
@@ -251,14 +271,15 @@ function switchToEn() {
   setLocaleUserChoice('en')
 }
 
+function goSettings() {
+  closeProfileMenu()
+  closeSidebar()
+  router.push({ name: 'settings' })
+}
+
 function doLogout() {
   closeProfileMenu()
   logout()
-}
-
-function goSettings() {
-  closeProfileMenu()
-  router.push({ name: 'settings' })
 }
 
 const foundersTeams = computed(() => teams.value.filter((t) => !isFutureEnrollmentEntry(t)))
@@ -459,23 +480,8 @@ const { canInstall, promptInstall } = usePwaInstall()
           </template>
         </template>
       </nav>
-      <div class="sidebar-partner">
-        <img
-          :src="logoFll"
-          alt="FIRST LEGO League"
-          class="sidebar-partner-logo sidebar-partner-logo--fll"
-          decoding="async"
-        >
-        <a
-          href="https://www.hands-on-technology.org"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="sidebar-partner-link"
-        >
-          <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
-        </a>
-      </div>
-      <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">
+      <div class="sidebar-lower">
+        <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">
         <button
           v-if="isGuestShell && !isAuthenticated()"
           type="button"
@@ -494,20 +500,27 @@ const { canInstall, promptInstall } = usePwaInstall()
           <span class="sidebar-item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
           <span class="sidebar-item-label"><I18nText k="auth.logout" /></span>
         </button>
-        <div v-else class="sidebar-profile-wrap">
+        <div
+          v-else
+          class="sidebar-profile-wrap"
+          @mouseenter="showProfileMenu"
+          @mouseleave="scheduleHideProfileMenu"
+        >
           <button
             type="button"
             class="profile-trigger sidebar-item"
             aria-haspopup="true"
             :aria-expanded="profileMenuOpen"
-            :aria-label="t('common.settings')"
-            @click="openProfileMenu"
+            :aria-label="user?.name || t('common.coach')"
+            @click="showProfileMenu"
+            @focus="showProfileMenu"
           >
-            <span class="sidebar-item-icon profile-settings-icon" aria-hidden="true">
-              <i class="bi bi-gear-fill" />
+            <span class="sidebar-item-icon profile-account-icon" aria-hidden="true">
+              <i class="bi bi-person-circle" />
             </span>
             <span class="sidebar-item-label">
-              <I18nText k="common.settings" />
+              <template v-if="user?.name">{{ user.name }}</template>
+              <I18nText v-else k="common.coach" />
             </span>
           </button>
           <Transition name="profile-menu">
@@ -569,8 +582,8 @@ const { canInstall, promptInstall } = usePwaInstall()
                 </div>
               </div>
               <button type="button" class="profile-menu-item" role="menuitem" @click="goSettings">
-                <i class="bi bi-person-lines-fill"></i>
-                <span><I18nText k="settings.profileTitle" /></span>
+                <i class="bi bi-gear-fill"></i>
+                <span><I18nText k="common.settings" /></span>
               </button>
               <button type="button" class="profile-menu-item" role="menuitem" disabled>
                 <i class="bi bi-question-circle"></i>
@@ -612,6 +625,23 @@ const { canInstall, promptInstall } = usePwaInstall()
               </button>
             </div>
           </Transition>
+        </div>
+        </div>
+        <div class="sidebar-partner">
+          <img
+            :src="logoFll"
+            alt="FIRST LEGO League"
+            class="sidebar-partner-logo sidebar-partner-logo--fll"
+            decoding="async"
+          >
+          <a
+            href="https://www.hands-on-technology.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="sidebar-partner-link"
+          >
+            <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
+          </a>
         </div>
       </div>
     </aside>
@@ -720,14 +750,20 @@ const { canInstall, promptInstall } = usePwaInstall()
   object-fit: contain;
   object-position: center;
 }
+.sidebar-lower {
+  flex-shrink: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+}
 .sidebar-partner {
-  margin: 0.75rem 0.5rem 0;
-  padding: 0.85rem 0.5rem 0.4rem;
+  margin: 0 0.5rem max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding: 0.75rem 0.5rem 0.5rem;
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  margin-bottom: -1rem;
   text-align: center;
 }
 .sidebar-partner-link {
@@ -823,7 +859,10 @@ const { canInstall, promptInstall } = usePwaInstall()
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   margin-top: 0.85rem;
 }
 .sidebar-nav-top-spacer {
@@ -1006,9 +1045,8 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 
 .sidebar-bottom {
-  padding: 0.75rem 0.5rem max(0.75rem, env(safe-area-inset-bottom, 0px));
+  padding: 0.5rem 0.5rem 0.65rem;
   border-top: 1px solid var(--color-border);
-  margin-top: auto;
   background: var(--liquid-bg-subtle);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1020,11 +1058,11 @@ const { canInstall, promptInstall } = usePwaInstall()
 .sidebar-bottom--guest {
   gap: 0.75rem;
 }
-.profile-settings-icon .bi {
-  font-size: 1.2rem;
+.profile-account-icon .bi {
+  font-size: 1.35rem;
   opacity: 0.9;
 }
-.profile-trigger:hover .profile-settings-icon .bi {
+.profile-trigger:hover .profile-account-icon .bi {
   opacity: 1;
   color: var(--color-accent);
 }
@@ -1115,7 +1153,14 @@ const { canInstall, promptInstall } = usePwaInstall()
   color: var(--color-text-muted);
   text-align: left;
 }
-.profile-trigger:hover {
+.profile-trigger:hover,
+.sidebar-profile-wrap:hover .profile-trigger,
+.profile-trigger:focus-visible {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.profile-trigger[aria-expanded='true'] {
   background: var(--color-bg-hover);
   color: var(--color-text);
   border-color: var(--color-border);
