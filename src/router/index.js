@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { initKeycloak, isAuthenticated, hasCoachRole, hasAdminRole, login } from '@/auth/keycloak'
+import { applyCoachLocaleFromProfile } from '@/i18n'
+import { getNodeCoachMe } from '@/services/draht'
 
 const routes = [
   {
@@ -102,6 +104,7 @@ const router = createRouter({
 })
 
 let keycloakReady = false
+let coachLocaleApplied = false
 
 router.beforeEach(async (to) => {
   if (!keycloakReady) {
@@ -112,6 +115,11 @@ router.beforeEach(async (to) => {
       console.error('Keycloak init failed', e)
       keycloakReady = true
     }
+  }
+
+  if (!coachLocaleApplied && isAuthenticated() && hasCoachRole()) {
+    coachLocaleApplied = true
+    await applyCoachLocaleFromProfile(getNodeCoachMe)
   }
 
   if (to.meta.requiresAuth) {

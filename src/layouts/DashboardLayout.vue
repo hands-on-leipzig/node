@@ -4,7 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getUserProfile, logout, hasAdminRole, isAuthenticated, hasCoachRole, login } from '@/auth/keycloak'
 import {
-  setLocale,
+  setLocaleUserChoice,
   showTranslationKeys,
   setShowTranslationKeys,
   translationEditMode,
@@ -245,10 +245,10 @@ watch(
 )
 
 function switchToDe() {
-  setLocale('de')
+  setLocaleUserChoice('de')
 }
 function switchToEn() {
-  setLocale('en')
+  setLocaleUserChoice('en')
 }
 
 function doLogout() {

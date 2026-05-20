@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomSelect from '@/components/CustomSelect.vue'
-import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { formatAddressBookLines, formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import {
   emptyAddressNewFields,
   ADDRESS_MODE_INVOICE,
@@ -10,6 +10,7 @@ import {
   invoiceCountryUsesVatId,
   invoiceNeedsRegisteredAsCompany,
   invoiceNeedsVatId,
+  syncExistingAddressSelection,
 } from '@/utils/addressForm'
 
 const { t, locale } = useI18n()
@@ -70,9 +71,12 @@ const addressOptions = computed(() =>
     .map((addr) => {
       const id = addressIdOf(addr, '')
       if (!/^\d+$/.test(String(id).trim())) return null
+      const { primary, secondary } = formatAddressBookLines(addr, locale.value)
+      const fallback = formatOverviewAddress(addr, locale.value)
       return {
         value: String(Number(String(id).trim())),
-        label: addr.label || formatOverviewAddress(addr, locale.value),
+        label: primary || fallback,
+        subLabel: primary ? secondary : '',
       }
     })
     .filter(Boolean)
@@ -112,22 +116,31 @@ function setMode(useExisting) {
   const wantExisting = !!useExisting
   const prev = props.modelValue
   const newBlock = { ...emptyAddressNewFields(props.mode), ...(prev.new || {}) }
-
-  let addressId = prev.addressId
-  if (wantExisting) {
-    const stillValid = props.addresses.some((a) => addressIdOf(a) === String(addressId))
-    if (!stillValid) {
-      addressId = props.addresses[0] ? addressIdOf(props.addresses[0]) : ''
-    }
-  }
-
-  emit('update:modelValue', {
+  const base = {
     ...prev,
     useExisting: wantExisting,
-    addressId,
     new: newBlock,
-  })
+  }
+  emit(
+    'update:modelValue',
+    wantExisting ? syncExistingAddressSelection(base, props.addresses) : base,
+  )
 }
+
+function ensureExistingSelection() {
+  const next = syncExistingAddressSelection(props.modelValue, props.addresses)
+  const prevId = String(props.modelValue.addressId ?? '')
+  const nextId = String(next.addressId ?? '')
+  if (next.useExisting !== props.modelValue.useExisting || prevId !== nextId) {
+    emit('update:modelValue', next)
+  }
+}
+
+watch(
+  () => [props.addresses, props.modelValue.useExisting, props.modelValue.addressId],
+  ensureExistingSelection,
+  { immediate: true },
+)
 
 function setAddressId(id) {
   emit('update:modelValue', { ...props.modelValue, addressId: id })

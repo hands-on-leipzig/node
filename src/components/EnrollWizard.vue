@@ -19,6 +19,7 @@ import {
   buildNewAddressPayload,
   ADDRESS_MODE_INVOICE,
   ADDRESS_MODE_DELIVERY,
+  syncExistingAddressSelection,
 } from '@/utils/addressForm'
 import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
 import AddressSelector from '@/components/AddressSelector.vue'
@@ -1237,6 +1238,14 @@ async function loadAddresses() {
       if (invoiceAddress.value.useExisting === false) {
         invoiceAddress.value = { ...invoiceAddress.value, useExisting: true }
       }
+      deliveryAddress.value = syncExistingAddressSelection(
+        deliveryAddress.value,
+        deliveryAddresses.value,
+      )
+      invoiceAddress.value = syncExistingAddressSelection(
+        invoiceAddress.value,
+        invoiceAddresses.value,
+      )
     } else {
       deliveryAddress.value = { ...deliveryAddress.value, useExisting: false }
       invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }

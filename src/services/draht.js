@@ -86,7 +86,7 @@ export function getAddresses() {
 /**
  * Current coach identity from the API (Dolibarr contact id as set by Bearer middleware).
  * Prefer this over parsing the JWT in the browser — the claim name may differ or be omitted from tokenParsed.
- * @returns {Promise<{ data: { coachContactId: number } }>}
+ * @returns {Promise<{ data: { data: { coachContactId: number, defaultLang?: string } } }>}
  */
 export function getNodeCoachMe() {
   return api.get('/me')

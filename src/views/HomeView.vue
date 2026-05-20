@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { isAuthenticated, login, logout, getUserProfile, hasAdminRole } from '@/auth/keycloak'
 import {
-  setLocale,
+  setLocaleUserChoice,
   showTranslationKeys,
   setShowTranslationKeys,
   translationEditMode,
@@ -60,7 +60,7 @@ function doLogin() {
           type="button"
           class="pill-btn"
           :class="{ active: locale === 'de' }"
-          @click="setLocale('de')"
+          @click="setLocaleUserChoice('de')"
         >
           DE
         </button>
@@ -68,7 +68,7 @@ function doLogin() {
           type="button"
           class="pill-btn"
           :class="{ active: locale === 'en' }"
-          @click="setLocale('en')"
+          @click="setLocaleUserChoice('en')"
         >
           EN
         </button>

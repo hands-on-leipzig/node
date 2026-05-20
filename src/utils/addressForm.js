@@ -1,3 +1,5 @@
+import { isDolibarrRowId } from '@/services/draht'
+
 /** @typedef {'invoice' | 'delivery'} AddressFormMode */
 
 export const ADDRESS_MODE_INVOICE = 'invoice'
@@ -40,6 +42,38 @@ export function emptyAddressState(mode) {
     useExisting: true,
     addressId: '',
     new: emptyAddressNewFields(mode),
+  }
+}
+
+/** @param {Record<string, unknown> | null | undefined} addr */
+export function addressListEntryId(addr) {
+  if (!addr || typeof addr !== 'object') return ''
+  const raw = addr.id ?? addr.addressId ?? addr.rowid
+  return raw != null ? String(raw).trim() : ''
+}
+
+/**
+ * When "saved address" mode is on, ensure addressId points at a row in the list (defaults to first entry).
+ *
+ * @param {{ useExisting?: boolean, addressId?: string } | null | undefined} state
+ * @param {Array<Record<string, unknown>>} addresses
+ */
+export function syncExistingAddressSelection(state, addresses) {
+  if (!state || state.useExisting === false) return state
+  const list = Array.isArray(addresses) ? addresses : []
+  if (!list.length) {
+    return { ...state, addressId: '' }
+  }
+  const current = String(state.addressId ?? '').trim()
+  if (isDolibarrRowId(current) && list.some((a) => addressListEntryId(a) === current)) {
+    return state
+  }
+  const firstId = addressListEntryId(list[0])
+  if (!isDolibarrRowId(firstId)) return state
+  return {
+    ...state,
+    useExisting: true,
+    addressId: String(Number(firstId)),
   }
 }
 

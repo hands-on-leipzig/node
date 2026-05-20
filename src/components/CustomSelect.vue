@@ -4,7 +4,7 @@ import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition
 
 const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
-  /** @type {Array<{ value?: string|number, label?: string, heading?: boolean, disabled?: boolean }>} */
+  /** @type {Array<{ value?: string|number, label?: string, subLabel?: string, heading?: boolean, disabled?: boolean }>} */
   options: { type: Array, default: () => [] },
   placeholder: { type: String, default: '' },
   id: { type: String, default: '' },
@@ -74,6 +74,17 @@ const selectedOption = computed(() => {
 const displayLabel = computed(() => {
   const o = selectedOption.value
   return o ? (o.label ?? String(o.value)) : props.placeholder
+})
+
+const displaySubLabel = computed(() => {
+  const o = selectedOption.value
+  return o?.subLabel ? String(o.subLabel) : ''
+})
+
+const triggerAriaLabel = computed(() => {
+  if (!selectedOption.value) return props.placeholder || 'Choose option'
+  const parts = [displayLabel.value, displaySubLabel.value].filter(Boolean)
+  return parts.join(', ')
 })
 
 function moveHighlight(delta) {
@@ -162,11 +173,17 @@ onUnmounted(() => {
       :disabled="disabled"
       :aria-expanded="open"
       aria-haspopup="listbox"
-      :aria-label="placeholder || 'Choose option'"
+      :aria-label="triggerAriaLabel"
       @click.stop="toggle"
       @keydown="onKeydown"
     >
-      <span class="custom-select-value">{{ displayLabel }}</span>
+      <span
+        class="custom-select-value"
+        :class="{ 'custom-select-value--stacked': !!displaySubLabel }"
+      >
+        <span class="custom-select-value-primary">{{ displayLabel }}</span>
+        <span v-if="displaySubLabel" class="custom-select-value-secondary">{{ displaySubLabel }}</span>
+      </span>
       <span class="custom-select-chevron" aria-hidden="true">
         <i class="bi bi-chevron-down"></i>
       </span>
@@ -206,7 +223,13 @@ onUnmounted(() => {
             @click="select(opt)"
             @mouseenter="highlightedIndex = idx"
           >
-            {{ opt.label ?? opt.value }}
+            <span
+              class="custom-select-option-text"
+              :class="{ 'custom-select-option-text--stacked': !!opt.subLabel }"
+            >
+              <span class="custom-select-option-primary">{{ opt.label ?? opt.value }}</span>
+              <span v-if="opt.subLabel" class="custom-select-option-secondary">{{ opt.subLabel }}</span>
+            </span>
           </button>
           </template>
         </div>
@@ -235,6 +258,11 @@ onUnmounted(() => {
   cursor: pointer;
   text-align: left;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.custom-select-trigger:has(.custom-select-value--stacked) {
+  min-height: auto;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
 }
 .custom-select-trigger:not(.liquid-surface-control) {
   background-color: var(--color-bg-elevated);
@@ -265,6 +293,50 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.custom-select-value--stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  white-space: normal;
+}
+.custom-select-value-primary {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-select-value-secondary {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-select-option-text {
+  display: block;
+}
+.custom-select-option-text--stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.custom-select-option-primary {
+  display: block;
+  line-height: 1.3;
+}
+.custom-select-option-secondary {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+.custom-select-option.selected .custom-select-option-secondary {
+  color: color-mix(in srgb, var(--color-accent) 72%, var(--color-text-muted));
 }
 .custom-select-value:empty::before {
   content: attr(data-placeholder);
@@ -311,6 +383,10 @@ onUnmounted(() => {
 }
 .custom-select-heading--first {
   margin-top: 0.15rem;
+}
+.custom-select-option:has(.custom-select-option-text--stacked) {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 .custom-select-option {
   display: block;
