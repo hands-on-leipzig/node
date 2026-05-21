@@ -322,7 +322,7 @@ function resetToStandardShipment() {
                   class="tekla-versandaufschub"
                 >
                   <p v-if="hasShipmentDate" class="tekla-shipment-main">
-                    <I18nText k="detail.shipmentDateLabel" />
+                    <I18nText k="detail.shipmentDateLabel" />&nbsp;
                     <strong>{{ formatShipmentDate(plannedYmd, locale) }}</strong>
                   </p>
                   <p v-else class="tekla-shipment-hint">
@@ -339,9 +339,6 @@ function resetToStandardShipment() {
                     <I18nText k="detail.shipmentWednesdayHint" />
                   </p>
                   <div v-if="hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
-                    <p class="tekla-shipment-picker-intro">
-                      <I18nText k="detail.shipmentPickOptionalIntro" />
-                    </p>
                     <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
                         <I18nText k="detail.shipmentPickWednesday" />
                       </label>

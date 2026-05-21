@@ -284,7 +284,6 @@ export default {
         "shipmentEarliestChosen": "Chosen earliest shipment date: ",
         "shipmentEarliestIsStandard": "Default date (first Wednesday after summer holidays).",
         "shipmentWednesdayHint": "Shipment is automatically scheduled for the first Wednesday after the summer holidays in your region. You can optionally choose a different Wednesday (earlier or later).",
-        "shipmentPickOptionalIntro": "Optional: choose a different Wednesday as the shipment date",
         "shipmentPickWednesday": "Choose a different Wednesday",
         "shipmentChangeEarliest": "Change earliest shipment date",
         "shipmentResetStandard": "Reset to default",
