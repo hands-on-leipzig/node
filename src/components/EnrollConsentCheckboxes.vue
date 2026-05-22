@@ -125,7 +125,7 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
       </label>
 
       <label
-        class="enroll-consent-card enroll-consent-card--optional"
+        class="enroll-consent-card"
         :class="{ 'is-checked': consentNewsletter }"
         :for="`${idPrefix}-newsletter`"
       >
@@ -135,11 +135,11 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
           class="enroll-consent-native"
           type="checkbox"
         />
-        <span class="enroll-consent-tile enroll-consent-tile--soft" aria-hidden="true">
-          <i class="bi bi-envelope enroll-consent-tile-mark enroll-consent-tile-mark--mail"></i>
+        <span class="enroll-consent-tile" aria-hidden="true">
+          <i class="bi bi-check-lg enroll-consent-tile-mark"></i>
         </span>
         <span class="enroll-consent-body">
-          <span class="enroll-consent-label enroll-consent-label--optional">
+          <span class="enroll-consent-label">
             <I18nText k="enroll.consentNewsletter" />
           </span>
         </span>
@@ -245,12 +245,6 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
     0 6px 20px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
-.enroll-consent-card--optional.is-checked {
-  background: color-mix(in srgb, var(--color-text-muted) 8%, var(--color-bg-elevated));
-  border-color: color-mix(in srgb, var(--color-text-muted) 35%, var(--color-border));
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--color-text) 6%, transparent);
-}
-
 .enroll-consent-card:has(.enroll-consent-native:focus-visible) {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -287,11 +281,6 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
     transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.enroll-consent-tile--soft {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--color-text-muted) 40%, var(--color-border));
-}
-
 .enroll-consent-card:hover .enroll-consent-tile {
   border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
 }
@@ -307,14 +296,6 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
   transform: scale(1.02);
 }
 
-.enroll-consent-card--optional.is-checked .enroll-consent-tile {
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--color-text-muted) 75%, var(--color-bg)),
-    color-mix(in srgb, var(--color-text-muted) 95%, var(--color-text))
-  );
-}
-
 .enroll-consent-tile-mark {
   font-size: 0.95rem;
   line-height: 1;
@@ -325,25 +306,9 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
     transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.enroll-consent-tile-mark--mail {
-  font-size: 0.85rem;
-  opacity: 0.35;
-  transform: none;
-}
-
-.enroll-consent-card--optional:not(.is-checked) .enroll-consent-tile-mark--mail {
-  opacity: 0.45;
-}
-
 .enroll-consent-card.is-checked .enroll-consent-tile-mark {
   opacity: 1;
   transform: scale(1) rotate(0deg);
-}
-
-.enroll-consent-card--optional.is-checked .enroll-consent-tile-mark--mail {
-  opacity: 1;
-  color: #fff;
-  transform: none;
 }
 
 .enroll-consent-body {
@@ -356,10 +321,6 @@ const consentNewsletter = defineModel('consentNewsletter', { type: Boolean, defa
   font-size: var(--text-base, 0.9375rem);
   line-height: 1.5;
   color: var(--color-text);
-}
-
-.enroll-consent-label--optional {
-  color: var(--color-text-muted);
 }
 
 .required {
