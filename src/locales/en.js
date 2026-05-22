@@ -320,7 +320,11 @@ export default {
         "requestEventChange": "Request change of event",
         "eventSectionComingSoon": "Event registration and changes are temporarily disabled here and will be enabled later.",
         "coCoachFocusBanner": "This is where co-coaches for this team are listed. Linking works by e-mail invitation and confirmation by the invited person.",
-        "coCoachFocusDismiss": "Dismiss note"
+        "coCoachFocusDismiss": "Dismiss note",
+        "enrollmentContextBannerTeam": "This is the enrollment of team {teamRef} for the on-site event.",
+        "enrollmentContextBannerTeamSuffix": "The related group for the education program is part of the same Future registration and appears as a separate entry in the sidebar for technical reasons —",
+        "enrollmentContextBannerGroupLink": "group {groupRef}",
+        "enrollmentContextBannerTeamEnd": "."
     },
     "groupDetail": {
         "event": "Event",
@@ -343,7 +347,11 @@ export default {
         "registerForEventButton": "Register group for event",
         "registering": "Registering…",
         "registerEventSuccess": "Group has been registered for the event.",
-        "registerEventFailed": "Registration for the event failed."
+        "registerEventFailed": "Registration for the event failed.",
+        "enrollmentContextBannerGroup": "This is the enrollment of group {groupRef} for the education program (Future).",
+        "enrollmentContextBannerGroupSuffix": "For technical reasons, the related event teams appear as separate enrollments in the sidebar —",
+        "enrollmentContextBannerTeamListAnd": " and ",
+        "enrollmentContextBannerGroupEnd": "."
     },
     "dashboard": {
         "cockpitTitle": "My Coach Dashboard",

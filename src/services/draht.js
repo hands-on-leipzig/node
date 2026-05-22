@@ -350,6 +350,8 @@ export function normalizeNodeListRow(row) {
   const edition = row.edition === 'future' || row.edition === 'founders'
     ? row.edition
     : (program != null && isFutureProgram(program) ? 'future' : null)
+  const groupIdRaw = row.groupId ?? row.group_id
+  const groupId = groupIdRaw != null && groupIdRaw !== '' ? Number(groupIdRaw) : null
   return {
     id,
     name: name || `#${id}`,
@@ -357,6 +359,7 @@ export function normalizeNodeListRow(row) {
     ref: row.ref != null ? String(row.ref) : null,
     program: Number.isFinite(program) ? program : null,
     edition,
+    groupId: Number.isFinite(groupId) && groupId > 0 ? groupId : null,
   }
 }
 

@@ -9,6 +9,7 @@ import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
+import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -272,6 +273,7 @@ watch(
         @save-team-name="saveTeamName"
         @clear-team-name-error="teamNameError = ''"
       />
+      <FutureEnrollmentContextBanner kind="team" :card="team" />
 
       <!-- 2) Timeline -->
       <TeklaTimeline

@@ -287,6 +287,30 @@ const futureTeams = computed(() => teams.value.filter((t) => isFutureEnrollmentE
 const hasFoundersEnrollments = computed(() => foundersTeams.value.length > 0 || classes.value.length > 0)
 const hasFutureEnrollments = computed(() => groups.value.length > 0 || futureTeams.value.length > 0)
 
+/** Future sidebar: groups with nested event teams; orphan teams without groupId last. */
+const futureSidebarTree = computed(() => {
+  const teamsByGroup = new Map()
+  for (const g of groups.value) {
+    teamsByGroup.set(g.id, [])
+  }
+  const orphanTeams = []
+  for (const team of futureTeams.value) {
+    const gid = team.groupId != null ? Number(team.groupId) : 0
+    if (gid > 0 && teamsByGroup.has(gid)) {
+      teamsByGroup.get(gid).push(team)
+    } else {
+      orphanTeams.push(team)
+    }
+  }
+  return {
+    groups: groups.value.map((group) => ({
+      group,
+      teams: teamsByGroup.get(group.id) || [],
+    })),
+    orphanTeams,
+  }
+})
+
 const SIDEBAR_SECTIONS_STORAGE_KEY = 'handson.sidebarSections'
 
 function readSidebarSectionOpen(section, defaultOpen = true) {
@@ -439,27 +463,49 @@ const { canInstall, promptInstall } = usePwaInstall()
                 <span class="sidebar-section-toggle-label"><I18nText k="nav.sidebarSectionFuture" /></span>
               </button>
               <div v-show="futureSectionOpen" id="sidebar-section-future" class="sidebar-section-entries">
-                <button
-                  v-for="group in groups"
-                  :key="'group-' + group.id"
-                  type="button"
-                  class="sidebar-tekla-tile"
-                  :class="[
-                    { active: isGroupActive(group.id) },
-                    `sidebar-tekla-tile--${sidebarTeklaAccent(group)}`,
-                  ]"
-                  :title="sidebarTeklaAriaLabel(group, 'group')"
-                  :aria-label="sidebarTeklaAriaLabel(group, 'group')"
-                  @click="goGroup(group.id)"
+                <div
+                  v-for="entry in futureSidebarTree.groups"
+                  :key="'group-block-' + entry.group.id"
+                  class="sidebar-future-group-block"
                 >
-                  <span class="sidebar-tekla-tile-text">
-                    <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(group, 'group') }}</span>
-                    <span v-if="sidebarTeklaRefLabel(group)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(group) }}</span>
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    class="sidebar-tekla-tile"
+                    :class="[
+                      { active: isGroupActive(entry.group.id) },
+                      `sidebar-tekla-tile--${sidebarTeklaAccent(entry.group)}`,
+                    ]"
+                    :title="sidebarTeklaAriaLabel(entry.group, 'group')"
+                    :aria-label="sidebarTeklaAriaLabel(entry.group, 'group')"
+                    @click="goGroup(entry.group.id)"
+                  >
+                    <span class="sidebar-tekla-tile-text">
+                      <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(entry.group, 'group') }}</span>
+                      <span v-if="sidebarTeklaRefLabel(entry.group)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(entry.group) }}</span>
+                    </span>
+                  </button>
+                  <button
+                    v-for="team in entry.teams"
+                    :key="'future-team-' + team.id"
+                    type="button"
+                    class="sidebar-tekla-tile sidebar-tekla-tile--nested"
+                    :class="[
+                      { active: isTeamActive(team.id) },
+                      `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
+                    ]"
+                    :title="sidebarTeklaAriaLabel(team, 'team')"
+                    :aria-label="sidebarTeklaAriaLabel(team, 'team')"
+                    @click="goTeam(team.id)"
+                  >
+                    <span class="sidebar-tekla-tile-text">
+                      <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(team, 'team') }}</span>
+                      <span v-if="sidebarTeklaRefLabel(team)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(team) }}</span>
+                    </span>
+                  </button>
+                </div>
                 <button
-                  v-for="team in futureTeams"
-                  :key="'future-team-' + team.id"
+                  v-for="team in futureSidebarTree.orphanTeams"
+                  :key="'future-team-orphan-' + team.id"
                   type="button"
                   class="sidebar-tekla-tile"
                   :class="[
@@ -914,6 +960,22 @@ const { canInstall, promptInstall } = usePwaInstall()
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.15rem 0.35rem 0.35rem;
+}
+.sidebar-future-group-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.sidebar-tekla-tile--nested {
+  width: calc(100% - 0.85rem);
+  margin-left: 0.85rem;
+  padding-left: 0.55rem;
+  border-left-width: 2px;
+  font-size: 0.8125rem;
+}
+.sidebar-tekla-tile--nested .sidebar-tekla-tile-title {
+  font-weight: 600;
+  font-size: 0.8125rem;
 }
 .sidebar-section-hint {
   margin: 0.35rem 0.5rem 0.5rem;

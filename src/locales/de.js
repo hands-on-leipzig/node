@@ -320,7 +320,11 @@ export default {
         "requestEventChange": "Änderung der Veranstaltung anfragen",
         "eventSectionComingSoon": "Die Veranstaltungsanmeldung und Änderungen sind hier vorerst deaktiviert und werden später freigeschaltet.",
         "coCoachFocusBanner": "Hier findest du die Co-Coaches zu diesem Team. Verknüpfungen erfolgen per E-Mail-Einladung und Bestätigung durch die eingeladene Person.",
-        "coCoachFocusDismiss": "Hinweis ausblenden"
+        "coCoachFocusDismiss": "Hinweis ausblenden",
+        "enrollmentContextBannerTeam": "Dies ist die Anmeldung des Teams {teamRef} zum Vor-Ort-Event.",
+        "enrollmentContextBannerTeamSuffix": "Die zugehörige Gruppe zum Bildungsprogramm stammt aus derselben Future-Anmeldung und erscheint aus technischen Gründen als separater Eintrag in der Seitenleiste —",
+        "enrollmentContextBannerGroupLink": "Gruppe {groupRef}",
+        "enrollmentContextBannerTeamEnd": "."
     },
     "groupDetail": {
         "event": "Veranstaltung",
@@ -343,7 +347,11 @@ export default {
         "registerForEventButton": "Gruppe zum Event anmelden",
         "registering": "Wird angemeldet…",
         "registerEventSuccess": "Gruppe wurde für das Event angemeldet.",
-        "registerEventFailed": "Anmeldung für das Event fehlgeschlagen."
+        "registerEventFailed": "Anmeldung für das Event fehlgeschlagen.",
+        "enrollmentContextBannerGroup": "Dies ist die Anmeldung der Gruppe {groupRef} zum Bildungsprogramm (Future).",
+        "enrollmentContextBannerGroupSuffix": "Aus technischen Gründen erscheinen die zugehörigen Event-Teams als eigene Anmeldungen in der Seitenleiste —",
+        "enrollmentContextBannerTeamListAnd": " und ",
+        "enrollmentContextBannerGroupEnd": "."
     },
     "dashboard": {
         "cockpitTitle": "Mein Coach:in-Dashboard",

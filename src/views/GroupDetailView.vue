@@ -9,6 +9,7 @@ import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
+import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextBanner.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -89,6 +90,7 @@ watch(
     </div>
     <template v-else-if="group">
       <DetailTeklaHeader :card="group" kind="group" />
+      <FutureEnrollmentContextBanner kind="group" :card="group" />
 
       <TeklaTimeline
         v-if="timelineSteps.length"
