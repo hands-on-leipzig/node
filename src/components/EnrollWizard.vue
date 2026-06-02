@@ -2737,14 +2737,17 @@ watch(
 .wizard-backdrop {
   position: fixed;
   inset: 0;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
   background: radial-gradient(circle at top, rgba(37, 99, 235, 0.08), transparent 55%),
     radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.06), transparent 50%),
     var(--liquid-modal-scrim-bg, rgba(6, 6, 8, 0.78));
   backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.92));
   -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.92));
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   z-index: 9999;
   overflow: hidden;
 }
@@ -2752,9 +2755,10 @@ watch(
   width: 100%;
   height: 100%;
   min-height: 0;
-  max-height: 100%;
+  max-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(18rem, 38%) 1fr;
+  grid-template-columns: minmax(18rem, 38%) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--wizard-shell-fill);
   box-shadow: var(--liquid-shadow);
   overflow: hidden;
@@ -2816,6 +2820,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
+  scrollbar-gutter: stable;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-text-muted) 35%, transparent) transparent;
 }
@@ -2834,7 +2840,7 @@ html[data-theme='dark'] .wizard-sticky-top {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: min(70vh, 100%);
+  min-height: min(70vh, 100dvh);
 }
 .wizard-step:not(.wizard-step-form) .wizard-options {
   width: 100%;
@@ -2846,7 +2852,7 @@ html[data-theme='dark'] .wizard-sticky-top {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: min(65vh, 100%);
+  min-height: min(65vh, 100dvh);
   text-align: center;
 }
 .wizard-team-name-hero {
@@ -3923,6 +3929,11 @@ html[data-theme='dark'] .wizard-sticky-top {
   color: #f8fafc;
   display: flex;
   align-items: center;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   animation: wizardSlideIn 0.5s ease;
 }
 .wizard-hero-content {
@@ -4131,14 +4142,10 @@ html[data-theme='dark'] .wizard-sticky-top {
 }
 
 @media (max-width: 960px) {
-  .wizard-backdrop {
-    align-items: stretch;
-    justify-content: stretch;
-  }
   .wizard-modal {
     height: 100dvh;
     max-height: 100dvh;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
   }
   /* Full-screen mobile mode: hide large hero column */
@@ -4150,6 +4157,9 @@ html[data-theme='dark'] .wizard-sticky-top {
     height: 100%;
     max-height: 100dvh;
     flex: 1 1 auto;
+  }
+  .wizard-panel-main {
+    min-height: 0;
   }
 
   .wizard-header {
