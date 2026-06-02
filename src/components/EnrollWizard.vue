@@ -29,6 +29,7 @@ import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
+import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -804,28 +805,47 @@ const founderGenderOptions = computed(() => [
 
 let zipLookupTimer = null
 let zipLookupAbort = null
+const institutionZipPlaces = ref([])
+const institutionZipLoading = ref(false)
 
-async function lookupZipCityState() {
+function applyInstitutionPlace(item) {
+  if (!item) return
+  if (item.city) formData.value.city = item.city
+  if (item.state) formData.value.state = item.state
+  institutionZipPlaces.value = []
+}
+
+async function lookupInstitutionPlaces() {
   const zip = formData.value.zip?.trim()
-  let country = (formData.value.country || '').toLowerCase()
-  if (!zip) return
-  // Fallback: if no country selected but zip looks like DACH PLZ, try DE so Ort gets filled (Team/Class)
-  if (!country && /^\d{4,5}$/.test(zip)) country = 'de'
-  if (!country) return
+  if (!zip) {
+    institutionZipPlaces.value = []
+    institutionZipLoading.value = false
+    return
+  }
+  const country = normalizeCountryForZipLookup(formData.value.country, zip)
+  if (!country) {
+    institutionZipPlaces.value = []
+    return
+  }
   if (zipLookupAbort) zipLookupAbort.abort()
   zipLookupAbort = new AbortController()
+  institutionZipLoading.value = true
   try {
-    const res = await fetch(`https://api.zippopotam.us/${country}/${encodeURIComponent(zip)}`, { signal: zipLookupAbort.signal })
-    if (!res.ok) return
-    const data = await res.json()
-    const place = Array.isArray(data.places) && data.places.length ? data.places[0] : null
-    if (!place) return
-    const city = place['place name']
-    const state = place['state']
-    if (city) formData.value.city = city
-    if (state) formData.value.state = state
+    const places = await fetchPlacesForPostalCode(country, zip, { signal: zipLookupAbort.signal })
+    institutionZipPlaces.value = places
+    if (places.length === 1) {
+      applyInstitutionPlace(places[0])
+    } else if (places.length > 1) {
+      formData.value.city = ''
+      formData.value.state = ''
+    } else {
+      formData.value.city = ''
+      formData.value.state = ''
+    }
   } catch (_) {
-    // ignore lookup errors
+    institutionZipPlaces.value = []
+  } finally {
+    institutionZipLoading.value = false
   }
 }
 
@@ -963,12 +983,17 @@ function isInstitutionFieldMissing(field) {
   return false
 }
 
+function institutionPlaceSelectionPending() {
+  return institutionZipPlaces.value.length > 1
+}
+
 function hasRequiredInstitutionFields() {
   return !(
     isInstitutionFieldMissing('organization')
     || isInstitutionFieldMissing('schoolType')
     || isInstitutionFieldMissing('country')
     || isInstitutionFieldMissing('zip')
+    || institutionPlaceSelectionPending()
   )
 }
 
@@ -1832,11 +1857,12 @@ watch([step, foundersTeamNameStepIndex], () => {
 watch(
   () => [formData.value.country, formData.value.zip],
   () => {
+    institutionZipPlaces.value = []
     if (zipLookupTimer) clearTimeout(zipLookupTimer)
     zipLookupTimer = setTimeout(() => {
-      lookupZipCityState()
+      lookupInstitutionPlaces()
     }, 350)
-  }
+  },
 )
 </script>
 
@@ -2151,8 +2177,38 @@ watch(
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
                 </p>
+                <div v-if="institutionZipLoading" class="wizard-zip-lookup-state">
+                  <i class="bi bi-arrow-repeat spin" aria-hidden="true" />
+                  <I18nText k="enroll.addressLookupLoading" />
+                </div>
+                <template v-else-if="institutionZipPlaces.length > 1">
+                  <p class="wizard-zip-place-prompt">
+                    <I18nText k="enroll.selectPlaceFromList" />
+                  </p>
+                  <div class="wizard-zip-place-list" role="listbox">
+                    <button
+                      v-for="(place, idx) in institutionZipPlaces"
+                      :key="'wizard-inst-zip-' + idx"
+                      type="button"
+                      class="wizard-zip-place-item"
+                      @click="applyInstitutionPlace(place)"
+                    >
+                      <span class="wizard-zip-place-item-main">{{ place.postalCode }} {{ place.city }}</span>
+                      <span v-if="place.state" class="wizard-zip-place-item-sub">{{ place.state }}</span>
+                    </button>
+                  </div>
+                  <p
+                    v-if="step4ValidationAttempted && institutionPlaceSelectionPending()"
+                    class="wizard-form-field-error"
+                  >
+                    <I18nText k="enroll.selectPlaceFromList" />
+                  </p>
+                </template>
               </div>
-              <div v-if="formData.city || formData.state" class="wizard-institution-place liquid-surface liquid-surface--radius-lg liquid-surface--accent liquid-surface--accent-blue">
+              <div
+                v-if="(formData.city || formData.state) && institutionZipPlaces.length <= 1"
+                class="wizard-institution-place liquid-surface liquid-surface--radius-lg liquid-surface--accent liquid-surface--accent-blue"
+              >
                 <span class="wizard-institution-place-label"><I18nText k="enroll.location" /></span>
                 <span class="wizard-institution-place-value">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
@@ -3339,6 +3395,52 @@ html[data-theme='dark'] .wizard-sticky-top {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
   color: #dc2626;
+}
+.wizard-zip-lookup-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.wizard-zip-place-prompt {
+  margin: 0.5rem 0 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.wizard-zip-place-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+.wizard-zip-place-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-elevated);
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font: inherit;
+  color: var(--color-text);
+}
+.wizard-zip-place-item:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+}
+.wizard-zip-place-item-main {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.wizard-zip-place-item-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
 }
 .wizard-institution-place {
   display: flex;

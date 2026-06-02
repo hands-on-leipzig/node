@@ -12,6 +12,10 @@ import {
   invoiceNeedsVatId,
   syncExistingAddressSelection,
 } from '@/utils/addressForm'
+import {
+  fetchPlacesForPostalCode,
+  normalizeCountryForZipLookup,
+} from '@/utils/postalCodeLookup'
 import I18nText from "@/components/I18nText.vue";
 
 const { t, locale } = useI18n()
@@ -192,15 +196,6 @@ function clearAutocompleteState() {
   if (streetAbortController) streetAbortController.abort()
 }
 
-function normalizeCountryForZipLookup(rawCountry, rawZip) {
-  const country = String(rawCountry || '').trim().toLowerCase()
-  const zip = String(rawZip || '').trim()
-  if (country) return country
-  // Fallback for common DACH-style numeric postcodes when no country selected.
-  if (/^\d{4,5}$/.test(zip)) return 'de'
-  return ''
-}
-
 function onCountryChange(value) {
   const base = { ...(props.modelValue.new || {}), country: value }
   emit('update:modelValue', {
@@ -228,37 +223,24 @@ function onZipInput(value) {
 
 async function lookupZip(rawZip, country) {
   const zip = String(rawZip || '').trim()
-  if (!zip || !country) return
+  const resolvedCountry = normalizeCountryForZipLookup(country, zip)
+  if (!zip || !resolvedCountry) return
   if (zipAbortController) zipAbortController.abort()
   zipAbortController = new AbortController()
   zipLoading.value = true
   try {
-    const res = await fetch(`https://api.zippopotam.us/${encodeURIComponent(country)}/${encodeURIComponent(zip)}`, {
+    const places = await fetchPlacesForPostalCode(resolvedCountry, zip, {
       signal: zipAbortController.signal,
     })
-    if (!res.ok) {
-      zipSuggestions.value = []
-      return
-    }
-    const data = await res.json()
-    const places = Array.isArray(data?.places) ? data.places : []
-    const normalized = places.map((p) => ({
-      postalCode: data['post code'] || zip,
-      city: p['place name'] || '',
-      state: p.state || '',
-      country,
-    }))
-    const seen = new Set()
-    zipSuggestions.value = normalized.filter((s) => {
-      const key = `${s.postalCode}|${s.city}|${s.state}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    }).slice(0, 6)
-    if (zipSuggestions.value.length === 1) {
-      const only = zipSuggestions.value[0]
+    zipSuggestions.value = places
+    if (places.length === 1) {
+      const only = places[0]
       if (only.city) setNewField('city', only.city)
       if (only.state) setNewField('state', only.state)
+      zipSuggestions.value = []
+    } else if (places.length > 1) {
+      setNewField('city', '')
+      setNewField('state', '')
     }
   } catch (_) {
     zipSuggestions.value = []
@@ -516,7 +498,10 @@ onBeforeUnmount(() => {
               <div v-if="zipLoading" class="autocomplete-state">
               <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
               </div>
-              <div v-else-if="zipSuggestions.length" class="autocomplete-list" role="listbox">
+              <p v-else-if="zipSuggestions.length > 1" class="autocomplete-prompt">
+                <I18nText k="enroll.selectPlaceFromList" />
+              </p>
+              <div v-if="zipSuggestions.length > 1" class="autocomplete-list" role="listbox">
                 <button
                   v-for="(s, i) in zipSuggestions"
                   :key="idPrefix + '-zip-s-' + i"
@@ -919,6 +904,12 @@ onBeforeUnmount(() => {
 }
 .field-row .field-flex {
   flex: 2;
+}
+.autocomplete-prompt {
+  margin: 0.35rem 0 0.25rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 .autocomplete-wrap {
   position: relative;

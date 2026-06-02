@@ -502,6 +502,7 @@ export default {
         "voucherCodeLabel": "Voucher code",
         "voucherChecking": "Checking voucher…",
         "addressLookupLoading": "Looking up address…",
+        "selectPlaceFromList": "Please select your locality:",
         "voucherValid": "Voucher is valid.",
         "voucherInvalid": "Voucher code is invalid or not applicable.",
         "voucherInvoiceForced": "Due to the voucher, the invoice address has been set automatically.",

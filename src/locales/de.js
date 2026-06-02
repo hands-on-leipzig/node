@@ -502,6 +502,7 @@ export default {
         "voucherCodeLabel": "Voucher-Code",
         "voucherChecking": "Gutschein wird geprüft…",
         "addressLookupLoading": "Adresse wird gesucht…",
+        "selectPlaceFromList": "Bitte Ort auswählen:",
         "voucherValid": "Gutschein ist gültig.",
         "voucherInvalid": "Gutscheincode ist ungültig oder nicht anwendbar.",
         "voucherInvoiceForced": "Durch den Gutschein wurde die Rechnungsadresse automatisch gesetzt.",
