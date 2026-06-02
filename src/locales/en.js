@@ -512,6 +512,8 @@ export default {
         "enterNewAddress": "New address",
         "enterNewAddressHint": "Enter street, postal code, city, and country.",
         "noSavedAddresses": "No saved addresses yet.",
+        "deliveryNoteHeading": "Shipping note:",
+        "deliveryNote": "Shipping of the season materials is scheduled by default for the first Wednesday after the summer holidays in your federal state. Optionally, you may choose an earlier or later Wednesday. The earliest possible shipping date is 05 August 2026. After submitting your registration, you can adjust the shipping date at any time in the dashboard.",
         "street": "Street, number",
         "postalCode": "Postal code",
         "city": "City",

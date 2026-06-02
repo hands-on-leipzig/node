@@ -12,6 +12,7 @@ import {
   invoiceNeedsVatId,
   syncExistingAddressSelection,
 } from '@/utils/addressForm'
+import I18nText from "@/components/I18nText.vue";
 
 const { t, locale } = useI18n()
 
@@ -35,11 +36,6 @@ const props = defineProps({
   label: {
     type: String,
     required: true,
-  },
-  /** Set false when the parent already renders a section heading (avoids duplicate titles). */
-  showLabel: {
-    type: Boolean,
-    default: true,
   },
   idPrefix: {
     type: String,
@@ -380,7 +376,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="address-selector">
-    <label v-if="showLabel" class="address-label">{{ label }}</label>
+    <h4 class="address-label">{{ label }}</h4>
     <div
       class="address-mode-cards"
       role="radiogroup"
@@ -714,11 +710,10 @@ onBeforeUnmount(() => {
   margin-bottom: 1.25rem;
 }
 .address-label {
-  display: block;
-  font-size: var(--text-base);
-  font-weight: 500;
+  margin: 0 0 0.55rem;
+  font-size: 0.97rem;
+  font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 0.5rem;
 }
 .address-mode-cards {
   display: grid;
@@ -850,14 +845,6 @@ onBeforeUnmount(() => {
 .field-required {
   color: var(--color-accent, #2563eb);
   font-weight: 600;
-}
-.address-subsection-title {
-  margin: 1.25rem 0 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--color-border);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--color-text);
 }
 .field-label-block {
   display: block;

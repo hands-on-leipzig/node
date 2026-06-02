@@ -33,6 +33,7 @@ import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
 import logoFounders from '@/assets/first_canopy_fll_founders_edition_rgb_fullcolor.png'
+import I18nText from "@/components/I18nText.vue";
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -2422,8 +2423,8 @@ watch(
           <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
-              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
               <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+                <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
                 <div class="field voucher-invoice-forced">
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
@@ -2434,7 +2435,6 @@ watch(
                 mode="invoice"
                 :addresses="invoiceAddresses"
                 :label="t('enroll.invoiceAddress')"
-                :show-label="false"
                 id-prefix="wizard-invoice"
               />
             </div>
@@ -2443,6 +2443,12 @@ watch(
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
+
+              <div style="margin-bottom: .5rem;">
+                <h4><I18nText k="enroll.deliveryNoteHeading" /></h4>
+                <p><I18nText k="enroll.deliveryNote" /></p>
+              </div>
+
               <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" mode="delivery" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
             </div>
           </div>
@@ -2538,8 +2544,8 @@ watch(
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
-              <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
               <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+                <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
                 <div class="field voucher-invoice-forced">
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
                 </div>
@@ -2550,7 +2556,6 @@ watch(
                 mode="invoice"
                 :addresses="invoiceAddresses"
                 :label="t('enroll.invoiceAddress')"
-                :show-label="false"
                 id-prefix="wizard-invoice"
               />
             </div>

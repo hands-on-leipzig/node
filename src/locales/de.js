@@ -512,6 +512,8 @@ export default {
         "enterNewAddress": "Neue Adresse",
         "enterNewAddressHint": "Straße, PLZ, Ort und Land eintragen.",
         "noSavedAddresses": "Es sind noch keine gespeicherten Adressen vorhanden.",
+        "deliveryNoteHeading": "Hinweis zum Versand:",
+        "deliveryNote": "Der Versand der Saisonmaterialien erfolgt standardmäßig am ersten Mittwoch nach den Sommerferien deines Bundeslands. Optional kannst du auch einen früheren oder späteren Mittwoch auswählen. Der frühestmögliche Versandtermin ist der 05.08.2026. Nach dem Absenden der Anmeldung kannst du den Versandtermin jederzeit im Dashboard anpassen.",
         "street": "Straße, Hausnummer",
         "postalCode": "PLZ",
         "city": "Ort",
