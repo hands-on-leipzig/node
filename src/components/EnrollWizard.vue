@@ -114,6 +114,34 @@ const effectiveSeasonSetCount = computed(() => {
   const w = Number(wizardSeasonSetCount.value)
   return [0, 1, 2].includes(w) ? w : 1
 })
+
+/** Voucher/form preset fixes season set count — user must not choose. */
+const seasonSetsPresetLocked = computed(() => {
+  const n = presetSeasonSetCount.value
+  return n != null && [0, 1, 2].includes(n)
+})
+
+function isSeasonSetsWizardStep(s) {
+  if (edition.value === 'future' && s === 5) return true
+  return edition.value === 'founders'
+    && foundersNeedsSeasonSets.value
+    && s === foundersSeasonSetsStep.value
+}
+
+function shouldSkipSeasonSetsWizardStep() {
+  if (!seasonSetsPresetLocked.value) return false
+  if (edition.value === 'future') return true
+  return foundersNeedsSeasonSets.value
+}
+
+/** Step index after moving forward/backward, skipping the season-sets step when preset-locked. */
+function adjustStepForSeasonSetsSkip(s, direction) {
+  let n = s + direction
+  if (shouldSkipSeasonSetsWizardStep() && isSeasonSetsWizardStep(n)) {
+    n += direction
+  }
+  return n
+}
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
 // Founder team: participants (first name, last name, date of birth, gender)
@@ -259,7 +287,11 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.progressDetails', active: s === 3, done: s > 3 },
       { key: 'wizard.progressParticipants', active: s === 4, done: s > 4 },
-      { key: 'wizard.progressSeasonSets', active: s === 5, done: s > 5 },
+      {
+        key: 'wizard.progressSeasonSets',
+        active: s === 5 && !shouldSkipSeasonSetsWizardStep(),
+        done: s > 5 || shouldSkipSeasonSetsWizardStep(),
+      },
       { key: 'wizard.progressOnSite', active: s === 6, done: s > 6 },
       { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
       { key: 'wizard.progressReview', active: s === 8, done: success.value },
@@ -278,7 +310,11 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressEvent', active: s === 7, done: s > 7 },
     ]
     if (foundersNeedsSeasonSets.value) {
-      items.push({ key: 'wizard.progressSeasonSets', active: s === 8, done: s > 8 })
+      items.push({
+        key: 'wizard.progressSeasonSets',
+        active: s === 8 && !shouldSkipSeasonSetsWizardStep(),
+        done: s > 8 || shouldSkipSeasonSetsWizardStep(),
+      })
     }
     items.push(
       { key: 'wizard.progressAddresses', active: s === addr, done: s > addr },
@@ -295,7 +331,11 @@ const wizardProgressSteps = computed(() => {
     { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
   ]
   if (foundersNeedsSeasonSets.value) {
-    items.push({ key: 'wizard.progressSeasonSets', active: s === foundersSeasonSetsStep.value, done: s > foundersSeasonSetsStep.value })
+    items.push({
+      key: 'wizard.progressSeasonSets',
+      active: s === foundersSeasonSetsStep.value && !shouldSkipSeasonSetsWizardStep(),
+      done: s > foundersSeasonSetsStep.value || shouldSkipSeasonSetsWizardStep(),
+    })
   }
   items.push(
     { key: 'wizard.progressAddresses', active: s === addr, done: s > addr },
@@ -530,7 +570,7 @@ function seasonSetsStepIndex() {
 }
 
 function selectWizardSeasonSetCount(count) {
-  if (presetSeasonSetCount.value != null && [0, 1, 2].includes(presetSeasonSetCount.value)) return
+  if (seasonSetsPresetLocked.value) return
   wizardSeasonSetCount.value = count
   const expected = seasonSetsStepIndex()
   if (expected >= 0) scheduleAdvanceIfReady(expected)
@@ -626,6 +666,18 @@ watch(
     refreshFuturePupilCompare()
   },
   { immediate: true },
+)
+
+watch(
+  [seasonSetsPresetLocked, () => step.value, edition, foundersNeedsSeasonSets],
+  () => {
+    if (!props.open) return
+    if (!shouldSkipSeasonSetsWizardStep()) return
+    if (!isSeasonSetsWizardStep(step.value)) return
+    nextTick(() => {
+      if (canNext()) next()
+    })
+  },
 )
 
 const summaryItems = computed(() => {
@@ -1073,11 +1125,13 @@ function canNext() {
   }
   if (s === 5) {
     if (edition.value === 'future') {
+      if (shouldSkipSeasonSetsWizardStep()) return true
       const w = Number(wizardSeasonSetCount.value)
       return [0, 1, 2].includes(w)
     }
     if (foundersClassEnrollment.value) {
       if (foundersNeedsSeasonSets.value) {
+        if (shouldSkipSeasonSetsWizardStep()) return true
         const w = Number(wizardSeasonSetCount.value)
         return [0, 1, 2].includes(w)
       }
@@ -1114,6 +1168,7 @@ function canNext() {
     if (edition.value === 'future') return false
     if (ft) {
       if (foundersNeedsSeasonSets.value) {
+        if (shouldSkipSeasonSetsWizardStep()) return true
         const w = Number(wizardSeasonSetCount.value)
         return [0, 1, 2].includes(w)
       }
@@ -1163,11 +1218,15 @@ function next() {
   }
   if (step.value < lastStep.value) {
     if (step.value === institutionStepIndex.value && foundersClassEnrollment.value) {
-      step.value = foundersNeedsSeasonSets.value
-        ? foundersSeasonSetsStep.value
-        : foundersAddressesStep.value
+      if (foundersNeedsSeasonSets.value) {
+        step.value = shouldSkipSeasonSetsWizardStep()
+          ? foundersAddressesStep.value
+          : foundersSeasonSetsStep.value
+      } else {
+        step.value = foundersAddressesStep.value
+      }
     } else {
-      step.value++
+      step.value = adjustStepForSeasonSetsSkip(step.value, 1)
     }
   }
   step4ValidationAttempted.value = false
@@ -1201,17 +1260,19 @@ function prev() {
       if (step.value === foundersOrderStep.value) {
         step.value = foundersAddressesStep.value
       } else if (step.value === foundersAddressesStep.value && foundersNeedsSeasonSets.value) {
-        step.value = foundersSeasonSetsStep.value
+        step.value = shouldSkipSeasonSetsWizardStep()
+          ? institutionStepIndex.value
+          : foundersSeasonSetsStep.value
       } else if (
         step.value === foundersSeasonSetsStep.value
         || (step.value === foundersAddressesStep.value && !foundersNeedsSeasonSets.value)
       ) {
         step.value = institutionStepIndex.value
       } else {
-        step.value--
+        step.value = adjustStepForSeasonSetsSkip(step.value, -1)
       }
     } else {
-      step.value--
+      step.value = adjustStepForSeasonSetsSkip(step.value, -1)
     }
   }
 }
@@ -1484,6 +1545,7 @@ function firstIncompleteEnrollmentStep() {
     if (!futureGroup.value) return 2
     if (!hasRequiredInstitutionFields()) return 3
     if (futurePupils.value == null) return 4
+    if (shouldSkipSeasonSetsWizardStep()) return 6
     return 5
   }
   if (edition.value === 'founders') {
@@ -1494,7 +1556,10 @@ function firstIncompleteEnrollmentStep() {
       if (!hasRequiredTeamName()) return 5
       return 6
     }
-    if (foundersNeedsSeasonSets.value) return foundersSeasonSetsStep.value
+    if (foundersNeedsSeasonSets.value) {
+      if (shouldSkipSeasonSetsWizardStep()) return foundersAddressesStep.value
+      return foundersSeasonSetsStep.value
+    }
     return foundersAddressesStep.value
   }
   return 1
@@ -2311,7 +2376,7 @@ watch(
 
           <!-- Season sets (Future step 5 / Founders class / Founder team) -->
           <div
-            v-show="(step === 5 && edition === 'future') || (edition === 'founders' && foundersNeedsSeasonSets && step === foundersSeasonSetsStep)"
+            v-show="!shouldSkipSeasonSetsWizardStep() && ((step === 5 && edition === 'future') || (edition === 'founders' && foundersNeedsSeasonSets && step === foundersSeasonSetsStep))"
             class="wizard-step wizard-step-animate wizard-step-season-sets"
           >
             <div class="wizard-season-sets-intro">
