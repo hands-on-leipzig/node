@@ -23,7 +23,9 @@ import {
 } from '@/utils/addressForm'
 import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
 import AddressSelector from '@/components/AddressSelector.vue'
+import CountryNativeSelect from '@/components/CountryNativeSelect.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
+import { institutionAutocomplete, institutionFieldName } from '@/utils/addressAutofill'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
@@ -846,14 +848,12 @@ const schoolTypeWizardOptions = computed(() => {
   return out
 })
 
-const countryWizardSelectOptions = computed(() => {
-  const out = []
-  out.push({ heading: true, label: t('enroll.countriesTop') })
-  out.push(...countryOptions.value.top)
-  out.push({ heading: true, label: t('enroll.countriesOther') })
-  out.push(...countryOptions.value.rest)
-  return out
-})
+const institutionCountryGroups = computed(() => ({
+  topLabel: t('enroll.countriesTop'),
+  top: countryOptions.value.top,
+  restLabel: t('enroll.countriesOther'),
+  rest: countryOptions.value.rest,
+}))
 
 const founderGenderOptions = computed(() => [
   { value: 'M', label: t('detail.genderM') },
@@ -1038,6 +1038,11 @@ function isInstitutionFieldMissing(field) {
   if (field === 'schoolType') return requiresSchoolDetails && !formData.value.schoolType
   if (field === 'country') return requiresLocation && !formData.value.country?.trim()
   if (field === 'zip') return requiresLocation && !formData.value.zip?.trim()
+  if (field === 'city') {
+    return requiresLocation
+      && institutionZipPlaces.value.length <= 1
+      && !formData.value.city?.trim()
+  }
   return false
 }
 
@@ -1051,6 +1056,7 @@ function hasRequiredInstitutionFields() {
     || isInstitutionFieldMissing('schoolType')
     || isInstitutionFieldMissing('country')
     || isInstitutionFieldMissing('zip')
+    || isInstitutionFieldMissing('city')
     || institutionPlaceSelectionPending()
   )
 }
@@ -2167,9 +2173,11 @@ watch(
               <p class="wizard-institution-intro-text"><I18nText k="wizard.institutionLead" /></p>
               <p class="wizard-institution-intro-meta"><I18nText k="wizard.requiredLegend" /></p>
             </div>
-            <div
+            <form
               v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'"
               class="wizard-institution-fields"
+              autocomplete="on"
+              @submit.prevent
             >
               <div
                 class="wizard-form-field"
@@ -2204,7 +2212,8 @@ watch(
                   class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('organization') }"
                   :disabled="isPrivateInstitution"
-                  autocomplete="organization"
+                  :name="institutionFieldName('organization')"
+                  :autocomplete="institutionAutocomplete('organization')"
                 >
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('organization')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2217,13 +2226,15 @@ watch(
                 <label class="wizard-form-field-label" for="wizard-institution-country">
                   <I18nText k="enroll.schoolCountry" /> <span class="required">*</span>
                 </label>
-                <CustomSelect
+                <CountryNativeSelect
                   id="wizard-institution-country"
                   v-model="formData.country"
-                  surface
-                  surface-accent
-                  :options="countryWizardSelectOptions"
+                  variant="wizard"
+                  :name="institutionFieldName('country')"
+                  :autocomplete="institutionAutocomplete('country')"
+                  :groups="institutionCountryGroups"
                   :placeholder="t('enroll.selectCountry')"
+                  required
                 />
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2243,7 +2254,8 @@ watch(
                   class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('zip') }"
                   inputmode="numeric"
-                  autocomplete="postal-code"
+                  :name="institutionFieldName('postalCode')"
+                  :autocomplete="institutionAutocomplete('postalCode')"
                 >
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2277,13 +2289,32 @@ watch(
                 </template>
               </div>
               <div
-                v-if="(formData.city || formData.state) && institutionZipPlaces.length <= 1"
-                class="wizard-institution-place liquid-surface liquid-surface--radius-lg liquid-surface--accent liquid-surface--accent-blue"
+                class="wizard-form-field"
+                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('city') }"
               >
-                <span class="wizard-institution-place-label"><I18nText k="enroll.location" /></span>
-                <span class="wizard-institution-place-value">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
+                <label class="wizard-form-field-label" for="wizard-institution-city">
+                  <I18nText k="enroll.city" /> <span class="required">*</span>
+                </label>
+                <input
+                  id="wizard-institution-city"
+                  v-model="formData.city"
+                  type="text"
+                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                  :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('city') }"
+                  :name="institutionFieldName('city')"
+                  :autocomplete="institutionAutocomplete('city')"
+                >
+                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('city')" class="wizard-form-field-error">
+                  <I18nText k="common.requiredField" />
+                </p>
               </div>
-            </div>
+              <p
+                v-if="formData.state && institutionZipPlaces.length <= 1"
+                class="wizard-institution-state-hint"
+              >
+                {{ formData.state }}
+              </p>
+            </form>
           </div>
 
           <!-- Step 4 (Future): pupils -->

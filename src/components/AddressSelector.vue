@@ -2,7 +2,9 @@
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CustomSelect from '@/components/CustomSelect.vue'
+import CountryNativeSelect from '@/components/CountryNativeSelect.vue'
 import { formatAddressBookLines, formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { addressAutocomplete, addressFieldName } from '@/utils/addressAutofill'
 import {
   emptyAddressNewFields,
   ADDRESS_MODE_INVOICE,
@@ -100,6 +102,14 @@ const streetContextReady = computed(() => {
   const zip = (props.modelValue.new?.postalCode || '').trim()
   return country.length > 0 && zip.length >= 3
 })
+
+function ac(field) {
+  return addressAutocomplete(props.mode, field)
+}
+
+function fn(field) {
+  return addressFieldName(props.idPrefix, field)
+}
 
 const countryOptions = computed(() => {
   const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
@@ -432,7 +442,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <template v-else>
-      <div class="address-fields">
+      <form class="address-fields" autocomplete="on" @submit.prevent>
         <template v-if="isInvoiceMode">
           <div class="field">
             <label :for="idPrefix + '-institution'">
@@ -440,20 +450,24 @@ onBeforeUnmount(() => {
             </label>
             <input
               :id="idPrefix + '-institution'"
+              :name="fn('institution')"
               type="text"
               required
+              :autocomplete="ac('institution')"
               :value="modelValue.new?.institution"
               @input="setNewField('institution', $event.target.value)"
-            />
+            >
           </div>
           <div class="field">
             <label :for="idPrefix + '-contactPerson'"><I18nText k="enroll.contactPerson" /></label>
             <input
-                :id="idPrefix + '-contactPerson'"
-                type="text"
-                :value="modelValue.new?.contactPerson"
-                @input="setNewField('contactPerson', $event.target.value)"
-            />
+              :id="idPrefix + '-contactPerson'"
+              :name="fn('contactPerson')"
+              type="text"
+              :autocomplete="ac('contactPerson')"
+              :value="modelValue.new?.contactPerson"
+              @input="setNewField('contactPerson', $event.target.value)"
+            >
           </div>
         </template>
         <template v-else-if="isDeliveryMode">
@@ -463,22 +477,27 @@ onBeforeUnmount(() => {
             </label>
             <input
               :id="idPrefix + '-name'"
+              :name="fn('name')"
               type="text"
               required
+              :autocomplete="ac('name')"
               :value="modelValue.new?.name"
               @input="setNewField('name', $event.target.value)"
-            />
+            >
           </div>
         </template>
         <div class="field field-select">
           <label :for="idPrefix + '-country'">
             <I18nText k="enroll.country" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
           </label>
-          <CustomSelect
+          <CountryNativeSelect
             :id="idPrefix + '-country'"
+            :name="fn('country')"
             :model-value="(modelValue.new?.country || '').toLowerCase()"
-            :options="countryOptions"
+            :autocomplete="ac('country')"
             :placeholder="t('enroll.selectCountry')"
+            :options="countryOptions"
+            required
             @update:model-value="onCountryChange"
           />
         </div>
@@ -490,11 +509,14 @@ onBeforeUnmount(() => {
             <div class="autocomplete-wrap">
               <input
                 :id="idPrefix + '-postalCode'"
+                :name="fn('postalCode')"
                 type="text"
                 required
+                inputmode="numeric"
+                :autocomplete="ac('postalCode')"
                 :value="modelValue.new?.postalCode"
                 @input="onZipInput($event.target.value)"
-              />
+              >
               <div v-if="zipLoading" class="autocomplete-state">
               <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
               </div>
@@ -521,11 +543,13 @@ onBeforeUnmount(() => {
             </label>
             <input
               :id="idPrefix + '-city'"
+              :name="fn('city')"
               type="text"
               required
+              :autocomplete="ac('city')"
               :value="modelValue.new?.city"
               @input="setNewField('city', $event.target.value)"
-            />
+            >
           </div>
         </div>
         <div class="field">
@@ -535,13 +559,16 @@ onBeforeUnmount(() => {
           <div class="autocomplete-wrap">
             <input
               :id="idPrefix + '-street'"
+              :name="fn('street')"
               type="text"
               required
-              :disabled="!streetContextReady"
+              :readonly="!streetContextReady"
+              :class="{ 'address-input-readonly': !streetContextReady }"
+              :autocomplete="ac('street')"
               :placeholder="streetContextReady ? '' : t('enroll.street')"
               :value="modelValue.new?.street"
               @input="onStreetInput($event.target.value)"
-            />
+            >
             <div v-if="streetLoading" class="autocomplete-state">
               <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
             </div>
@@ -564,10 +591,12 @@ onBeforeUnmount(() => {
             <label :for="idPrefix + '-addressLine3-invoice'"><I18nText k="enroll.addressLine3" /></label>
             <input
               :id="idPrefix + '-addressLine3-invoice'"
+              :name="fn('addressLine3')"
               type="text"
+              :autocomplete="ac('addressLine3')"
               :value="modelValue.new?.addressLine3"
               @input="setNewField('addressLine3', $event.target.value)"
-            />
+            >
           </div>
         </template>
         <template v-else-if="isDeliveryMode">
@@ -575,19 +604,23 @@ onBeforeUnmount(() => {
             <label :for="idPrefix + '-addressLine2'"><I18nText k="enroll.addressLine2" /></label>
             <input
               :id="idPrefix + '-addressLine2'"
+              :name="fn('addressLine2')"
               type="text"
+              :autocomplete="ac('addressLine2')"
               :value="modelValue.new?.addressLine2"
               @input="setNewField('addressLine2', $event.target.value)"
-            />
+            >
           </div>
           <div class="field">
             <label :for="idPrefix + '-addressLine3-delivery'"><I18nText k="enroll.addressLine3" /></label>
             <input
               :id="idPrefix + '-addressLine3-delivery'"
+              :name="fn('addressLine3')"
               type="text"
+              :autocomplete="ac('addressLine3')"
               :value="modelValue.new?.addressLine3"
               @input="setNewField('addressLine3', $event.target.value)"
-            />
+            >
           </div>
         </template>
         <template v-if="isInvoiceMode">
@@ -595,28 +628,34 @@ onBeforeUnmount(() => {
             <label :for="idPrefix + '-leitwegId'"><I18nText k="enroll.leitwegId" /></label>
             <input
               :id="idPrefix + '-leitwegId'"
+              :name="fn('leitwegId')"
               type="text"
+              autocomplete="off"
               :value="modelValue.new?.leitwegId"
               @input="setNewField('leitwegId', $event.target.value)"
-            />
+            >
           </div>
           <div class="field">
             <label :for="idPrefix + '-supplierNumber'"><I18nText k="enroll.supplierNumber" /></label>
             <input
               :id="idPrefix + '-supplierNumber'"
+              :name="fn('supplierNumber')"
               type="text"
+              autocomplete="off"
               :value="modelValue.new?.supplierNumber"
               @input="setNewField('supplierNumber', $event.target.value)"
-            />
+            >
           </div>
           <div class="field">
             <label :for="idPrefix + '-orderReference'"><I18nText k="enroll.orderReference" /></label>
             <input
               :id="idPrefix + '-orderReference'"
+              :name="fn('orderReference')"
               type="text"
+              autocomplete="off"
               :value="modelValue.new?.orderReference"
               @input="setNewField('orderReference', $event.target.value)"
-            />
+            >
           </div>
           <div class="field">
             <span class="field-label-block">
@@ -651,11 +690,13 @@ onBeforeUnmount(() => {
             </label>
             <input
               :id="idPrefix + '-vatId'"
+              :name="fn('vatId')"
               type="text"
               required
+              autocomplete="off"
               :value="modelValue.new?.vatId"
               @input="setNewField('vatId', $event.target.value)"
-            />
+            >
           </div>
           <div v-if="showRegisteredAsCompanyField" class="field">
             <span class="field-label-block">
@@ -685,7 +726,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </template>
-      </div>
+      </form>
     </template>
   </div>
 </template>
@@ -890,6 +931,11 @@ onBeforeUnmount(() => {
 .address-fields input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+.address-fields input.address-input-readonly {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: color-mix(in srgb, var(--color-text-muted) 6%, var(--color-bg-elevated));
 }
 .address-fields .field-select :deep(.custom-select-trigger) {
   min-height: var(--touch);
