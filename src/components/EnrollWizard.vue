@@ -23,14 +23,13 @@ import {
 } from '@/utils/addressForm'
 import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
 import AddressSelector from '@/components/AddressSelector.vue'
-import CountryNativeSelect from '@/components/CountryNativeSelect.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
-import { institutionAutocomplete, institutionFieldName } from '@/utils/addressAutofill'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
+import { extractLockedSeasonSetCount } from '@/utils/voucherPreset'
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
@@ -130,19 +129,27 @@ function isSeasonSetsWizardStep(s) {
     && s === foundersSeasonSetsStep.value
 }
 
-function shouldSkipSeasonSetsWizardStep() {
+const shouldSkipSeasonSetsWizardStep = computed(() => {
   if (!seasonSetsPresetLocked.value) return false
   if (edition.value === 'future') return true
   return foundersNeedsSeasonSets.value
-}
+})
 
 /** Step index after moving forward/backward, skipping the season-sets step when preset-locked. */
 function adjustStepForSeasonSetsSkip(s, direction) {
   let n = s + direction
-  if (shouldSkipSeasonSetsWizardStep() && isSeasonSetsWizardStep(n)) {
+  if (shouldSkipSeasonSetsWizardStep.value && isSeasonSetsWizardStep(n)) {
     n += direction
   }
   return n
+}
+
+/** If we landed on the season-sets step although count is voucher-locked, advance once more. */
+function skipSeasonSetsStepIfNeeded() {
+  if (!shouldSkipSeasonSetsWizardStep.value) return
+  if (!isSeasonSetsWizardStep(step.value)) return
+  if (!canNext()) return
+  step.value = adjustStepForSeasonSetsSkip(step.value, 1)
 }
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
@@ -291,8 +298,8 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressParticipants', active: s === 4, done: s > 4 },
       {
         key: 'wizard.progressSeasonSets',
-        active: s === 5 && !shouldSkipSeasonSetsWizardStep(),
-        done: s > 5 || shouldSkipSeasonSetsWizardStep(),
+        active: s === 5 && !shouldSkipSeasonSetsWizardStep.value,
+        done: s > 5 || shouldSkipSeasonSetsWizardStep.value,
       },
       { key: 'wizard.progressOnSite', active: s === 6, done: s > 6 },
       { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
@@ -314,8 +321,8 @@ const wizardProgressSteps = computed(() => {
     if (foundersNeedsSeasonSets.value) {
       items.push({
         key: 'wizard.progressSeasonSets',
-        active: s === 8 && !shouldSkipSeasonSetsWizardStep(),
-        done: s > 8 || shouldSkipSeasonSetsWizardStep(),
+        active: s === 8 && !shouldSkipSeasonSetsWizardStep.value,
+        done: s > 8 || shouldSkipSeasonSetsWizardStep.value,
       })
     }
     items.push(
@@ -335,8 +342,8 @@ const wizardProgressSteps = computed(() => {
   if (foundersNeedsSeasonSets.value) {
     items.push({
       key: 'wizard.progressSeasonSets',
-      active: s === foundersSeasonSetsStep.value && !shouldSkipSeasonSetsWizardStep(),
-      done: s > foundersSeasonSetsStep.value || shouldSkipSeasonSetsWizardStep(),
+      active: s === foundersSeasonSetsStep.value && !shouldSkipSeasonSetsWizardStep.value,
+      done: s > foundersSeasonSetsStep.value || shouldSkipSeasonSetsWizardStep.value,
     })
   }
   items.push(
@@ -408,6 +415,7 @@ function scheduleAdvanceIfReady(expectedStep) {
     if (step.value !== expectedStep) return
     if (!canNext()) return
     next()
+    skipSeasonSetsStepIfNeeded()
   })
 }
 
@@ -674,10 +682,10 @@ watch(
   [seasonSetsPresetLocked, () => step.value, edition, foundersNeedsSeasonSets],
   () => {
     if (!props.open) return
-    if (!shouldSkipSeasonSetsWizardStep()) return
+    if (!shouldSkipSeasonSetsWizardStep.value) return
     if (!isSeasonSetsWizardStep(step.value)) return
     nextTick(() => {
-      if (canNext()) next()
+      skipSeasonSetsStepIfNeeded()
     })
   },
 )
@@ -848,12 +856,14 @@ const schoolTypeWizardOptions = computed(() => {
   return out
 })
 
-const institutionCountryGroups = computed(() => ({
-  topLabel: t('enroll.countriesTop'),
-  top: countryOptions.value.top,
-  restLabel: t('enroll.countriesOther'),
-  rest: countryOptions.value.rest,
-}))
+const countryWizardSelectOptions = computed(() => {
+  const out = []
+  out.push({ heading: true, label: t('enroll.countriesTop') })
+  out.push(...countryOptions.value.top)
+  out.push({ heading: true, label: t('enroll.countriesOther') })
+  out.push(...countryOptions.value.rest)
+  return out
+})
 
 const founderGenderOptions = computed(() => [
   { value: 'M', label: t('detail.genderM') },
@@ -1038,11 +1048,6 @@ function isInstitutionFieldMissing(field) {
   if (field === 'schoolType') return requiresSchoolDetails && !formData.value.schoolType
   if (field === 'country') return requiresLocation && !formData.value.country?.trim()
   if (field === 'zip') return requiresLocation && !formData.value.zip?.trim()
-  if (field === 'city') {
-    return requiresLocation
-      && institutionZipPlaces.value.length <= 1
-      && !formData.value.city?.trim()
-  }
   return false
 }
 
@@ -1056,7 +1061,6 @@ function hasRequiredInstitutionFields() {
     || isInstitutionFieldMissing('schoolType')
     || isInstitutionFieldMissing('country')
     || isInstitutionFieldMissing('zip')
-    || isInstitutionFieldMissing('city')
     || institutionPlaceSelectionPending()
   )
 }
@@ -1137,13 +1141,13 @@ function canNext() {
   }
   if (s === 5) {
     if (edition.value === 'future') {
-      if (shouldSkipSeasonSetsWizardStep()) return true
+      if (shouldSkipSeasonSetsWizardStep.value) return true
       const w = Number(wizardSeasonSetCount.value)
       return [0, 1, 2].includes(w)
     }
     if (foundersClassEnrollment.value) {
       if (foundersNeedsSeasonSets.value) {
-        if (shouldSkipSeasonSetsWizardStep()) return true
+        if (shouldSkipSeasonSetsWizardStep.value) return true
         const w = Number(wizardSeasonSetCount.value)
         return [0, 1, 2].includes(w)
       }
@@ -1180,7 +1184,7 @@ function canNext() {
     if (edition.value === 'future') return false
     if (ft) {
       if (foundersNeedsSeasonSets.value) {
-        if (shouldSkipSeasonSetsWizardStep()) return true
+        if (shouldSkipSeasonSetsWizardStep.value) return true
         const w = Number(wizardSeasonSetCount.value)
         return [0, 1, 2].includes(w)
       }
@@ -1231,7 +1235,7 @@ function next() {
   if (step.value < lastStep.value) {
     if (step.value === institutionStepIndex.value && foundersClassEnrollment.value) {
       if (foundersNeedsSeasonSets.value) {
-        step.value = shouldSkipSeasonSetsWizardStep()
+        step.value = shouldSkipSeasonSetsWizardStep.value
           ? foundersAddressesStep.value
           : foundersSeasonSetsStep.value
       } else {
@@ -1240,6 +1244,7 @@ function next() {
     } else {
       step.value = adjustStepForSeasonSetsSkip(step.value, 1)
     }
+    skipSeasonSetsStepIfNeeded()
   }
   step4ValidationAttempted.value = false
 }
@@ -1272,7 +1277,7 @@ function prev() {
       if (step.value === foundersOrderStep.value) {
         step.value = foundersAddressesStep.value
       } else if (step.value === foundersAddressesStep.value && foundersNeedsSeasonSets.value) {
-        step.value = shouldSkipSeasonSetsWizardStep()
+        step.value = shouldSkipSeasonSetsWizardStep.value
           ? institutionStepIndex.value
           : foundersSeasonSetsStep.value
       } else if (
@@ -1439,6 +1444,19 @@ function logVoucherDebug(label, payload) {
   console.info(`[EnrollWizard][voucher] ${label}`, payload)
 }
 
+/**
+ * Lock season set count from voucher form_preset (seasonSetCount / num_boards)
+ * or Versandvorlage via API field force_numberOfBoards (top-level on validate response).
+ * @returns {boolean} whether count was locked
+ */
+function applyVoucherSeasonSetLock(sources) {
+  const setsNum = extractLockedSeasonSetCount(sources)
+  if (setsNum == null) return false
+  presetSeasonSetCount.value = setsNum
+  wizardSeasonSetCount.value = setsNum
+  return true
+}
+
 function applyVoucherPreset(raw) {
   const data = raw && typeof raw === 'object' && raw.preset && typeof raw.preset === 'object' ? raw.preset : raw
   if (!data || typeof data !== 'object') {
@@ -1482,11 +1500,7 @@ function applyVoucherPreset(raw) {
     presetBranch = 'no_matching_rule'
   }
 
-  const setsNum = data.seasonSetCount != null ? Number(data.seasonSetCount) : (data.num_boards != null ? Number(data.num_boards) : NaN)
-  if ([0, 1, 2].includes(setsNum)) {
-    presetSeasonSetCount.value = setsNum
-    wizardSeasonSetCount.value = setsNum
-  }
+  applyVoucherSeasonSetLock(data)
   if (typeof data.registerEventTeams === 'boolean') {
     presetRegisterEventTeams.value = data.registerEventTeams
   } else if (data.registerEventTeams == null) {
@@ -1557,7 +1571,7 @@ function firstIncompleteEnrollmentStep() {
     if (!futureGroup.value) return 2
     if (!hasRequiredInstitutionFields()) return 3
     if (futurePupils.value == null) return 4
-    if (shouldSkipSeasonSetsWizardStep()) return 6
+    if (shouldSkipSeasonSetsWizardStep.value) return 6
     return 5
   }
   if (edition.value === 'founders') {
@@ -1569,7 +1583,7 @@ function firstIncompleteEnrollmentStep() {
       return 6
     }
     if (foundersNeedsSeasonSets.value) {
-      if (shouldSkipSeasonSetsWizardStep()) return foundersAddressesStep.value
+      if (shouldSkipSeasonSetsWizardStep.value) return foundersAddressesStep.value
       return foundersSeasonSetsStep.value
     }
     return foundersAddressesStep.value
@@ -1676,6 +1690,7 @@ async function validateVoucherCode() {
       }
       if (presetFromApi) applyVoucherPreset(presetFromApi)
       else logVoucherDebug('validate: no preset object on API body', { code, apiType: body?.type, apiKeys })
+      if (body) applyVoucherSeasonSetLock(body)
     }
 
     logVoucherDebug('validate: summary', {
@@ -2173,11 +2188,9 @@ watch(
               <p class="wizard-institution-intro-text"><I18nText k="wizard.institutionLead" /></p>
               <p class="wizard-institution-intro-meta"><I18nText k="wizard.requiredLegend" /></p>
             </div>
-            <form
+            <div
               v-if="edition === 'future' || foundersType === 'class' || foundersType === 'team'"
               class="wizard-institution-fields"
-              autocomplete="on"
-              @submit.prevent
             >
               <div
                 class="wizard-form-field"
@@ -2212,8 +2225,7 @@ watch(
                   class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('organization') }"
                   :disabled="isPrivateInstitution"
-                  :name="institutionFieldName('organization')"
-                  :autocomplete="institutionAutocomplete('organization')"
+                  autocomplete="off"
                 >
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('organization')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2226,15 +2238,13 @@ watch(
                 <label class="wizard-form-field-label" for="wizard-institution-country">
                   <I18nText k="enroll.schoolCountry" /> <span class="required">*</span>
                 </label>
-                <CountryNativeSelect
+                <CustomSelect
                   id="wizard-institution-country"
                   v-model="formData.country"
-                  variant="wizard"
-                  :name="institutionFieldName('country')"
-                  :autocomplete="institutionAutocomplete('country')"
-                  :groups="institutionCountryGroups"
+                  surface
+                  surface-accent
+                  :options="countryWizardSelectOptions"
                   :placeholder="t('enroll.selectCountry')"
-                  required
                 />
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('country')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2254,8 +2264,7 @@ watch(
                   class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('zip') }"
                   inputmode="numeric"
-                  :name="institutionFieldName('postalCode')"
-                  :autocomplete="institutionAutocomplete('postalCode')"
+                  autocomplete="off"
                 >
                 <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('zip')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
@@ -2289,32 +2298,13 @@ watch(
                 </template>
               </div>
               <div
-                class="wizard-form-field"
-                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isInstitutionFieldMissing('city') }"
+                v-if="(formData.city || formData.state) && institutionZipPlaces.length <= 1"
+                class="wizard-institution-place liquid-surface liquid-surface--radius-lg liquid-surface--accent liquid-surface--accent-blue"
               >
-                <label class="wizard-form-field-label" for="wizard-institution-city">
-                  <I18nText k="enroll.city" /> <span class="required">*</span>
-                </label>
-                <input
-                  id="wizard-institution-city"
-                  v-model="formData.city"
-                  type="text"
-                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
-                  :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('city') }"
-                  :name="institutionFieldName('city')"
-                  :autocomplete="institutionAutocomplete('city')"
-                >
-                <p v-if="step4ValidationAttempted && isInstitutionFieldMissing('city')" class="wizard-form-field-error">
-                  <I18nText k="common.requiredField" />
-                </p>
+                <span class="wizard-institution-place-label"><I18nText k="enroll.location" /></span>
+                <span class="wizard-institution-place-value">{{ [formData.city, formData.state].filter(Boolean).join(', ') }}</span>
               </div>
-              <p
-                v-if="formData.state && institutionZipPlaces.length <= 1"
-                class="wizard-institution-state-hint"
-              >
-                {{ formData.state }}
-              </p>
-            </form>
+            </div>
           </div>
 
           <!-- Step 4 (Future): pupils -->
@@ -2413,7 +2403,7 @@ watch(
 
           <!-- Season sets (Future step 5 / Founders class / Founder team) -->
           <div
-            v-show="!shouldSkipSeasonSetsWizardStep() && ((step === 5 && edition === 'future') || (edition === 'founders' && foundersNeedsSeasonSets && step === foundersSeasonSetsStep))"
+            v-show="!shouldSkipSeasonSetsWizardStep && ((step === 5 && edition === 'future') || (edition === 'founders' && foundersNeedsSeasonSets && step === foundersSeasonSetsStep))"
             class="wizard-step wizard-step-animate wizard-step-season-sets"
           >
             <div class="wizard-season-sets-intro">

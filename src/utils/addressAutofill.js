@@ -36,23 +36,3 @@ export function addressAutocomplete(mode, field) {
 export function addressFieldName(idPrefix, field) {
   return `${idPrefix}-${field}`
 }
-
-/**
- * Institution / school location (wizard step — not billing/shipping on the same screen).
- * @param {string} field
- */
-export function institutionAutocomplete(field) {
-  /** @type {Record<string, string>} */
-  const map = {
-    organization: 'organization',
-    postalCode: 'postal-code',
-    city: 'address-level2',
-    state: 'address-level1',
-    country: 'country',
-  }
-  return map[field] ?? 'on'
-}
-
-export function institutionFieldName(field) {
-  return `wizard-institution-${field}`
-}

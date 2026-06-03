@@ -48,6 +48,7 @@ handsonApi.interceptors.response.use((response) => response, responseErrorHandle
  * Voucher is valid when the API returns message "VoucherValid" (i.e. type !== 'error').
  * - type '1': forces invoice address; response includes data.id (societe id) and data.name; use data.id as invoice_adr when submitting.
  * - type '2' / '3': no invoice override; optional `preset` from voucher program (edition, program, group, …) for enrollment wizard.
+ * - `force_numberOfBoards` (1|2): fixed season set count from Versandvorlage — not inside `preset`; wizard maps this to seasonSetCount.
  *
  * @param {string} code - Voucher code (e.g. user-entered ref)
  * @param {number} [program] - Optional program id (team: 1/2, class: 4/5, future groups: 6/7). If omitted, validates without program.
@@ -63,7 +64,9 @@ export async function validateVoucher(code, program = null) {
   const body = res.data
   // Valid when API does not return type 'error' (success responses have type '1' or '2' and message e.g. VoucherValid)
   const valid = body && body.type !== 'error'
-  const voucherType = valid && (body.type === '1' || body.type === '2') ? String(body.type) : null
+  const voucherType = valid && (body.type === '1' || body.type === '2' || body.type === '3')
+    ? String(body.type)
+    : null
   const invoiceAddressId = voucherType === '1' && body.data && body.data.id != null ? Number(body.data.id) : null
   const invoiceAddressName = voucherType === '1' && body.data && body.data.name ? String(body.data.name) : null
   return {
