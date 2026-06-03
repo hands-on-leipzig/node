@@ -680,10 +680,16 @@ watch(
   },
 )
 
+const summaryVoucherCode = computed(() => {
+  const code = voucher.value?.trim()
+  if (!code || voucherValid.value !== true) return ''
+  return code
+})
+
 const summaryItems = computed(() => {
   const items = []
-  if (voucher.value?.trim() && voucherValid.value === true) {
-    items.push({ label: t('wizard.entryByCode') })
+  if (summaryVoucherCode.value) {
+    items.push({ label: `${t('enroll.voucher')}: ${summaryVoucherCode.value}` })
   }
   if (edition.value === 'founders') {
     items.push({ label: t('dashboard.editionFounders') })
@@ -2605,6 +2611,10 @@ watch(
                 <span><I18nText k="wizard.orderOnSiteEvent" /></span>
                 <strong class="wizard-cart-multi-lines">{{ futureTeamEventSummaries.join(' · ') }}</strong>
               </div>
+              <div v-if="summaryVoucherCode" class="wizard-cart-row">
+                <span><I18nText k="enroll.voucher" /></span>
+                <strong>{{ summaryVoucherCode }}</strong>
+              </div>
               <div class="wizard-cart-divider" role="presentation" />
               <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
               <p v-if="pricingLoading" class="wizard-hint"><I18nText k="wizard.pricingLoading" /></p>
@@ -2730,9 +2740,9 @@ watch(
                 <span><I18nText k="detail.players" /></span>
                 <strong>{{ founderTeamPlayers.filter((p) => p.firstname || p.name || p.gender || p.birthdayStr).length }}</strong>
               </div>
-              <div v-if="voucher?.trim()" class="wizard-cart-row">
+              <div v-if="summaryVoucherCode" class="wizard-cart-row">
                 <span><I18nText k="enroll.voucher" /></span>
-                <strong>{{ voucherValid === true ? (voucherMessage || voucher) : voucher }}</strong>
+                <strong>{{ summaryVoucherCode }}</strong>
               </div>
               <div class="wizard-cart-divider" role="presentation" />
               <h4 class="wizard-cart-subtitle"><I18nText k="wizard.orderPricesHeading" /></h4>
