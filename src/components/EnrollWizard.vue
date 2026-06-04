@@ -168,6 +168,12 @@ const deliveryAddresses = ref([])
 const invoiceAddresses = ref([])
 const deliveryAddressDifferent = ref(false)
 
+/** Voucher sets invoice (Thirdparty) — delivery must be a separate contact address, not “same as invoice”. */
+const voucherForcesInvoiceAddress = computed(
+  () => (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value))
+    || isDolibarrRowId(voucherPresetInvoiceId.value),
+)
+
 const consentDataProcessing = ref(false)
 const consentTerms = ref(false)
 const consentNewsletter = ref(false)
@@ -1400,6 +1406,9 @@ function buildInvoicePayload() {
 }
 
 function buildDeliveryPayload() {
+  if (voucherForcesInvoiceAddress.value) {
+    return buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
+  }
   if (!deliveryAddressDifferent.value) {
     return { sameAsInvoice: true }
   }
@@ -1408,8 +1417,16 @@ function buildDeliveryPayload() {
 
 /** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
 function isDeliveryAddressValid() {
+  if (voucherForcesInvoiceAddress.value) {
+    return !!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
+  }
   if (!deliveryAddressDifferent.value) return isInvoiceAddressValid()
   return !!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
+}
+
+function syncDeliveryRequiredForVoucherInvoice() {
+  if (!voucherForcesInvoiceAddress.value) return
+  deliveryAddressDifferent.value = true
 }
 
 /** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
@@ -1533,6 +1550,7 @@ function applyVoucherPreset(raw) {
       useExisting: true,
       addressId: String(invId),
     }
+    syncDeliveryRequiredForVoucherInvoice()
   }
 
   const fd = data.formDefaults
@@ -1691,6 +1709,7 @@ async function validateVoucherCode() {
       if (presetFromApi) applyVoucherPreset(presetFromApi)
       else logVoucherDebug('validate: no preset object on API body', { code, apiType: body?.type, apiKeys })
       if (body) applyVoucherSeasonSetLock(body)
+      syncDeliveryRequiredForVoucherInvoice()
     }
 
     logVoucherDebug('validate: summary', {
@@ -1956,6 +1975,16 @@ watch(
     }, 350)
   },
 )
+
+watch(voucherForcesInvoiceAddress, (forced) => {
+  if (forced) syncDeliveryRequiredForVoucherInvoice()
+})
+
+watch(deliveryAddressDifferent, (different) => {
+  if (voucherForcesInvoiceAddress.value && !different) {
+    deliveryAddressDifferent.value = true
+  }
+})
 </script>
 
 <template>
@@ -2587,7 +2616,10 @@ watch(
               />
             </div>
             <div class="wizard-address-section">
-              <label class="wizard-delivery-toggle">
+              <p v-if="voucherForcesInvoiceAddress" class="wizard-hint wizard-hint-required">
+                <i class="bi bi-info-circle"></i> <I18nText k="wizard.deliveryRequiredVoucherInvoice" />
+              </p>
+              <label v-else class="wizard-delivery-toggle">
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
@@ -2597,7 +2629,14 @@ watch(
                 <p><I18nText k="enroll.deliveryNote" /></p>
               </div>
 
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" mode="delivery" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <AddressSelector
+                v-if="deliveryAddressDifferent || voucherForcesInvoiceAddress"
+                v-model="deliveryAddress"
+                mode="delivery"
+                :addresses="deliveryAddresses"
+                :label="t('enroll.deliveryAddress')"
+                id-prefix="wizard-delivery"
+              />
             </div>
           </div>
 
@@ -2712,11 +2751,25 @@ watch(
               />
             </div>
             <div class="wizard-address-section">
-              <label class="wizard-delivery-toggle">
+              <p v-if="voucherForcesInvoiceAddress" class="wizard-hint wizard-hint-required">
+                <i class="bi bi-info-circle"></i> <I18nText k="wizard.deliveryRequiredVoucherInvoice" />
+              </p>
+              <label v-else class="wizard-delivery-toggle">
                 <input v-model="deliveryAddressDifferent" type="checkbox">
                 <span><I18nText k="wizard.deliveryDifferentToggle" /></span>
               </label>
-              <AddressSelector v-if="deliveryAddressDifferent" v-model="deliveryAddress" mode="delivery" :addresses="deliveryAddresses" :label="t('enroll.deliveryAddress')" id-prefix="wizard-delivery" />
+              <div v-if="voucherForcesInvoiceAddress" style="margin-bottom: .5rem;">
+                <h4><I18nText k="enroll.deliveryNoteHeading" /></h4>
+                <p><I18nText k="enroll.deliveryNote" /></p>
+              </div>
+              <AddressSelector
+                v-if="deliveryAddressDifferent || voucherForcesInvoiceAddress"
+                v-model="deliveryAddress"
+                mode="delivery"
+                :addresses="deliveryAddresses"
+                :label="t('enroll.deliveryAddress')"
+                id-prefix="wizard-delivery"
+              />
             </div>
           </div>
 

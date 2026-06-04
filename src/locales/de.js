@@ -752,6 +752,7 @@ export default {
         "teamSingular": "Team",
         "teamsPlural": "Teams",
         "deliveryDifferentToggle": "Lieferadresse weicht von Rechnungsadresse ab",
+        "deliveryRequiredVoucherInvoice": "Der Gutschein legt die Rechnungsadresse fest. Bitte gib an, wohin die Saisonmaterialien geliefert werden sollen.",
         "eventTeamAutoUpgraded": "Wir haben die Gruppengröße automatisch auf {pupils} erhöht, damit {teams} Teams angemeldet werden können.",
         "eventTeamUpgradeNeeded": "Für {teams} Teams brauchst du mindestens {pupils} Teilnehmende. Möchtest du die Teilnehmendenzahl jetzt erhöhen?",
         "eventTeamUpgradeAction": "Teilnehmendenzahl erhöhen",

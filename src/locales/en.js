@@ -752,6 +752,7 @@ export default {
         "teamSingular": "Team",
         "teamsPlural": "Teams",
         "deliveryDifferentToggle": "Delivery address differs from invoice address",
+        "deliveryRequiredVoucherInvoice": "The voucher sets the invoice address. Please enter where the season materials should be delivered.",
         "eventTeamAutoUpgraded": "We automatically increased group size to {pupils} so {teams} teams can be registered.",
         "eventTeamUpgradeNeeded": "{teams} teams require at least {pupils} participants. Do you want to increase your participant count now?",
         "eventTeamUpgradeAction": "Increase participant count",
