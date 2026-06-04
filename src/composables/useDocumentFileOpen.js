@@ -29,7 +29,7 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
   async function openViaStream(driveId, itemId, file) {
     const blob = await getDocumentsFileStreamBlob(driveId, itemId)
     if (!blob) {
-      openExternalUrl(file?.url || '')
+      // Do not fall back to file.url — Graph webUrl opens the library/folder, not the file for guests.
       return
     }
     const blobUrl = URL.createObjectURL(blob)
@@ -57,7 +57,12 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
           return
         }
         const guestUrl = String(link?.url || '').trim()
-        if (guestUrl) {
+        const via = String(link?.via || '')
+        const preferStream =
+          link?.useStream ||
+          via === 'stream_proxy' ||
+          (guestUrl && /\/:f:\//i.test(guestUrl))
+        if (!preferStream && guestUrl) {
           if (isPdfDocumentFile(file) && tryOpenPdfAsBlob) {
             const ok = await tryOpenPdfAsBlob(guestUrl, title)
             if (ok) return
