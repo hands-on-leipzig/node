@@ -61,30 +61,51 @@ watch(
 </template>
 
 <style scoped>
+/* Mobile: edge-to-edge PDF. From 640px: ~2em margin around the viewer. */
 .pdf-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
+  flex-direction: column;
+  padding:
+    env(safe-area-inset-top, 0)
+    env(safe-area-inset-right, 0)
+    env(safe-area-inset-bottom, 0)
+    env(safe-area-inset-left, 0);
   background: var(--liquid-modal-scrim-bg);
 }
 
 .pdf-modal-box {
-  width: 100%;
-  max-width: 56rem;
-  max-height: 90vh;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  max-height: 100dvh;
+  max-height: 100vh;
   background: var(--liquid-popover-fill);
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-lg);
+  border: none;
+  border-radius: 0;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
   -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+}
+
+@media (min-width: 640px) {
+  .pdf-modal-backdrop {
+    padding:
+      max(2em, env(safe-area-inset-top, 0px))
+      max(2em, env(safe-area-inset-right, 0px))
+      max(2em, env(safe-area-inset-bottom, 0px))
+      max(2em, env(safe-area-inset-left, 0px));
+  }
+
+  .pdf-modal-box {
+    border: 1px solid var(--liquid-border);
+    border-radius: var(--radius-lg);
+  }
 }
 
 .pdf-modal-header {
@@ -129,14 +150,13 @@ watch(
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: stretch;
-  justify-content: stretch;
+  flex-direction: column;
 }
 
 .pdf-modal-iframe {
+  flex: 1;
   width: 100%;
-  height: 75vh;
-  min-height: 20rem;
+  min-height: 0;
   border: none;
 }
 
