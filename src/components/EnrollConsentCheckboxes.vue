@@ -36,9 +36,9 @@ async function openTermsPdf(event) {
   event.preventDefault()
   event.stopPropagation()
 
-  const proxyBlob = await getParticipationTermsPdfBlobUrl(locale.value)
-  if (proxyBlob) {
-    await openPdf(proxyBlob, t('enroll.consentTermsPdfTitle'))
+  const proxyBlobUrl = await getParticipationTermsPdfBlobUrl(locale.value)
+  if (proxyBlobUrl) {
+    await openPdf(proxyBlobUrl, t('enroll.consentTermsPdfTitle'))
     return
   }
 

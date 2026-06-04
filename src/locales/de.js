@@ -364,6 +364,7 @@ export default {
         "registrationClosedHint": "Der Anmeldezeitraum hat noch nicht begonnen.",
         "documentsForDownload": "Coach:innen-Dokumente",
         "documentsLoadingList": "Dateien werden aus SharePoint geladen…",
+        "documentsOpeningFile": "Dokument wird geöffnet…",
         "documentsGraphNoFiles": "Der Ordner konnte nicht automatisch aufgelistet werden. Öffne den Ordner unten oder bitte einen Admin, Microsoft Graph (MS_CLIENT_*) und die Ordner-URL zu prüfen.",
         "documentsDescription": "Nützliche Dokumente für Coach:innen.",
         "documentsOpenMobile": "Dokumente öffnen",

@@ -389,6 +389,7 @@ export default {
         "coCoachTypeGroup": "Group",
         "documentsForDownload": "Docs for coaches",
         "documentsLoadingList": "Loading files from SharePoint…",
+        "documentsOpeningFile": "Opening document…",
         "documentsGraphNoFiles": "The folder could not be listed automatically. Open the folder below or ask an admin to check Microsoft Graph (MS_CLIENT_*) and the folder URL.",
         "documentsDescription": "Useful docs for coaches.",
         "documentsOpenMobile": "Open documents",

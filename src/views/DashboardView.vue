@@ -19,6 +19,7 @@ import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
+import DocumentsFileOpeningOverlay from '@/components/DocumentsFileOpeningOverlay.vue'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
@@ -292,6 +293,8 @@ const documentsConfig = ref({
 })
 const documentsLoading = ref(false)
 const documentsLoadedOnce = ref(false)
+const documentsFileOpening = ref(false)
+const documentsFileOpeningName = ref('')
 const documentsModalOpen = ref(false)
 const pdfModalOpen = ref(false)
 const pdfModalUrl = ref('')
@@ -498,23 +501,17 @@ function closeDocumentsModal() {
   documentsModalOpen.value = false
 }
 
-async function tryOpenPdfAsBlob(rawUrl, title) {
-  try {
-    const res = await fetch(rawUrl, { credentials: 'include' })
-    if (!res.ok) return false
-    const blob = await res.blob()
-    if (!blob || blob.size <= 0) return false
-    if (pdfModalBlobUrl.value) {
-      URL.revokeObjectURL(pdfModalBlobUrl.value)
-    }
-    pdfModalBlobUrl.value = URL.createObjectURL(blob)
-    pdfModalUrl.value = pdfModalBlobUrl.value
-    pdfModalTitle.value = title
-    pdfModalOpen.value = true
-    return true
-  } catch {
-    return false
+/** @param {Blob} blob */
+async function openPdfFromBlob(blob, title) {
+  if (!blob || blob.size < 100) return false
+  if (pdfModalBlobUrl.value) {
+    URL.revokeObjectURL(pdfModalBlobUrl.value)
   }
+  pdfModalBlobUrl.value = URL.createObjectURL(blob)
+  pdfModalUrl.value = pdfModalBlobUrl.value
+  pdfModalTitle.value = title
+  pdfModalOpen.value = true
+  return true
 }
 
 function openExternalUrl(url) {
@@ -523,7 +520,7 @@ function openExternalUrl(url) {
 }
 
 const { openDocumentFile } = useDocumentFileOpen({
-  tryOpenPdfAsBlob,
+  openPdfFromBlob,
   openExternalUrl,
   openPdfDirect: (url, title) => {
     pdfModalUrl.value = url
@@ -532,9 +529,22 @@ const { openDocumentFile } = useDocumentFileOpen({
   },
 })
 
+/** @param {{ url?: string, name?: string, driveId?: string, itemId?: string, graphItem?: boolean }} file */
+async function handleOpenDocumentFile(file) {
+  if (documentsFileOpening.value) return
+  documentsFileOpening.value = true
+  documentsFileOpeningName.value = String(file?.name || '').trim()
+  try {
+    await openDocumentFile(file || {})
+  } finally {
+    documentsFileOpening.value = false
+    documentsFileOpeningName.value = ''
+  }
+}
+
 /** @param {{ url?: string, name?: string, driveId?: string, itemId?: string, graphItem?: boolean }} payload */
 async function openDocumentsPdf(payload) {
-  await openDocumentFile(payload || {})
+  await handleOpenDocumentFile(payload || {})
 }
 
 function closeDocumentsPdf() {
@@ -680,13 +690,22 @@ const hasDocumentTreeContent = computed(() => {
             >
               <I18nText k="dashboard.documentsGraphNoFiles" />
             </p>
-            <DocumentsFolderTree
+            <div
               v-if="hasDocumentTreeContent"
-              :node="documentsFolderRoot"
-              :depth="0"
-              @open-pdf="openDocumentsPdf"
-              @open-file="openDocumentFile"
-            />
+              class="dashboard-documents-panel"
+              :class="{ 'dashboard-documents-panel--busy': documentsFileOpening }"
+            >
+              <DocumentsFileOpeningOverlay
+                :open="documentsFileOpening"
+                :file-name="documentsFileOpeningName"
+              />
+              <DocumentsFolderTree
+                :node="documentsFolderRoot"
+                :depth="0"
+                @open-pdf="openDocumentsPdf"
+                @open-file="handleOpenDocumentFile"
+              />
+            </div>
           </template>
           <template v-else-if="!documentsLoading">
             <p class="dashboard-card-desc dashboard-documents-empty">
@@ -782,13 +801,22 @@ const hasDocumentTreeContent = computed(() => {
               >
                 <I18nText k="dashboard.documentsGraphNoFiles" />
               </p>
-              <DocumentsFolderTree
+              <div
                 v-if="hasDocumentTreeContent"
-                :node="documentsFolderRoot"
-                :depth="0"
-                @open-pdf="openDocumentsPdf"
-                @open-file="openDocumentFile"
-              />
+                class="dashboard-documents-panel"
+                :class="{ 'dashboard-documents-panel--busy': documentsFileOpening }"
+              >
+                <DocumentsFileOpeningOverlay
+                  :open="documentsFileOpening"
+                  :file-name="documentsFileOpeningName"
+                />
+                <DocumentsFolderTree
+                  :node="documentsFolderRoot"
+                  :depth="0"
+                  @open-pdf="openDocumentsPdf"
+                  @open-file="handleOpenDocumentFile"
+                />
+              </div>
             </template>
             <template v-else>
               <p class="dashboard-card-desc dashboard-documents-empty">
@@ -1020,6 +1048,19 @@ const hasDocumentTreeContent = computed(() => {
 
 .dashboard-card-documents {
   grid-column: 1 / -1;
+}
+.dashboard-documents-panel {
+  position: relative;
+  min-height: 2.5rem;
+  border-radius: var(--radius);
+}
+.dashboard-documents-panel--busy :deep(.doc-folder-tree) {
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.dashboard-documents-modal-body .dashboard-documents-panel {
+  min-height: 6rem;
 }
 .dashboard-documents-loading {
   display: flex;

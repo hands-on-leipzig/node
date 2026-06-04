@@ -1,13 +1,6 @@
 import { getDocumentsFileLink, getDocumentsFileStreamBlob } from '@/services/draht'
 import { isPdfDocumentFile } from '@/utils/documentFileIcon'
-
-function hostOf(url) {
-  try {
-    return new URL(url).hostname.toLowerCase()
-  } catch {
-    return ''
-  }
-}
+import { isSharePointHost } from '@/utils/sharePointHost'
 
 function unwrapLinkPayload(data) {
   if (!data || typeof data !== 'object') return data
@@ -24,21 +17,19 @@ function unwrapLinkPayload(data) {
 
 /**
  * Open a coach-dashboard document (Graph-listed SharePoint file or manual https link).
+ * SharePoint bytes are loaded via DRAHT (documents-file-stream), never fetch() from the SPA.
  */
-export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdfDirect }) {
+export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfDirect }) {
   async function openViaStream(driveId, itemId, file) {
     const blob = await getDocumentsFileStreamBlob(driveId, itemId)
     if (!blob) {
-      // Do not fall back to file.url — Graph webUrl opens the library/folder, not the file for guests.
       return
     }
-    const blobUrl = URL.createObjectURL(blob)
     const title = String(file?.name || 'Download')
-    if (isPdfDocumentFile(file) && tryOpenPdfAsBlob) {
-      const ok = await tryOpenPdfAsBlob(blobUrl, title)
-      URL.revokeObjectURL(blobUrl)
-      if (ok) return
+    if (isPdfDocumentFile(file) && openPdfFromBlob) {
+      if (await openPdfFromBlob(blob, title)) return
     }
+    const blobUrl = URL.createObjectURL(blob)
     openExternalUrl(blobUrl)
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
   }
@@ -49,6 +40,11 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
     const title = String(file?.name || 'Download')
 
     if (driveId && itemId) {
+      // PDF in-app: always proxy via API (avoids CORS on SharePoint guest URLs).
+      if (isPdfDocumentFile(file)) {
+        await openViaStream(driveId, itemId, file)
+        return
+      }
       try {
         const res = await getDocumentsFileLink(driveId, itemId)
         const link = unwrapLinkPayload(res?.data)
@@ -63,10 +59,6 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
           via === 'stream_proxy' ||
           (guestUrl && /\/:f:\//i.test(guestUrl))
         if (!preferStream && guestUrl) {
-          if (isPdfDocumentFile(file) && tryOpenPdfAsBlob) {
-            const ok = await tryOpenPdfAsBlob(guestUrl, title)
-            if (ok) return
-          }
           openExternalUrl(guestUrl)
           return
         }
@@ -81,9 +73,7 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
     const rawUrl = String(file?.url || '').trim()
     if (!rawUrl) return
     if (isPdfDocumentFile(file)) {
-      const host = hostOf(rawUrl)
-      if (host.endsWith('sharepoint.com') || host.endsWith('onedrive.live.com')) {
-        if (tryOpenPdfAsBlob && (await tryOpenPdfAsBlob(rawUrl, title))) return
+      if (isSharePointHost(rawUrl)) {
         openExternalUrl(rawUrl)
         return
       }
@@ -91,7 +81,6 @@ export function useDocumentFileOpen({ tryOpenPdfAsBlob, openExternalUrl, openPdf
         openPdfDirect(rawUrl, title)
         return
       }
-      if (tryOpenPdfAsBlob && (await tryOpenPdfAsBlob(rawUrl, title))) return
     }
     openExternalUrl(rawUrl)
   }
