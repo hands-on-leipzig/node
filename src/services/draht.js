@@ -465,6 +465,36 @@ export function getDocumentsFolderFiles() {
 }
 
 /**
+ * Guest / public view link for a Graph-listed file (GET /handson/node/documents-file-link).
+ * @param {string} driveId
+ * @param {string} itemId
+ */
+export function getDocumentsFileLink(driveId, itemId) {
+  return api.get('/documents-file-link', {
+    params: { driveId: String(driveId || ''), itemId: String(itemId || '') },
+  })
+}
+
+/**
+ * Stream file bytes when no guest link is available (same auth as documents-config).
+ * @param {string} driveId
+ * @param {string} itemId
+ * @returns {Promise<Blob|null>}
+ */
+export async function getDocumentsFileStreamBlob(driveId, itemId) {
+  try {
+    const res = await api.get('/documents-file-stream', {
+      params: { driveId: String(driveId || ''), itemId: String(itemId || '') },
+      responseType: 'blob',
+    })
+    const blob = res?.data
+    return blob && blob.size > 0 ? blob : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Update documents folder URL (admin only on server). PUT /handson/node/documents-config
  */
 export function putDocumentsConfig(payload) {

@@ -12,7 +12,9 @@ So that reload and direct URLs (e.g. `/dashboard`) work:
 Handled entirely by **DRAHT** — no separate Node API.
 
 - **GET** `node/documents-config` — static config (`folderUrl`, `title`, manual `files`, flags). Optional **`?mergeGraph=1`** still merges Graph server-side (legacy).
-- **GET** `node/documents-folder-files` — JSON `{ files, folderUrl, graphOk, graphCode }` (coach dashboard). Each item in `files` may include `path` or `folderPath` (relative path under the linked folder, use `/` segments) so the UI can show nested folder accordions; `folder` from admin config is merged the same way.
+- **GET** `node/documents-folder-files` — JSON `{ files, folderUrl, graphOk, graphCode }` (coach dashboard). Each item in `files` may include `path` or `folderPath` (relative path under the linked folder, use `/` segments) so the UI can show nested folder accordions; `folder` from admin config is merged the same way. Graph-listed rows also include `driveId` + `itemId` for guest-link resolution on click.
+- **GET** `node/documents-file-link?driveId=…&itemId=…` — resolves a **guest / anyone-with-link** URL via Graph (`createLink` with inherited folder permissions, or an existing anonymous permission). Same coach/admin auth as documents-config. If no public link can be created, returns `{ useStream: true }` and the SPA streams the file instead.
+- **GET** `node/documents-file-stream?driveId=…&itemId=…` — streams file bytes through Dolibarr (Graph app token). Fallback when anonymous links are disabled; works with **Files.Read.All** (no write permission required).
 - **GET** `node/documents-graph-status` — admin: token + `GET /sites/root` (MS_CLIENT_* sanity check). Response includes **Graph identity**: client-credentials / Entra app id (`appid`, `tid`, roles)—SharePoint is **not** accessed as the Keycloak user in the browser.
 - **POST** `node/documents-probe-folder` — admin, body `{ "url": "…" }` — same folder probe as after save.
 - After **PUT** `node/documents-config`, response includes **`folderGraphProbe`** (readable, HTTP codes, `summaryKey`) when Graph is enabled.
@@ -48,6 +50,9 @@ DRAHT uses **client credentials** (app-only). Check these in order:
 
 3. **Add Sites.Read.All (application)**  
    Resolving `/:f:/s/…` links calls **`/sites/...`** and **`/shares/...`**. Many tenants need **both** `Files.Read.All` and **`Sites.Read.All`** (application) with admin consent. If probe shows **403** on **Site-API** or **driveItem**, add Sites.Read.All and consent again.
+
+3b. **Optional: Files.ReadWrite.All (application)**  
+   For **direct guest links** on file click (`documents-file-link` → Graph `createLink`), the app may need **Files.ReadWrite.All** in some tenants. If coaches still get Microsoft login but **documents-file-stream** works, you can rely on the stream fallback only (read permission is enough).
 
 4. **New token**  
    Dolibarr may cache the bearer token for several minutes. After changing permissions, wait ~5–10 minutes or clear the cache / restart PHP if you implemented caching.

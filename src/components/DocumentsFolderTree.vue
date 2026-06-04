@@ -19,9 +19,14 @@ const props = defineProps({
     default: 0,
   },
 })
-const emit = defineEmits(['open-pdf'])
+const emit = defineEmits(['open-pdf', 'open-file'])
 
 function onFileClick(event, file) {
+  if (file?.graphItem && file?.driveId && file?.itemId) {
+    event.preventDefault()
+    emit('open-file', file)
+    return
+  }
   if (!isPdfDocumentFile(file)) return
   event.preventDefault()
   emit('open-pdf', { url: file.url, name: file.name || 'PDF' })
@@ -78,7 +83,12 @@ const hasFolders = computed(() => (props.node.folders?.length || 0) > 0)
           <span class="doc-folder-tree-count">{{ subtreeCount(fd.node) }}</span>
         </summary>
         <div class="doc-folder-tree-panel">
-          <DocumentsFolderTree :node="fd.node" :depth="depth + 1" @open-pdf="emit('open-pdf', $event)" />
+          <DocumentsFolderTree
+            :node="fd.node"
+            :depth="depth + 1"
+            @open-pdf="emit('open-pdf', $event)"
+            @open-file="emit('open-file', $event)"
+          />
         </div>
       </details>
     </div>

@@ -7,12 +7,22 @@ function normalizeFiles(raw) {
   if (!Array.isArray(raw)) return []
   return raw
     .filter((x) => x && typeof x === 'object')
-    .map((x) => ({
-      name: String(x.name ?? '').trim() || 'Download',
-      url: String(x.url ?? '').trim(),
-      folder: String(x.folder ?? x.group ?? '').trim(),
-      path: String(x.path ?? x.folderPath ?? x.relativePath ?? '').trim().replace(/\\/g, '/'),
-    }))
+    .map((x) => {
+      const driveId = String(x.driveId ?? x.drive_id ?? '').trim()
+      const itemId = String(x.itemId ?? x.item_id ?? '').trim()
+      const row = {
+        name: String(x.name ?? '').trim() || 'Download',
+        url: String(x.url ?? '').trim(),
+        folder: String(x.folder ?? x.group ?? '').trim(),
+        path: String(x.path ?? x.folderPath ?? x.relativePath ?? '').trim().replace(/\\/g, '/'),
+      }
+      if (driveId && itemId) {
+        row.driveId = driveId
+        row.itemId = itemId
+        row.graphItem = true
+      }
+      return row
+    })
     .filter((x) => /^https?:\/\//i.test(x.url))
     .slice(0, 150)
 }
@@ -96,6 +106,9 @@ function mergeFileLists(graphFiles, manualFiles) {
       url: f.url,
       folder: f.folder || '',
       path: f.path || '',
+      ...(f.driveId && f.itemId
+        ? { driveId: f.driveId, itemId: f.itemId, graphItem: true }
+        : {}),
     })
   }
   for (const f of manualFiles) {
@@ -106,6 +119,9 @@ function mergeFileLists(graphFiles, manualFiles) {
       url: f.url,
       folder: f.folder || '',
       path: f.path || '',
+      ...(f.driveId && f.itemId
+        ? { driveId: f.driveId, itemId: f.itemId, graphItem: true }
+        : {}),
     })
   }
   return out

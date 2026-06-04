@@ -21,6 +21,7 @@ import CustomSelect from '@/components/CustomSelect.vue'
 import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
+import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -516,27 +517,24 @@ async function tryOpenPdfAsBlob(rawUrl, title) {
   }
 }
 
+function openExternalUrl(url) {
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const { openDocumentFile } = useDocumentFileOpen({
+  tryOpenPdfAsBlob,
+  openExternalUrl,
+  openPdfDirect: (url, title) => {
+    pdfModalUrl.value = url
+    pdfModalTitle.value = title
+    pdfModalOpen.value = true
+  },
+})
+
+/** @param {{ url?: string, name?: string, driveId?: string, itemId?: string, graphItem?: boolean }} payload */
 async function openDocumentsPdf(payload) {
-  const rawUrl = String(payload?.url || '')
-  const title = String(payload?.name || 'PDF')
-  const host = (() => {
-    try {
-      return new URL(rawUrl).hostname.toLowerCase()
-    } catch {
-      return ''
-    }
-  })()
-  // SharePoint/OneDrive often forbids direct iframe embedding (X-Frame-Options/CSP).
-  // Workaround: try fetching bytes and display a local blob URL in the modal.
-  // If that fails (CORS/auth), fall back to a new tab.
-  if (host.endsWith('sharepoint.com') || host.endsWith('onedrive.live.com')) {
-    if (await tryOpenPdfAsBlob(rawUrl, title)) return
-    window.open(rawUrl, '_blank', 'noopener,noreferrer')
-    return
-  }
-  pdfModalUrl.value = rawUrl
-  pdfModalTitle.value = title
-  pdfModalOpen.value = true
+  await openDocumentFile(payload || {})
 }
 
 function closeDocumentsPdf() {
@@ -687,6 +685,7 @@ const hasDocumentTreeContent = computed(() => {
               :node="documentsFolderRoot"
               :depth="0"
               @open-pdf="openDocumentsPdf"
+              @open-file="openDocumentFile"
             />
           </template>
           <template v-else-if="!documentsLoading">
@@ -788,6 +787,7 @@ const hasDocumentTreeContent = computed(() => {
                 :node="documentsFolderRoot"
                 :depth="0"
                 @open-pdf="openDocumentsPdf"
+                @open-file="openDocumentFile"
               />
             </template>
             <template v-else>
