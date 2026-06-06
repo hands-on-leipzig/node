@@ -171,3 +171,18 @@ export function resolveSidebarAccentTone(row) {
   if (element === 'klazi') return 'explore'
   return 'explore'
 }
+
+/**
+ * Sidebar title for a future group row (5+ / 8+ depending on program).
+ *
+ * @param {Record<string, unknown>|null|undefined} row
+ * @returns {'dashboard.futureGroupType5'|'dashboard.futureGroupType8'|'dashboard.coCoachTypeGroup'}
+ */
+export function resolveSidebarGroupLabelKey(row) {
+  const programId = normalizeProgramId(row)
+  const entry = programId != null ? BY_PROGRAM[programId] : null
+  if (entry?.variantTone === 'future5') return 'dashboard.futureGroupType5'
+  if (entry?.variantTone === 'future8') return 'dashboard.futureGroupType8'
+  if (row?.edition === 'future') return 'dashboard.futureGroupType8'
+  return 'dashboard.coCoachTypeGroup'
+}

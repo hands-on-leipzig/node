@@ -355,6 +355,14 @@ export function normalizeNodeListRow(row) {
     : (program != null && isFutureProgram(program) ? 'future' : null)
   const groupIdRaw = row.groupId ?? row.group_id
   const groupId = groupIdRaw != null && groupIdRaw !== '' ? Number(groupIdRaw) : null
+  const rawEventTeamIds = row.eventTeamIds ?? row.event_team_ids
+  let eventTeamIds = null
+  if (Array.isArray(rawEventTeamIds)) {
+    const ids = rawEventTeamIds
+      .map((v) => Number(v))
+      .filter((id) => Number.isFinite(id) && id > 0)
+    if (ids.length > 0) eventTeamIds = ids
+  }
   return {
     id,
     name: name || `#${id}`,
@@ -363,7 +371,23 @@ export function normalizeNodeListRow(row) {
     program: Number.isFinite(program) ? program : null,
     edition,
     groupId: Number.isFinite(groupId) && groupId > 0 ? groupId : null,
+    ...(eventTeamIds ? { eventTeamIds } : {}),
   }
+}
+
+/**
+ * Unwrap a single node card from GET /teams|/classes|/groups/{id}.
+ * @param {import('axios').AxiosResponse|undefined} res
+ * @returns {Record<string, unknown>|null}
+ */
+export function unwrapNodeCard(res) {
+  let d = res?.data
+  if (d == null || typeof d !== 'object') return null
+  if (d.data != null && typeof d.data === 'object' && !Array.isArray(d.data)) {
+    const inner = d.data
+    if (inner.id != null || inner.rowid != null) d = inner
+  }
+  return d
 }
 
 /**

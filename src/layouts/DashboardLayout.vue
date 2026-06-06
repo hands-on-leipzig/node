@@ -11,8 +11,8 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
-import { listTeams, listClasses, listGroups, parseNodeListPayload, isFutureEnrollmentEntry } from '@/services/draht'
-import { resolveSidebarAccentTone } from '@/utils/enrollmentDisplay'
+import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry } from '@/services/draht'
+import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey } from '@/utils/enrollmentDisplay'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
@@ -30,6 +30,8 @@ const profileMenuOpen = ref(false)
 const teams = ref([])
 const classes = ref([])
 const groups = ref([])
+/** groupId -> Set of linked future event team ids (from list API and/or group detail). */
+const futureGroupTeamIds = ref(new Map())
 const sidebarLoading = ref(false)
 const sidebarGroupsError = ref('')
 
@@ -68,11 +70,52 @@ function doLogin() {
   login()
 }
 
+function collectEventTeamIdsFromGroupRow(group) {
+  const ids = new Set()
+  if (!group || !Array.isArray(group.eventTeamIds)) return ids
+  for (const raw of group.eventTeamIds) {
+    const id = Number(raw)
+    if (Number.isFinite(id) && id > 0) ids.add(id)
+  }
+  return ids
+}
+
+async function loadFutureGroupTeamLinks(groupRows) {
+  const map = new Map()
+  const needsFetch = []
+  for (const group of groupRows) {
+    const fromList = collectEventTeamIdsFromGroupRow(group)
+    if (fromList.size > 0) {
+      map.set(group.id, fromList)
+    } else {
+      needsFetch.push(group)
+    }
+  }
+  if (needsFetch.length > 0) {
+    const results = await Promise.allSettled(needsFetch.map((g) => getGroup(g.id)))
+    for (let i = 0; i < needsFetch.length; i++) {
+      const group = needsFetch[i]
+      const res = results[i]
+      if (res.status !== 'fulfilled') continue
+      const card = unwrapNodeCard(res.value)
+      const eventTeams = Array.isArray(card?.eventTeams) ? card.eventTeams : []
+      const ids = new Set()
+      for (const et of eventTeams) {
+        const tid = Number(et?.id ?? et?.rowid)
+        if (Number.isFinite(tid) && tid > 0) ids.add(tid)
+      }
+      if (ids.size > 0) map.set(group.id, ids)
+    }
+  }
+  futureGroupTeamIds.value = map
+}
+
 async function loadSidebarLists() {
   if (!isCoachApp.value) {
     teams.value = []
     classes.value = []
     groups.value = []
+    futureGroupTeamIds.value = new Map()
     return
   }
   sidebarLoading.value = true
@@ -100,14 +143,19 @@ async function loadSidebarLists() {
     if (foundersTeams.value.length > 0 || classes.value.length > 0) {
       foundersSectionOpen.value = true
     }
+    await loadFutureGroupTeamLinks(groups.value)
     if (groups.value.length > 0 || futureTeams.value.length > 0) {
       futureSectionOpen.value = true
     }
     if (import.meta.env.DEV) {
+      const linkedTeamCount = [...futureGroupTeamIds.value.values()].reduce((sum, ids) => sum + ids.size, 0)
       console.info('[sidebar] loaded', {
         teams: teams.value.length,
         classes: classes.value.length,
         groups: groups.value.length,
+        futureTeams: futureTeams.value.length,
+        futureTeamsWithGroupId: futureTeams.value.filter((t) => t.groupId != null).length,
+        linkedFutureTeams: linkedTeamCount,
       })
     }
   } finally {
@@ -118,7 +166,7 @@ async function loadSidebarLists() {
 /** @param {'team'|'class'|'group'} kind */
 function sidebarTeklaBoldLabel(item, kind) {
   if (kind === 'class') return t('dashboard.class')
-  if (kind === 'group') return t('dashboard.coCoachTypeGroup')
+  if (kind === 'group') return t(resolveSidebarGroupLabelKey(item))
   return String(item?.name ?? '').trim() || t('dashboard.team')
 }
 
@@ -259,6 +307,7 @@ watch(
       teams.value = []
       classes.value = []
       groups.value = []
+      futureGroupTeamIds.value = new Map()
     }
   },
   { immediate: true },
@@ -289,25 +338,27 @@ const hasFutureEnrollments = computed(() => groups.value.length > 0 || futureTea
 
 /** Future sidebar: groups with nested event teams; orphan teams without groupId last. */
 const futureSidebarTree = computed(() => {
-  const teamsByGroup = new Map()
-  for (const g of groups.value) {
-    teamsByGroup.set(g.id, [])
-  }
-  const orphanTeams = []
-  for (const team of futureTeams.value) {
-    const gid = team.groupId != null ? Number(team.groupId) : 0
-    if (gid > 0 && teamsByGroup.has(gid)) {
-      teamsByGroup.get(gid).push(team)
-    } else {
-      orphanTeams.push(team)
+  const teamById = new Map(futureTeams.value.map((t) => [t.id, t]))
+  const assignedIds = new Set()
+  const groupsOut = groups.value.map((group) => {
+    const nested = []
+    const addTeam = (team) => {
+      if (!team || assignedIds.has(team.id)) return
+      nested.push(team)
+      assignedIds.add(team.id)
     }
-  }
+    for (const team of futureTeams.value) {
+      if (Number(team.groupId) === Number(group.id)) addTeam(team)
+    }
+    const linkedIds = futureGroupTeamIds.value.get(group.id)
+    if (linkedIds) {
+      for (const tid of linkedIds) addTeam(teamById.get(tid))
+    }
+    return { group, teams: nested }
+  })
   return {
-    groups: groups.value.map((group) => ({
-      group,
-      teams: teamsByGroup.get(group.id) || [],
-    })),
-    orphanTeams,
+    groups: groupsOut,
+    orphanTeams: futureTeams.value.filter((t) => !assignedIds.has(t.id)),
   }
 })
 
@@ -484,24 +535,29 @@ const { canInstall, promptInstall } = usePwaInstall()
                       <span v-if="sidebarTeklaRefLabel(entry.group)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(entry.group) }}</span>
                     </span>
                   </button>
-                  <button
-                    v-for="team in entry.teams"
-                    :key="'future-team-' + team.id"
-                    type="button"
-                    class="sidebar-tekla-tile sidebar-tekla-tile--nested"
-                    :class="[
-                      { active: isTeamActive(team.id) },
-                      `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
-                    ]"
-                    :title="sidebarTeklaAriaLabel(team, 'team')"
-                    :aria-label="sidebarTeklaAriaLabel(team, 'team')"
-                    @click="goTeam(team.id)"
+                  <div
+                    v-if="entry.teams.length > 0"
+                    class="sidebar-future-group-teams"
                   >
-                    <span class="sidebar-tekla-tile-text">
-                      <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(team, 'team') }}</span>
-                      <span v-if="sidebarTeklaRefLabel(team)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(team) }}</span>
-                    </span>
-                  </button>
+                    <button
+                      v-for="team in entry.teams"
+                      :key="'future-team-' + team.id"
+                      type="button"
+                      class="sidebar-tekla-tile sidebar-tekla-tile--nested"
+                      :class="[
+                        { active: isTeamActive(team.id) },
+                        `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
+                      ]"
+                      :title="sidebarTeklaAriaLabel(team, 'team')"
+                      :aria-label="sidebarTeklaAriaLabel(team, 'team')"
+                      @click="goTeam(team.id)"
+                    >
+                      <span class="sidebar-tekla-tile-text">
+                        <span class="sidebar-tekla-tile-title">{{ sidebarTeklaBoldLabel(team, 'team') }}</span>
+                        <span v-if="sidebarTeklaRefLabel(team)" class="sidebar-tekla-tile-ref">{{ sidebarTeklaRefLabel(team) }}</span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
                 <button
                   v-for="team in futureSidebarTree.orphanTeams"
@@ -964,18 +1020,38 @@ const { canInstall, promptInstall } = usePwaInstall()
 .sidebar-future-group-block {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.2rem;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.15rem;
+}
+.sidebar-future-group-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.sidebar-future-group-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  margin: 0.1rem 0 0 0.15rem;
+  padding: 0.15rem 0 0.2rem 1.05rem;
+  border-left: 3px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  border-radius: 0 0 0 var(--radius-sm);
+  background: color-mix(in srgb, var(--color-bg-muted) 35%, transparent);
 }
 .sidebar-tekla-tile--nested {
-  width: calc(100% - 0.85rem);
-  margin-left: 0.85rem;
-  padding-left: 0.55rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.5rem 0.4rem 0.55rem;
   border-left-width: 2px;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
+  box-shadow: none;
 }
 .sidebar-tekla-tile--nested .sidebar-tekla-tile-title {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
+}
+.sidebar-tekla-tile--nested .sidebar-tekla-tile-ref {
+  font-size: 0.66rem;
 }
 .sidebar-section-hint {
   margin: 0.35rem 0.5rem 0.5rem;

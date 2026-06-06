@@ -387,6 +387,8 @@ export default {
         "coCoachTypeTeam": "Team",
         "coCoachTypeClass": "Class",
         "coCoachTypeGroup": "Group",
+        "futureGroupType5": "5+ group",
+        "futureGroupType8": "8+ group",
         "documentsForDownload": "Docs for coaches",
         "documentsLoadingList": "Loading files from SharePoint…",
         "documentsOpeningFile": "Opening document…",

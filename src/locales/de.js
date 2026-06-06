@@ -442,7 +442,9 @@ export default {
         "addCoCoachClose": "Schließen",
         "coCoachTypeTeam": "Team",
         "coCoachTypeClass": "Klasse",
-        "coCoachTypeGroup": "Gruppe"
+        "coCoachTypeGroup": "Gruppe",
+        "futureGroupType5": "5+ Gruppe",
+        "futureGroupType8": "8+ Gruppe"
     },
     "enrollFuture": {
         "title": "Future Edition",
