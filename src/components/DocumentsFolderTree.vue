@@ -6,6 +6,7 @@ import {
   documentFileIconBiSuffix,
   documentFileVisualKind,
   isPdfDocumentFile,
+  isUrlShortcutDocumentFile,
 } from '@/utils/documentFileIcon'
 
 const props = defineProps({
@@ -22,7 +23,10 @@ const props = defineProps({
 const emit = defineEmits(['open-pdf', 'open-file'])
 
 function onFileClick(event, file) {
-  if (file?.graphItem && file?.driveId && file?.itemId) {
+  if (
+    (file?.graphItem && file?.driveId && file?.itemId)
+    || isUrlShortcutDocumentFile(file)
+  ) {
     event.preventDefault()
     emit('open-file', file)
     return

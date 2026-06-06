@@ -1,5 +1,9 @@
 import { getDocumentsFileLink, getDocumentsFileStreamBlob } from '@/services/draht'
-import { isPdfDocumentFile } from '@/utils/documentFileIcon'
+import {
+  isPdfDocumentFile,
+  isUrlShortcutDocumentFile,
+  parseInternetShortcutUrlFromBlob,
+} from '@/utils/documentFileIcon'
 import { isSharePointHost } from '@/utils/sharePointHost'
 
 function unwrapLinkPayload(data) {
@@ -20,7 +24,23 @@ function unwrapLinkPayload(data) {
  * SharePoint bytes are loaded via DRAHT (documents-file-stream), never fetch() from the SPA.
  */
 export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfDirect }) {
+  async function openUrlShortcutViaStream(driveId, itemId, file) {
+    const blob = await getDocumentsFileStreamBlob(driveId, itemId)
+    if (!blob) return
+    const target = await parseInternetShortcutUrlFromBlob(blob)
+    if (/^https?:\/\//i.test(target)) {
+      openExternalUrl(target)
+      return
+    }
+    const rawUrl = String(file?.url || '').trim()
+    if (rawUrl) openExternalUrl(rawUrl)
+  }
+
   async function openViaStream(driveId, itemId, file) {
+    if (isUrlShortcutDocumentFile(file)) {
+      await openUrlShortcutViaStream(driveId, itemId, file)
+      return
+    }
     const blob = await getDocumentsFileStreamBlob(driveId, itemId)
     if (!blob) {
       return
@@ -40,6 +60,10 @@ export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfD
     const title = String(file?.name || 'Download')
 
     if (driveId && itemId) {
+      if (isUrlShortcutDocumentFile(file)) {
+        await openUrlShortcutViaStream(driveId, itemId, file)
+        return
+      }
       // PDF in-app: always proxy via API (avoids CORS on SharePoint guest URLs).
       if (isPdfDocumentFile(file)) {
         await openViaStream(driveId, itemId, file)

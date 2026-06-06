@@ -33,6 +33,34 @@ export function isPdfDocumentFile(file) {
   return documentFileExtension(file) === 'pdf'
 }
 
+/** Windows Internet Shortcut (.url) — open target URL, not the shortcut file. */
+export function isUrlShortcutDocumentFile(file) {
+  return documentFileExtension(file) === 'url'
+}
+
+/**
+ * Parse `URL=` from a `.url` / InternetShortcut file body.
+ * @param {string} text
+ * @returns {string}
+ */
+export function parseInternetShortcutUrl(text) {
+  if (!text || typeof text !== 'string') return ''
+  const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
+  const match = normalized.match(/^URL=(.+)$/im)
+  if (!match) return ''
+  return String(match[1]).trim()
+}
+
+/** @param {Blob|null|undefined} blob */
+export async function parseInternetShortcutUrlFromBlob(blob) {
+  if (!blob) return ''
+  try {
+    return parseInternetShortcutUrl(await blob.text())
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Broad visual bucket for list row / icon chrome (BEM modifier on the icon wrap).
  * @param {{ name?: string, url?: string }} file
