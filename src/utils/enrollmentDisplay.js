@@ -81,10 +81,19 @@ export function resolveEnrollmentDisplay(card) {
   const entry = programId != null ? BY_PROGRAM[programId] : null
 
   if (entry) {
+    const element = String(card.element || '').toLowerCase()
+    let formatKey = entry.formatKey
+    if (programId === 6 || programId === 7) {
+      if (element === 'team') {
+        formatKey = 'dashboard.team'
+      } else if (element === 'gruppe') {
+        formatKey = programId === 6 ? 'dashboard.futureGroupType5' : 'dashboard.futureGroupType8'
+      }
+    }
     const badges = [
       { key: entry.editionKey, tone: entry.edition },
       { key: entry.variantKey, tone: entry.variantTone },
-      { key: entry.formatKey, tone: 'format' },
+      { key: formatKey, tone: 'format' },
     ]
     appendRegisteredPupilsBadge(badges, card)
     return { badges }

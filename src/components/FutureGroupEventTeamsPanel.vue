@@ -355,33 +355,6 @@ onMounted(() => {
   <div class="future-event-teams">
     <h3 class="detail-section-title"><I18nText k="groupDetail.eventTeamsTitle" /></h3>
 
-    <div
-      v-if="hasEventRegistration && currentEventLabel"
-      class="future-event-status future-event-status--active"
-    >
-      <div class="future-event-status-main">
-        <i class="bi bi-calendar-check" aria-hidden="true" />
-        <div>
-          <p class="future-event-status-headline">
-            <I18nText
-              k="groupDetail.eventTeamsStatusRegistered"
-              :values="{ count: enrolledTeams.length || currentEventTeamCount, event: currentEventLabel }"
-            />
-          </p>
-          <p class="future-event-status-meta">
-            <I18nText
-              k="groupDetail.eventTeamsStatusMeta"
-              :values="{
-                pupils: registeredPupils || '—',
-                maxTeams: maxTeamsByPupils,
-                cost: group.eventTeamTotalEur ?? estimatedSubmitCostEur,
-              }"
-            />
-          </p>
-        </div>
-      </div>
-    </div>
-
     <ul v-if="enrolledTeams.length" class="future-event-team-list">
       <li v-for="team in enrolledTeams" :key="'enrolled-team-' + team.id">
         <RouterLink
