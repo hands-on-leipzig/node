@@ -262,6 +262,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: color 0.25s, background-color 0.25s;
+  background-image: url("background/FLL_C_Robi_Detail_Girl_BG-f9534d6c.webp");
 }
 
 /**

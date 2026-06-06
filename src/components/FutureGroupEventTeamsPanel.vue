@@ -65,8 +65,16 @@ const hasEventRegistration = computed(
   () => enrolledTeams.value.length > 0 || currentEventTeamCount.value > 0,
 )
 
+function firstEnrolledTeamEvent() {
+  for (const team of enrolledTeams.value) {
+    const ev = team?.event
+    if (ev && (ev.label || ev.ref || ev.id != null)) return ev
+  }
+  return null
+}
+
 const currentEventLabel = computed(() => {
-  const ev = props.group?.event
+  const ev = firstEnrolledTeamEvent()
   if (!ev) return ''
   return ev.label || ev.ref || (ev.id != null ? `Event ${ev.id}` : '')
 })
@@ -224,10 +232,14 @@ function selectTeamCount(count) {
 
 function syncTeamEventsArray() {
   const count = Math.max(1, Number(selectedTeamCount.value) || 1)
-  const currentEventId = props.group?.event?.id != null ? Number(props.group.event.id) : null
+  const enrolledEventId = (() => {
+    const ev = firstEnrolledTeamEvent()
+    const id = ev?.id != null ? Number(ev.id) : NaN
+    return Number.isFinite(id) && id > 0 ? id : null
+  })()
   while (teamEvents.value.length < count) {
     teamEvents.value.push({
-      eventId: !isInitialRegistration.value && currentEventId > 0 ? currentEventId : null,
+      eventId: !isInitialRegistration.value && enrolledEventId != null ? enrolledEventId : null,
       name: '',
     })
   }
@@ -262,11 +274,10 @@ function primaryEventIdForSubmit() {
   const ids = teamEvents.value
     .map((e) => Number(e?.eventId))
     .filter((id) => Number.isFinite(id) && id > 0)
-  if (!ids.length) {
-    const cur = props.group?.event?.id
-    return cur != null ? Number(cur) : null
-  }
-  return ids[0]
+  if (ids.length) return ids[0]
+  const ev = firstEnrolledTeamEvent()
+  const enrolledId = ev?.id != null ? Number(ev.id) : NaN
+  return Number.isFinite(enrolledId) && enrolledId > 0 ? enrolledId : null
 }
 
 function buildEventTeamsPayload() {

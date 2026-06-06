@@ -1807,10 +1807,6 @@ async function submit() {
         if (teamEventsPayload.length) {
           payload.eventTeams = teamEventsPayload
         }
-        const uniqueEventIds = Array.from(new Set(teamEventsPayload.map((entry) => entry.eventId)))
-        if (uniqueEventIds.length === 1) {
-          payload.eventId = uniqueEventIds[0]
-        }
       } else if (presetRegisterEventTeams.value === false || futureOnSiteEvent.value === 'later') {
         payload.registerEventTeams = false
         payload.eventTeamCount = 0
