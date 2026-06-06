@@ -13,6 +13,7 @@ import {
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry } from '@/services/draht'
 import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey } from '@/utils/enrollmentDisplay'
+import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
@@ -110,7 +111,8 @@ async function loadFutureGroupTeamLinks(groupRows) {
   futureGroupTeamIds.value = map
 }
 
-async function loadSidebarLists() {
+async function loadSidebarLists(options = {}) {
+  const silent = options.silent === true
   if (!isCoachApp.value) {
     teams.value = []
     classes.value = []
@@ -118,7 +120,7 @@ async function loadSidebarLists() {
     futureGroupTeamIds.value = new Map()
     return
   }
-  sidebarLoading.value = true
+  if (!silent) sidebarLoading.value = true
   sidebarGroupsError.value = ''
   try {
     const [teamsRes, classesRes, groupsRes] = await Promise.allSettled([
@@ -159,8 +161,23 @@ async function loadSidebarLists() {
       })
     }
   } finally {
-    sidebarLoading.value = false
+    if (!silent) sidebarLoading.value = false
   }
+}
+
+let sidebarRefreshTimer = null
+
+function scheduleSidebarRefresh(detail = {}) {
+  const silent = detail.silent !== false
+  if (sidebarRefreshTimer) clearTimeout(sidebarRefreshTimer)
+  sidebarRefreshTimer = setTimeout(() => {
+    sidebarRefreshTimer = null
+    void loadSidebarLists({ silent })
+  }, 200)
+}
+
+function handleSidebarRefreshEvent(event) {
+  scheduleSidebarRefresh(event?.detail ?? {})
 }
 
 /** @param {'team'|'class'|'group'} kind */
@@ -283,18 +300,21 @@ function handleBrowserBack() {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('popstate', handleBrowserBack)
+  window.addEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
   pushBackTrapState()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   window.removeEventListener('popstate', handleBrowserBack)
+  window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
+  if (sidebarRefreshTimer) clearTimeout(sidebarRefreshTimer)
   if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
 })
 watch(
   () => route.path,
   (path) => {
     if (path === '/dashboard' || path === '/dashboard/' || path === '/' || path === '') {
-      loadSidebarLists()
+      scheduleSidebarRefresh({ silent: true })
     }
     pushBackTrapState()
   }

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getToken, updateToken } from '@/auth/keycloak'
+import { requestSidebarRefresh, shouldRefreshSidebarAfterMutation } from '@/utils/sidebarRefresh'
 
 // Base URL for the HandsOn API (env: VITE_DRAHT_API_URL). Proxies to Dolibarr when needed.
 const baseURL = (import.meta.env.VITE_DRAHT_API_URL || '') + '/handson/node'
@@ -40,7 +41,13 @@ const responseErrorHandler = (error) => {
   }
   return Promise.reject(error)
 }
-api.interceptors.response.use((response) => response, responseErrorHandler)
+const responseSuccessHandler = (response) => {
+  if (shouldRefreshSidebarAfterMutation(response.config)) {
+    requestSidebarRefresh({ source: response.config.url, silent: true })
+  }
+  return response
+}
+api.interceptors.response.use(responseSuccessHandler, responseErrorHandler)
 handsonApi.interceptors.response.use((response) => response, responseErrorHandler)
 
 /**
