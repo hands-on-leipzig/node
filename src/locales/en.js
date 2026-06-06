@@ -395,7 +395,7 @@ export default {
         "documentsGraphNoFiles": "The folder could not be listed automatically. Open the folder below or ask an admin to check Microsoft Graph (MS_CLIENT_*) and the folder URL.",
         "documentsDescription": "Useful docs for coaches.",
         "documentsOpenMobile": "Open documents",
-        "openDocumentsFolder": "Open folder",
+        "openDocumentsFolder": "Open SharePoint in new tab",
         "documentsNotConfigured": "No download folder has been set up yet.",
         "documentsNotConfiguredHint": "An administrator can add file links (and optionally a folder link) under Admin → Documents.",
         "documentsConfigureAdmin": "Configure folder (admin)",

@@ -706,6 +706,16 @@ const hasDocumentTreeContent = computed(() => {
                 @open-file="handleOpenDocumentFile"
               />
             </div>
+            <a
+              v-if="documentsConfig.folderUrl"
+              :href="documentsConfig.folderUrl"
+              class="dashboard-documents-link dashboard-documents-link-secondary dashboard-documents-sharepoint-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <i class="bi bi-box-arrow-up-right" aria-hidden="true" />
+              <I18nText k="dashboard.openDocumentsFolder" />
+            </a>
           </template>
           <template v-else-if="!documentsLoading">
             <p class="dashboard-card-desc dashboard-documents-empty">
@@ -817,6 +827,16 @@ const hasDocumentTreeContent = computed(() => {
                   @open-file="handleOpenDocumentFile"
                 />
               </div>
+              <a
+                v-if="documentsConfig.folderUrl"
+                :href="documentsConfig.folderUrl"
+                class="dashboard-documents-link dashboard-documents-link-secondary dashboard-documents-sharepoint-link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i class="bi bi-box-arrow-up-right" aria-hidden="true" />
+                <I18nText k="dashboard.openDocumentsFolder" />
+              </a>
             </template>
             <template v-else>
               <p class="dashboard-card-desc dashboard-documents-empty">
@@ -1110,6 +1130,9 @@ const hasDocumentTreeContent = computed(() => {
 .dashboard-documents-link-secondary:hover {
   background: var(--color-bg-hover);
   color: var(--color-text);
+}
+.dashboard-documents-sharepoint-link {
+  margin-top: 0.75rem;
 }
 .dashboard-documents-open-mobile {
   display: inline-flex;

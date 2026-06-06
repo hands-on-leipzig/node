@@ -368,7 +368,7 @@ export default {
         "documentsGraphNoFiles": "Der Ordner konnte nicht automatisch aufgelistet werden. Öffne den Ordner unten oder bitte einen Admin, Microsoft Graph (MS_CLIENT_*) und die Ordner-URL zu prüfen.",
         "documentsDescription": "Nützliche Dokumente für Coach:innen.",
         "documentsOpenMobile": "Dokumente öffnen",
-        "openDocumentsFolder": "Ordner öffnen",
+        "openDocumentsFolder": "SharePoint im neuen Tab öffnen",
         "documentsNotConfigured": "Es ist noch kein Download-Ordner hinterlegt.",
         "documentsNotConfiguredHint": "Ein Administrator kann unter Admin → Dokumente Datei-Links (und optional einen Ordner-Link) eintragen.",
         "documentsConfigureAdmin": "Ordner einrichten (Admin)",
