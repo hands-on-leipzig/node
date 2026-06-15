@@ -102,7 +102,7 @@ export default {
     },
     "nav": {
         "dashboard": "My dashboard",
-        "venues": "Tournament venues",
+        "venues": "Locations",
         "login": "Sign in",
         "enrollTeam": "Register team",
         "enrollClass": "Register class",
@@ -526,7 +526,7 @@ export default {
         "requiredField": "Required field",
         "institution": "Institution/Name",
         "contactPerson": "Contact person",
-        "deliveryName": "Name (delivery address)",
+        "deliveryName": "Institution/Name",
         "addressLine2": "Address line 2 (e.g. c/o, building)",
         "addressLine3": "Address line 3",
         "leitwegId": "Leitweg ID (e-invoice BT-10)",
