@@ -122,6 +122,14 @@ export default {
         "logOut": "Log out"
     },
     "admin": {
+        "viewAsCoachTitle": "View as coach",
+        "viewAsCoachLead": "Opens JOIN in a new tab with the selected coach’s data. Closing that tab ends the simulation.",
+        "viewAsCoachSearchPlaceholder": "Name or e-mail…",
+        "viewAsCoachLoading": "Loading coaches…",
+        "viewAsCoachEmpty": "No coaches found.",
+        "viewAsCoachLoadFailed": "Could not load coach list.",
+        "viewAsCoachOpenTab": "Open in new tab",
+        "viewAsCoachBanner": "Viewing JOIN as {name} (simulation). Close this tab to end the view.",
         "documentsTitle": "Documents for download",
         "documentsLead": "Add files coaches can open directly (name + link from SharePoint “Copy link”), and optionally a folder link. Listing a SharePoint folder automatically in the app would need Microsoft Graph on the server—this list is maintained here and stored centrally.",
         "documentsParticipationTermsSection": "Participation terms (enrollment)",

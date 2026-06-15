@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { initKeycloak, isAuthenticated, hasCoachRole, hasAdminRole, login } from '@/auth/keycloak'
 import { applyCoachLocaleFromProfile } from '@/i18n'
 import { getNodeCoachMe } from '@/services/draht'
+import { isCoachImpersonationActive, setImpersonatedCoach } from '@/utils/coachImpersonation'
 
 const routes = [
   {
@@ -117,6 +118,25 @@ router.beforeEach(async (to) => {
     }
   }
 
+  const viewAsRaw = to.query.viewAs
+  if (viewAsRaw != null && String(viewAsRaw).trim() !== '') {
+    if (!isAuthenticated()) {
+      login()
+      return false
+    }
+    if (hasAdminRole()) {
+      const id = parseInt(String(viewAsRaw), 10)
+      if (Number.isFinite(id) && id > 0) {
+        setImpersonatedCoach(id, String(to.query.viewAsLabel || ''))
+        coachLocaleApplied = false
+      }
+    }
+    const q = { ...to.query }
+    delete q.viewAs
+    delete q.viewAsLabel
+    return { path: to.path, query: q, replace: true }
+  }
+
   if (!coachLocaleApplied && isAuthenticated() && hasCoachRole()) {
     coachLocaleApplied = true
     await applyCoachLocaleFromProfile(getNodeCoachMe)
@@ -131,7 +151,7 @@ router.beforeEach(async (to) => {
     if (!hasCoachRole()) {
       return { name: 'venues', query: { forbidden: '1' } }
     }
-    if (to.meta.requiresAdmin && !hasAdminRole()) {
+    if (to.meta.requiresAdmin && (!hasAdminRole() || isCoachImpersonationActive())) {
       return { name: 'dashboard' }
     }
   }

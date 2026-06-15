@@ -122,6 +122,14 @@ export default {
         "logOut": "Abmelden"
     },
     "admin": {
+        "viewAsCoachTitle": "Als Coach ansehen",
+        "viewAsCoachLead": "Öffnet JOIN in einem neuen Tab mit den Daten des gewählten Coaches. Tab schließen beendet die Simulation.",
+        "viewAsCoachSearchPlaceholder": "Name oder E-Mail…",
+        "viewAsCoachLoading": "Coaches werden geladen…",
+        "viewAsCoachEmpty": "Keine Coaches gefunden.",
+        "viewAsCoachLoadFailed": "Coach-Liste konnte nicht geladen werden.",
+        "viewAsCoachOpenTab": "In neuem Tab öffnen",
+        "viewAsCoachBanner": "JOIN wird als {name} angezeigt (Simulation). Tab schließen beendet die Ansicht.",
         "documentsTitle": "Dokumente zum Download",
         "documentsLead": "Trage Dateien ein, die Coaches direkt öffnen können (Anzeigename + Link aus SharePoint „Link kopieren“), optional einen Ordner-Link. Ein automatisches Verzeichnis aus SharePoint bräuchte Microsoft Graph auf dem Server—hier pflegst du die Liste manuell. Die Liste wird zentral gespeichert.",
         "documentsParticipationTermsSection": "Teilnahmebedingungen (Anmeldung)",

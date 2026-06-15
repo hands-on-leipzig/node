@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { getToken, updateToken } from '@/auth/keycloak'
 import { requestSidebarRefresh, shouldRefreshSidebarAfterMutation } from '@/utils/sidebarRefresh'
+import {
+  COACH_IMPERSONATION_QUERY_PARAM,
+  getImpersonatedCoachId,
+} from '@/utils/coachImpersonation'
 
 // Base URL for the HandsOn API (env: VITE_DRAHT_API_URL). Proxies to Dolibarr when needed.
 const baseURL = (import.meta.env.VITE_DRAHT_API_URL || '') + '/handson/node'
@@ -29,6 +33,18 @@ const injectAuth = async (config) => {
     config.headers['X-Authorization'] = value
   }
   config.headers['DOLAPIENTITY'] = '1'
+  const impersonateId = getImpersonatedCoachId()
+  if (impersonateId != null) {
+    config.params = config.params || {}
+    if (config.params instanceof URLSearchParams) {
+      config.params.set(COACH_IMPERSONATION_QUERY_PARAM, String(impersonateId))
+    } else {
+      config.params = {
+        ...config.params,
+        [COACH_IMPERSONATION_QUERY_PARAM]: String(impersonateId),
+      }
+    }
+  }
   return config
 }
 
@@ -100,6 +116,19 @@ export function getAddresses() {
  */
 export function getNodeCoachMe() {
   return api.get('/me')
+}
+
+/**
+ * Admin: searchable coach list for view-as-coach picker.
+ * @param {string} [search]
+ * @param {number} [limit]
+ */
+export function listAdminCoaches(search = '', limit = 25) {
+  const params = {}
+  const q = String(search || '').trim()
+  if (q) params.search = q
+  if (limit != null && limit !== '') params.limit = String(limit)
+  return api.get('/admin/coaches', { params })
 }
 
 function firstDefined(...values) {

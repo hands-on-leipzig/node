@@ -11,10 +11,16 @@ import {
   setTranslationEditMode,
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
-import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry } from '@/services/draht'
+import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry, getNodeCoachMe } from '@/services/draht'
 import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey } from '@/utils/enrollmentDisplay'
 import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import CoachImpersonationBanner from '@/components/CoachImpersonationBanner.vue'
+import AdminViewAsCoachPanel from '@/components/AdminViewAsCoachPanel.vue'
+import {
+  isCoachImpersonationActive,
+  getImpersonatedCoachLabel,
+} from '@/utils/coachImpersonation'
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import logoHot from '@/assets/hot.png'
@@ -23,6 +29,9 @@ const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
 const user = computed(() => getUserProfile())
+const impersonatingCoach = computed(() => isCoachImpersonationActive())
+const showAdminFeatures = computed(() => hasAdminRole() && !impersonatingCoach.value)
+const impersonatedDisplayName = ref('')
 const isCoachApp = computed(() => isAuthenticated() && hasCoachRole())
 /** Logged-out (or non-coach) on public venues: minimal sidebar + login */
 const isGuestShell = computed(() => route.name === 'venues' && !isCoachApp.value)
@@ -44,7 +53,7 @@ const navItems = computed(() => {
     { path: '/dashboard', nameKey: 'nav.dashboard', exact: true, icon: 'bi-grid-1x2-fill' },
     { path: '/', nameKey: 'nav.venues', exact: true, icon: 'bi-geo-alt' },
   ]
-  if (hasAdminRole()) {
+  if (showAdminFeatures.value) {
     items.push({
       path: '/dashboard/admin/documents',
       nameKey: 'nav.adminDocuments',
@@ -66,6 +75,36 @@ const navItems = computed(() => {
   }
   return items
 })
+
+const sidebarProfileLabel = computed(() => {
+  if (impersonatingCoach.value) {
+    const fromApi = impersonatedDisplayName.value.trim()
+    if (fromApi) return fromApi
+    const stored = getImpersonatedCoachLabel().trim()
+    if (stored) return stored
+  }
+  return user.value?.name || ''
+})
+
+async function loadImpersonatedDisplayName() {
+  if (!impersonatingCoach.value) {
+    impersonatedDisplayName.value = ''
+    return
+  }
+  try {
+    const res = await getNodeCoachMe()
+    const d = res?.data?.data ?? res?.data ?? {}
+    const name = [d.firstname, d.lastname].filter(Boolean).join(' ').trim()
+    impersonatedDisplayName.value = name || String(d.email || '').trim()
+  } catch {
+    impersonatedDisplayName.value = ''
+  }
+}
+
+watch(impersonatingCoach, (on) => {
+  if (on) void loadImpersonatedDisplayName()
+  else impersonatedDisplayName.value = ''
+}, { immediate: true })
 
 function doLogin() {
   login()
@@ -633,7 +672,7 @@ const { canInstall, promptInstall } = usePwaInstall()
             class="profile-trigger sidebar-item"
             aria-haspopup="true"
             :aria-expanded="profileMenuOpen"
-            :aria-label="user?.name || t('common.coach')"
+            :aria-label="sidebarProfileLabel || t('common.coach')"
             @click="showProfileMenu"
             @focus="showProfileMenu"
           >
@@ -641,7 +680,7 @@ const { canInstall, promptInstall } = usePwaInstall()
               <i class="bi bi-person-circle" />
             </span>
             <span class="sidebar-item-label">
-              <template v-if="user?.name">{{ user.name }}</template>
+              <template v-if="sidebarProfileLabel">{{ sidebarProfileLabel }}</template>
               <I18nText v-else k="common.coach" />
             </span>
           </button>
@@ -649,7 +688,7 @@ const { canInstall, promptInstall } = usePwaInstall()
             <div v-if="profileMenuOpen" class="profile-menu" role="menu">
               <div class="profile-menu-header">
                 <span class="profile-menu-name">
-                  <template v-if="user?.name">{{ user.name }}</template>
+                  <template v-if="sidebarProfileLabel">{{ sidebarProfileLabel }}</template>
                   <I18nText v-else k="common.coach" />
                 </span>
               </div>
@@ -711,7 +750,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                 <i class="bi bi-question-circle"></i>
                 <span><I18nText k="common.help" /></span>
               </button>
-              <div v-if="hasAdminRole()" class="profile-menu-section">
+              <div v-if="showAdminFeatures" class="profile-menu-section">
                 <span class="profile-menu-label"><I18nText k="nav.adminTranslations" /></span>
                 <div class="profile-menu-btns">
                   <button
@@ -736,6 +775,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   </button>
                 </div>
               </div>
+              <AdminViewAsCoachPanel v-if="showAdminFeatures" />
               <button
                 type="button"
                 class="profile-menu-item profile-menu-item-logout"
@@ -782,6 +822,7 @@ const { canInstall, promptInstall } = usePwaInstall()
             <span>Install App</span>
           </button>
         </div>
+        <CoachImpersonationBanner />
         <RouterView />
       </div>
     </main>
@@ -1225,12 +1266,13 @@ const { canInstall, promptInstall } = usePwaInstall()
   color: var(--color-accent);
 }
 .profile-menu-prefs {
-  padding: 0.35rem 1rem 0.65rem;
+  padding: 0.5rem 1rem 0.7rem;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 0.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  background: color-mix(in srgb, var(--liquid-bg-deep) 94%, var(--color-bg-muted));
 }
 .profile-menu-prefs-block {
   display: flex;
@@ -1249,7 +1291,7 @@ const { canInstall, promptInstall } = usePwaInstall()
   gap: 0.35rem;
   min-height: 2.25rem;
   padding: 0.4rem 0.5rem;
-  border: 1px solid var(--liquid-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--liquid-tile-bg-inner);
   font-family: inherit;
@@ -1261,6 +1303,7 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 .profile-pref-btn:hover {
   background: var(--color-bg-hover);
+  border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-accent));
 }
 .profile-pref-btn.active {
   background: var(--color-accent);
@@ -1331,50 +1374,62 @@ const { canInstall, promptInstall } = usePwaInstall()
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  max-height: min(78vh, 32rem);
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
-  background: var(--liquid-popover-fill);
-  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
-  border: 1px solid var(--liquid-border);
+  background: var(--liquid-bg-deep);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    var(--shadow-lg),
+    0 12px 40px rgba(0, 0, 0, 0.18);
   padding: 0.5rem 0;
   z-index: 200;
   text-align: left;
+  isolation: isolate;
+  -webkit-font-smoothing: antialiased;
 }
 .profile-menu-header {
-  padding: 0.5rem 1rem 0.75rem;
+  padding: 0.65rem 1rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 0.25rem;
+  background: color-mix(in srgb, var(--liquid-bg-deep) 88%, var(--color-bg-muted));
 }
 .profile-menu-name {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
+  line-height: 1.35;
 }
 .profile-menu-item {
   width: 100%;
-  padding: 0.5rem 1rem;
+  padding: 0.55rem 1rem;
   border: none;
   background: none;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   text-align: left;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 .profile-menu-item .bi {
-  font-size: 1.1rem;
-  opacity: 0.85;
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
 }
 .profile-menu-item:hover:not(:disabled) {
   background: var(--color-bg-hover);
 }
+.profile-menu-item:hover:not(:disabled) .bi {
+  color: var(--color-accent);
+}
 .profile-menu-item:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
 .profile-menu-item-logout {
@@ -1385,18 +1440,21 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 .profile-menu-item-logout:hover {
   color: var(--color-text);
+  background: color-mix(in srgb, var(--color-danger, #c0392b) 10%, transparent);
 }
 .profile-menu-section {
-  padding: 0.5rem 1rem;
+  padding: 0.55rem 1rem;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--liquid-bg-deep) 92%, var(--color-bg-muted));
 }
 .profile-menu-label {
   display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-subtle);
-  margin-bottom: 0.35rem;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.4rem;
 }
 .profile-menu-btns {
   display: flex;
@@ -1404,26 +1462,28 @@ const { canInstall, promptInstall } = usePwaInstall()
   gap: 0.35rem;
 }
 .profile-pill {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  border: none;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  background: var(--color-bg-muted);
+  background: var(--liquid-tile-bg-inner);
   color: var(--color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .profile-pill:hover {
   background: var(--color-bg-hover);
   color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-border) 65%, var(--color-accent));
 }
 .profile-pill.active {
   background: var(--color-accent);
-  color: white;
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 .profile-menu-enter-active,
 .profile-menu-leave-active {
