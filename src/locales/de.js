@@ -798,6 +798,7 @@ export default {
         "gesamtschule": "Gesamtschule",
         "sekundarschule_gemeinschaftsschule": "Sekundarschule / Gemeinschaftsschule",
         "foerderschule": "Förderschule",
+        "international_school": "Internationale Schule",
         "volksschule": "Volksschule",
         "mittelschule": "Mittelschule",
         "ahs_unterstufe": "AHS (Unterstufe)",

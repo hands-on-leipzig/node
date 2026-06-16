@@ -7,6 +7,7 @@ export const SCHOOL_TYPE_OPTIONS = [
   { value: 'gesamtschule', label: 'Gesamtschule' },
   { value: 'sekundarschule_gemeinschaftsschule', label: 'Sekundarschule / Gemeinschaftsschule' },
   { value: 'foerderschule', label: 'Förderschule' },
+  { value: 'international_school', labelKey: 'schoolTypes.international_school' },
 
   { value: '__group_at', label: 'Österreich', disabled: true },
   { value: 'volksschule', label: 'Volksschule' },
@@ -17,6 +18,7 @@ export const SCHOOL_TYPE_OPTIONS = [
   { value: 'bms', label: 'Berufsbildende mittlere Schule (BMS)' },
   { value: 'polytechnische_schule', label: 'Polytechnische Schule' },
   { value: 'sonderschule_inklusion_at', label: 'Sonderschule / inklusiver Unterricht' },
+  { value: 'international_school', labelKey: 'schoolTypes.international_school' },
 
   { value: '__group_ch', label: 'Schweiz', disabled: true },
   { value: 'primarschule', label: 'Primarschule' },
@@ -27,6 +29,7 @@ export const SCHOOL_TYPE_OPTIONS = [
   { value: 'fms', label: 'Fachmittelschule (FMS)' },
   { value: 'bms_ch', label: 'Berufsmaturitätsschule (BMS)' },
   { value: 'sonderschule_inklusion_ch', label: 'Sonderschule / inklusiver Unterricht' },
+  { value: 'international_school', labelKey: 'schoolTypes.international_school' },
 
   { value: '__group_org', label: 'Organisationen & Sonstige', disabled: true },
   { value: 'verein', label: 'Verein' },

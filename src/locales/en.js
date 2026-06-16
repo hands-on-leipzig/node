@@ -798,6 +798,7 @@ export default {
         "gesamtschule": "Comprehensive school (DE)",
         "sekundarschule_gemeinschaftsschule": "Secondary / community school (DE)",
         "foerderschule": "Special needs school (DE)",
+        "international_school": "International School",
         "volksschule": "Primary school (AT)",
         "mittelschule": "Middle school (AT)",
         "ahs_unterstufe": "Academic secondary school – lower level (AT)",
