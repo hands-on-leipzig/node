@@ -367,8 +367,6 @@ function actionFromApi(apiAction) {
       return { label: t('dashboard.completeTeamData'), icon: 'bi-pencil-square' }
     case 'awaiting_shipment':
       return { label: t('dashboard.awaitingShipment'), icon: 'bi-box-seam' }
-    case 'awaiting_confirmation':
-      return { label: t('dashboard.awaitingConfirmation'), icon: 'bi-hourglass-split' }
     case 'contact_us':
       return { label: t('dashboard.contactUs'), icon: 'bi-chat-left-text' }
     default:
@@ -425,8 +423,12 @@ function goTeam(id) {
 function goClass(id) {
   router.push({ name: 'class-detail', params: { id } })
 }
+function goGroup(id) {
+  router.push({ name: 'group-detail', params: { id } })
+}
 function goToTask(item) {
   if (item.type === 'team') goTeam(item.id)
+  else if (item.type === 'group') goGroup(item.id)
   else goClass(item.id)
 }
 

@@ -411,7 +411,6 @@ export default {
         "payInvoice": "Rechnung bezahlen",
         "completeTeamData": "Teamdaten vervollständigen",
         "awaitingShipment": "Material wird vorbereitet",
-        "awaitingConfirmation": "Anmeldung wird geprüft",
         "contactUs": "Bitte bei uns melden",
         "registeredEntities": "Deine Anmeldungen",
         "noRegisteredEntities": "Noch keine Anmeldungen vorhanden.",

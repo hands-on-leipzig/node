@@ -438,7 +438,6 @@ export default {
         "payInvoice": "Pay invoice",
         "completeTeamData": "Complete team data",
         "awaitingShipment": "Material is being prepared",
-        "awaitingConfirmation": "Registration under review",
         "contactUs": "Please contact us",
         "registeredEntities": "Your registrations",
         "noRegisteredEntities": "No registrations yet.",
