@@ -18,6 +18,7 @@ import {
   fetchPlacesForPostalCode,
   normalizeCountryForZipLookup,
 } from '@/utils/postalCodeLookup'
+import { buildCountryOptions } from '@/utils/countryOptions'
 import I18nText from "@/components/I18nText.vue";
 
 const { t, locale } = useI18n()
@@ -111,15 +112,14 @@ function fn(field) {
   return addressFieldName(props.idPrefix, field)
 }
 
-const countryOptions = computed(() => {
-  const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
-    ? new Intl.DisplayNames(['de', 'en'], { type: 'region' })
-    : null
-  const toLabel = (code) => (displayNames ? displayNames.of(code.toUpperCase()) : code.toUpperCase())
-  const top = ['de', 'at', 'ch']
-  const extra = ['fr', 'it', 'nl', 'be', 'pl', 'cz', 'sk', 'hu', 'si', 'hr', 'es', 'pt', 'gb', 'ie']
-  const all = [...top, ...extra]
-  return all.map((c) => ({ value: c, label: toLabel(c) || c.toUpperCase() }))
+const countryGroups = computed(() => {
+  const { top, rest } = buildCountryOptions(locale.value)
+  return {
+    topLabel: t('enroll.countriesTop'),
+    top,
+    restLabel: t('enroll.countriesOther'),
+    rest,
+  }
 })
 
 function setMode(useExisting) {
@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
             :model-value="(modelValue.new?.country || '').toLowerCase()"
             :autocomplete="ac('country')"
             :placeholder="t('enroll.selectCountry')"
-            :options="countryOptions"
+            :groups="countryGroups"
             required
             @update:model-value="onCountryChange"
           />

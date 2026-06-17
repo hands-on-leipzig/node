@@ -31,6 +31,7 @@ import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
 import { extractLockedSeasonSetCount } from '@/utils/voucherPreset'
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
+import { buildCountryOptions } from '@/utils/countryOptions'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -825,30 +826,7 @@ function normalizeEvents(rawList) {
     .filter(Boolean)
 }
 
-const countryOptions = computed(() => {
-  const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
-    ? new Intl.DisplayNames([locale.value], { type: 'region' })
-    : null
-  let codes = ['DE', 'AT', 'CH', 'US', 'GB', 'FR', 'IT', 'ES', 'NL', 'BE', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'SE', 'NO', 'DK', 'FI', 'PT', 'IE', 'GR', 'SI', 'HR', 'RS', 'UA', 'TR', 'CN', 'JP', 'KR', 'AU', 'NZ', 'CA', 'BR', 'MX', 'AR', 'CL', 'ZA', 'IN']
-  if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
-    try {
-      const supported = Intl.supportedValuesOf('region')
-      if (Array.isArray(supported) && supported.length) codes = supported
-    } catch (_) {
-      // keep fallback list
-    }
-  }
-  codes = codes.filter((code) => /^[A-Z]{2}$/.test(code))
-  const toLabel = (code) => displayNames ? displayNames.of(code) : code
-  const unique = Array.from(new Set(codes))
-  unique.sort((a, b) => toLabel(a).localeCompare(toLabel(b)))
-  const top = ['DE', 'AT', 'CH']
-  const rest = unique.filter((c) => !top.includes(c))
-  return {
-    top: top.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
-    rest: rest.map((code) => ({ value: code.toLowerCase(), label: toLabel(code) })),
-  }
-})
+const countryOptions = computed(() => buildCountryOptions(locale.value))
 
 const schoolTypeWizardOptions = computed(() => {
   const out = []
