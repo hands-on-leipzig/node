@@ -360,10 +360,20 @@ async function loadUpcomingCalendar() {
 
 /** Map API action string to UI { label, icon }. */
 function actionFromApi(apiAction) {
-  if (apiAction === 'pay_invoice') {
-    return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
+  switch (apiAction) {
+    case 'pay_invoice':
+      return { label: t('dashboard.payInvoice'), icon: 'bi-receipt' }
+    case 'complete_team_data':
+      return { label: t('dashboard.completeTeamData'), icon: 'bi-pencil-square' }
+    case 'awaiting_shipment':
+      return { label: t('dashboard.awaitingShipment'), icon: 'bi-box-seam' }
+    case 'awaiting_confirmation':
+      return { label: t('dashboard.awaitingConfirmation'), icon: 'bi-hourglass-split' }
+    case 'contact_us':
+      return { label: t('dashboard.contactUs'), icon: 'bi-chat-left-text' }
+    default:
+      return { label: t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
   }
-  return { label: t('dashboard.actionRequired'), icon: 'bi-exclamation-circle' }
 }
 
 async function loadLists() {
