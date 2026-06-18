@@ -552,38 +552,54 @@ onBeforeUnmount(() => {
             >
           </div>
         </div>
-        <div class="field">
-          <label :for="idPrefix + '-street'">
-            <I18nText k="enroll.street" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
-          </label>
-          <div class="autocomplete-wrap">
+        <div class="field-row">
+          <div class="field field-flex">
+            <label :for="idPrefix + '-street'">
+              <I18nText k="enroll.street" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
+            <div class="autocomplete-wrap">
+              <input
+                :id="idPrefix + '-street'"
+                :name="fn('street')"
+                type="text"
+                required
+                :readonly="!streetContextReady"
+                :class="{ 'address-input-readonly': !streetContextReady }"
+                :autocomplete="ac('street')"
+                :placeholder="streetContextReady ? '' : t('enroll.street')"
+                :value="modelValue.new?.street"
+                @input="onStreetInput($event.target.value)"
+              >
+              <div v-if="streetLoading" class="autocomplete-state">
+                <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
+              </div>
+              <div v-else-if="streetSuggestions.length" class="autocomplete-list" role="listbox">
+                <button
+                  v-for="(s, i) in streetSuggestions"
+                  :key="idPrefix + '-street-s-' + i"
+                  type="button"
+                  class="autocomplete-item"
+                  @click="applyStreetSuggestion(s)"
+                >
+                  <span class="autocomplete-item-main">{{ s.street }}</span>
+                  <span class="autocomplete-item-sub">{{ s.postalCode }} {{ s.city }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="field field-housenumber">
+            <label :for="idPrefix + '-houseNumber'">
+              <I18nText k="enroll.houseNumber" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
+            </label>
             <input
-              :id="idPrefix + '-street'"
-              :name="fn('street')"
+              :id="idPrefix + '-houseNumber'"
+              :name="fn('houseNumber')"
               type="text"
               required
-              :readonly="!streetContextReady"
-              :class="{ 'address-input-readonly': !streetContextReady }"
-              :autocomplete="ac('street')"
-              :placeholder="streetContextReady ? '' : t('enroll.street')"
-              :value="modelValue.new?.street"
-              @input="onStreetInput($event.target.value)"
+              :autocomplete="ac('houseNumber')"
+              :value="modelValue.new?.houseNumber"
+              @input="setNewField('houseNumber', $event.target.value)"
             >
-            <div v-if="streetLoading" class="autocomplete-state">
-              <i class="bi bi-arrow-repeat spin" /> {{ t('enroll.addressLookupLoading') }}
-            </div>
-            <div v-else-if="streetSuggestions.length" class="autocomplete-list" role="listbox">
-              <button
-                v-for="(s, i) in streetSuggestions"
-                :key="idPrefix + '-street-s-' + i"
-                type="button"
-                class="autocomplete-item"
-                @click="applyStreetSuggestion(s)"
-              >
-                <span class="autocomplete-item-main">{{ s.street }}</span>
-                <span class="autocomplete-item-sub">{{ s.postalCode }} {{ s.city }}</span>
-              </button>
-            </div>
           </div>
         </div>
         <template v-if="isInvoiceMode">
@@ -950,6 +966,10 @@ onBeforeUnmount(() => {
 }
 .field-row .field-flex {
   flex: 2;
+}
+.field-row .field-housenumber {
+  flex: 0 0 7rem;
+  min-width: 5rem;
 }
 .autocomplete-prompt {
   margin: 0.35rem 0 0.25rem;

@@ -535,11 +535,54 @@ const { quote: pricingQuote, loading: pricingLoading, error: pricingError } = us
 
 const pricingLines = computed(() => (Array.isArray(pricingQuote.value?.lines) ? pricingQuote.value.lines : []))
 
-const pricingDisplayLines = computed(() => pricingLines.value)
+/**
+ * Mirrors the PHP helper handson_unified_rules_quote_line_is_season_set_shipping.
+ * A line is "shipping" when its lineKind is 'service' or its label/productRef
+ * contains a shipping-related keyword.
+ */
+function isShippingLine(line) {
+  if (!line || typeof line !== 'object') return false
+  if (line.lineKind === 'service') return true
+  const text = `${line.label ?? ''} ${line.productRef ?? ''}`.toLowerCase()
+  return /\b(porto|versand|shipping|lieferung|paketporto|transport|portgeb[uü]hr)\b/.test(text)
+}
+
+/**
+ * Delivery country is "confirmed" when an explicit address has been entered or
+ * selected — not just based on the institution location fallback.
+ * Used to decide whether to show shipping costs in the order overview.
+ */
+const deliveryCountryConfirmed = computed(() => {
+  // Separate delivery address entered
+  if (deliveryAddressDifferent.value || voucherForcesInvoiceAddress.value) {
+    const newC = deliveryAddress.value?.new?.country?.trim()
+    if (newC) return true
+    if (deliveryAddress.value?.useExisting && deliveryAddress.value?.addressId) return true
+    return false
+  }
+  // Delivery = invoice address; check whether an invoice address country is available
+  const newC = invoiceAddress.value?.new?.country?.trim()
+  if (newC) return true
+  if (invoiceAddress.value?.useExisting && invoiceAddress.value?.addressId) return true
+  return false
+})
+
+const pricingDisplayLines = computed(() => {
+  if (deliveryCountryConfirmed.value) return pricingLines.value
+  return pricingLines.value.filter((l) => !isShippingLine(l))
+})
 
 const pricingTotalGrossEur = computed(() => {
-  const t = Number(pricingQuote.value?.totalGrossEur)
-  return Number.isFinite(t) ? t : 0
+  if (deliveryCountryConfirmed.value) {
+    const t = Number(pricingQuote.value?.totalGrossEur)
+    return Number.isFinite(t) ? t : 0
+  }
+  // Subtract shipping lines from total
+  return pricingLines.value.reduce((sum, l) => {
+    if (isShippingLine(l)) return sum
+    const v = Number(l.lineGrossEur)
+    return sum + (Number.isFinite(v) ? v : 0)
+  }, 0)
 })
 
 const pricingUseApi = computed(() => pricingQuote.value?.ok === true)
@@ -664,16 +707,28 @@ const futureOrderEventTeamsCount = computed(() => {
 })
 
 function resolveQuoteCountryCode() {
-  const fromInstitution = formData.value.country?.trim()
-  if (fromInstitution) return fromInstitution.length === 2 ? fromInstitution.toUpperCase() : fromInstitution
-  const newC = deliveryAddress.value?.new?.country?.trim()
-  if (newC) return newC.length === 2 ? newC.toUpperCase() : newC
+  // Delivery address country takes priority — shipping (Logistikpauschale) is
+  // always calculated based on where the goods are sent, not the institution location.
+  const newDeliveryC = deliveryAddress.value?.new?.country?.trim()
+  if (newDeliveryC) return newDeliveryC.length === 2 ? newDeliveryC.toUpperCase() : newDeliveryC
   if (deliveryAddress.value?.useExisting && deliveryAddress.value?.addressId) {
     const id = String(deliveryAddress.value.addressId)
     const found = deliveryAddresses.value.find((a) => String(a.id) === id)
     const c = found?.country != null ? String(found.country).trim() : ''
     if (c) return c.length === 2 ? c.toUpperCase() : c
   }
+  // Delivery = invoice: use invoice address country
+  const newInvoiceC = invoiceAddress.value?.new?.country?.trim()
+  if (newInvoiceC) return newInvoiceC.length === 2 ? newInvoiceC.toUpperCase() : newInvoiceC
+  if (invoiceAddress.value?.useExisting && invoiceAddress.value?.addressId) {
+    const id = String(invoiceAddress.value.addressId)
+    const found = invoiceAddresses.value.find((a) => String(a.id) === id)
+    const c = found?.country != null ? String(found.country).trim() : ''
+    if (c) return c.length === 2 ? c.toUpperCase() : c
+  }
+  // Fall back to institution/school country
+  const fromInstitution = formData.value.country?.trim()
+  if (fromInstitution) return fromInstitution.length === 2 ? fromInstitution.toUpperCase() : fromInstitution
   return 'DE'
 }
 
@@ -2674,6 +2729,10 @@ watch(deliveryAddressDifferent, (different) => {
                     <strong>{{ formatWizardEur(line.lineGrossEur) }}</strong>
                   </span>
                 </div>
+                <div v-if="!deliveryCountryConfirmed" class="wizard-cart-row wizard-cart-row--price">
+                  <span><I18nText k="wizard.shippingPending" /></span>
+                  <span class="wizard-cart-muted"><I18nText k="wizard.shippingPendingNote" /></span>
+                </div>
                 <div v-if="futureOnSiteEvent !== 'yes'" class="wizard-cart-row wizard-cart-row--price">
                   <span><I18nText k="wizard.orderPriceEventLater" /></span>
                   <strong>{{ formatWizardEur(0) }}</strong>
@@ -2813,6 +2872,10 @@ watch(deliveryAddressDifferent, (different) => {
                     <span v-if="pricingLineShowsWasPrice(line)" class="wizard-price-was">{{ formatWizardEur(line.catalogGrossEur) }}</span>
                     <strong>{{ formatWizardEur(line.lineGrossEur) }}</strong>
                   </span>
+                </div>
+                <div v-if="!deliveryCountryConfirmed" class="wizard-cart-row wizard-cart-row--price">
+                  <span><I18nText k="wizard.shippingPending" /></span>
+                  <span class="wizard-cart-muted"><I18nText k="wizard.shippingPendingNote" /></span>
                 </div>
                 <div class="wizard-cart-row wizard-cart-row--price wizard-cart-row--total">
                   <span><I18nText k="wizard.orderPriceTotal" /></span>

@@ -18,7 +18,7 @@ const INVOICE_EINVOICE_DEFAULTS = {
  * @param {AddressFormMode} mode
  */
 export function emptyAddressNewFields(mode) {
-  const base = { street: '', postalCode: '', city: '', country: '' }
+  const base = { street: '', houseNumber: '', postalCode: '', city: '', country: '' }
   if (mode === ADDRESS_MODE_INVOICE) {
     return {
       ...base,
@@ -117,10 +117,11 @@ export function invoiceNeedsRegisteredAsCompany(n) {
 export function isAddressNewValid(n, mode) {
   if (!n || typeof n !== 'object') return false
   const street = String(n.street || '').trim()
+  const houseNumber = String(n.houseNumber || '').trim()
   const postalCode = String(n.postalCode || '').trim()
   const city = String(n.city || '').trim()
   const country = String(n.country || '').trim()
-  if (!street || !postalCode || !city || !country) return false
+  if (!street || !houseNumber || !postalCode || !city || !country) return false
   if (mode === ADDRESS_MODE_INVOICE) {
     if (!String(n.institution || '').trim()) return false
     const netInvoice = parseYesNo(n.netInvoiceDesired)
@@ -144,6 +145,7 @@ export function buildNewAddressPayload(addr, mode) {
   if (!isAddressNewValid(n, mode)) return undefined
   const payload = {
     street: String(n.street || '').trim(),
+    houseNumber: String(n.houseNumber || '').trim(),
     postalCode: String(n.postalCode || '').trim(),
     city: String(n.city || '').trim(),
     country: String(n.country || '').trim(),

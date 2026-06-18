@@ -102,7 +102,7 @@ export function formatOverviewAddress(addr, localeTag = 'en') {
   const zip = pickZip(addr)
   const town = pickTown(addr)
 
-  const streetLine = [addr.street, addr.number].filter(Boolean).join(' ').trim()
+  const streetLine = [addr.street, addr.houseNumber ?? addr.number].filter(Boolean).join(' ').trim()
     || String(addr.address || addr.address1 || '').trim()
 
   const parts = [
@@ -133,7 +133,7 @@ export function formatAddressBookLines(addr, localeTag = 'en') {
   const countryLabel = resolveCountryLabel(addr, localeTag)
   const zip = pickZip(addr)
   const town = pickTown(addr)
-  const streetLine = [addr.street, addr.number].filter(Boolean).join(' ').trim()
+  const streetLine = [addr.street, addr.houseNumber ?? addr.number].filter(Boolean).join(' ').trim()
     || String(addr.address || addr.address1 || '').trim()
   const line2 = String(addr.line2 || addr.addressLine2 || '').trim()
   const line3 = String(addr.line3 || addr.addressLine3 || '').trim()
