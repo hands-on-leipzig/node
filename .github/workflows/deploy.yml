@@ -44,8 +44,8 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
 
-      - name: Build
-        run: npm run build
+      - name: Build (test — uses .env + .env.test → dev API)
+        run: npm run build:test
 
       - name: Setup SSH key
         env:
