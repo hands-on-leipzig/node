@@ -77,7 +77,13 @@ onUnmounted(() => {
 
           <div class="venue-detail-modal-body">
             <div class="venue-detail-modal-map">
-              <VenueDetailMap :lat="venue.lat" :lon="venue.lon"/>
+              <VenueDetailMap
+                :lat="venue.lat"
+                :lon="venue.lon"
+                :address="venue.address || ''"
+                :zip="venue.zip || ''"
+                :country="venue.country || ''"
+              />
             </div>
             <aside class="venue-detail-modal-side">
               <p class="venue-detail-meta">
