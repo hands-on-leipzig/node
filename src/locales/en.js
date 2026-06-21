@@ -790,6 +790,10 @@ export default {
         "nameRequired": "Name is required.",
         "addressesRequired": "Please fill in delivery and invoice address to continue.",
         "addressesRequiredHint": "Select or add the invoice and delivery address to continue.",
+        "nameBlocked": "This name is not allowed. Please choose a real team name.",
+        "namePlaceholderWarning": "This name looks like a placeholder. Please double-check that this is your team's actual name.",
+        "nameDuplicateWarning": "A team with this name is already registered for this event. You may still proceed, but please verify the name.",
+        "nameWarningProceed": "Proceed anyway",
         "enrollmentFailed": "Registration failed."
     },
     "errors": {

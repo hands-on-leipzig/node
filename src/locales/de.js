@@ -790,6 +790,10 @@ export default {
         "nameRequired": "Name ist Pflicht.",
         "addressesRequired": "Bitte Liefer- und Rechnungsadresse angeben.",
         "addressesRequiredHint": "Wähle oder gib Rechnungs- und Lieferadresse an, um fortzufahren.",
+        "nameBlocked": "Dieser Name ist nicht zulässig. Bitte wähle einen echten Teamnamen.",
+        "namePlaceholderWarning": "Dieser Name sieht wie ein Platzhalter aus. Bitte prüfe, ob das bereits euer endgültiger Teamname ist.",
+        "nameDuplicateWarning": "Ein Team mit diesem Namen ist für dieses Event bereits angemeldet. Ihr könnt trotzdem fortfahren, aber bitte prüft den Namen nochmal.",
+        "nameWarningProceed": "Trotzdem fortfahren",
         "enrollmentFailed": "Anmeldung fehlgeschlagen."
     },
     "errors": {

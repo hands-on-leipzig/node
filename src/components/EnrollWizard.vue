@@ -9,6 +9,7 @@ import {
   fetchEnrollmentPricingQuote,
   getEventsNearest,
   validateVoucher,
+  validateTeamName,
   updateTeamPlayers,
   registerTeamForEvent,
   listAddressBookGrouped,
@@ -160,6 +161,13 @@ const founderTeamPlayers = ref([])
 const founderTeamEventId = ref(null)
 const founderEventsNearest = ref([])
 const founderEventsNearestLoading = ref(false)
+
+// Team name validation
+const nameValidation = ref({ blocked: false, blockedReason: null, warning: false, warningType: null, duplicateCount: 0 })
+const nameValidationLoading = ref(false)
+/** When true, user has acknowledged the soft warning and wants to proceed anyway. */
+const nameValidationIgnored = ref(false)
+let nameValidationTimer = null
 // Step 6
 const deliveryAddress = ref(emptyAddressState(ADDRESS_MODE_DELIVERY))
 const invoiceAddress = ref(emptyAddressState(ADDRESS_MODE_INVOICE))
@@ -1113,6 +1121,28 @@ function hasRequiredTeamName() {
   return foundersType.value !== 'team' || !!formData.value.name?.trim()
 }
 
+/** Debounced call to the backend name-validation endpoint. */
+function scheduleNameValidation(eventId = null) {
+  clearTimeout(nameValidationTimer)
+  const name = formData.value.name?.trim() ?? ''
+  if (!name) {
+    nameValidation.value = { blocked: false, blockedReason: null, warning: false, warningType: null, duplicateCount: 0 }
+    nameValidationLoading.value = false
+    return
+  }
+  nameValidationLoading.value = true
+  nameValidationTimer = setTimeout(async () => {
+    try {
+      const result = await validateTeamName(name, eventId ?? founderTeamEventId.value)
+      nameValidation.value = result
+    } catch (_) {
+      nameValidation.value = { blocked: false, blockedReason: null, warning: false, warningType: null, duplicateCount: 0 }
+    } finally {
+      nameValidationLoading.value = false
+    }
+  }, 400)
+}
+
 function hasRequiredSchoolFields() {
   return hasRequiredInstitutionFields() && hasRequiredParticipantFields() && hasRequiredTeamName()
 }
@@ -1192,7 +1222,7 @@ function canNext() {
       }
       return areAddressesValid()
     }
-    if (ft) return hasRequiredTeamName()
+    if (ft) return hasRequiredTeamName() && !nameValidation.value.blocked
     return true
   }
   if (s === 6) {
@@ -1786,6 +1816,10 @@ async function submit() {
     error.value = t('wizard.nameRequired')
     return
   }
+  if (edition.value === 'founders' && foundersType.value === 'team' && nameValidation.value.blocked) {
+    error.value = t('wizard.nameBlocked')
+    return
+  }
   if (voucher.value?.trim() && voucherValid.value === false) {
     error.value = t('enroll.voucherInvalid')
     return
@@ -1992,6 +2026,22 @@ watch([step, foundersTeamNameStepIndex], () => {
   nextTick(() => {
     document.getElementById('wizard-founder-team-name')?.focus?.()
   })
+})
+
+// Trigger name validation whenever the team name changes
+watch(
+  () => formData.value.name,
+  () => {
+    if (foundersType.value !== 'team') return
+    nameValidationIgnored.value = false
+    scheduleNameValidation()
+  },
+)
+
+// Re-run for duplicate check when event is selected (step 7)
+watch(founderTeamEventId, (eventId) => {
+  if (foundersType.value !== 'team' || !formData.value.name?.trim()) return
+  scheduleNameValidation(eventId)
 })
 
 watch(
@@ -2398,7 +2448,7 @@ watch(deliveryAddressDifferent, (different) => {
               <p class="wizard-hint"><I18nText k="wizard.teamNameHint" /></p>
               <div
                 class="wizard-form-field wizard-team-name-field"
-                :class="{ 'wizard-form-field--invalid': step4ValidationAttempted && isStep4RequiredFieldMissing('name') }"
+                :class="{ 'wizard-form-field--invalid': (step4ValidationAttempted && isStep4RequiredFieldMissing('name')) || nameValidation.blocked }"
               >
                 <label class="wizard-form-field-label wizard-team-name-label" for="wizard-founder-team-name">
                   <I18nText k="enrollTeam.teamName" /> <span class="required">*</span>
@@ -2408,13 +2458,31 @@ watch(deliveryAddressDifferent, (different) => {
                   v-model="formData.name"
                   type="text"
                   class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue wizard-team-name-input"
-                  :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isStep4RequiredFieldMissing('name') }"
+                  :class="{ 'liquid-surface-control--invalid': (step4ValidationAttempted && isStep4RequiredFieldMissing('name')) || nameValidation.blocked }"
                   :placeholder="t('wizard.teamNamePlaceholder')"
                   autocomplete="organization"
                   @keydown.enter.prevent="next()"
                 >
                 <p v-if="step4ValidationAttempted && isStep4RequiredFieldMissing('name')" class="wizard-form-field-error">
                   <I18nText k="common.requiredField" />
+                </p>
+                <!-- Hard block: name is on the blacklist -->
+                <p v-else-if="nameValidation.blocked" class="wizard-form-field-error">
+                  <I18nText k="wizard.nameBlocked" />
+                </p>
+                <!-- Soft warning: name looks like a placeholder -->
+                <p v-else-if="nameValidation.warning && nameValidation.warningType === 'placeholder' && !nameValidationIgnored" class="wizard-name-warning">
+                  <I18nText k="wizard.namePlaceholderWarning" />
+                  <button type="button" class="wizard-name-warning-dismiss" @click="nameValidationIgnored = true">
+                    <I18nText k="wizard.nameWarningProceed" />
+                  </button>
+                </p>
+                <!-- Soft warning: duplicate name at selected event -->
+                <p v-else-if="nameValidation.warning && nameValidation.warningType === 'duplicate' && !nameValidationIgnored" class="wizard-name-warning">
+                  <I18nText k="wizard.nameDuplicateWarning" />
+                  <button type="button" class="wizard-name-warning-dismiss" @click="nameValidationIgnored = true">
+                    <I18nText k="wizard.nameWarningProceed" />
+                  </button>
                 </p>
               </div>
             </div>
@@ -2516,6 +2584,16 @@ watch(deliveryAddressDifferent, (different) => {
                 @update:model-value="founderTeamEventId = $event"
               />
             </div>
+            <!-- Duplicate team name warning for the selected event -->
+            <p
+              v-if="founderTeamEventId && nameValidation.warning && nameValidation.warningType === 'duplicate' && !nameValidationIgnored"
+              class="wizard-name-warning wizard-name-warning--event-step"
+            >
+              <I18nText k="wizard.nameDuplicateWarning" />
+              <button type="button" class="wizard-name-warning-dismiss" @click="nameValidationIgnored = true">
+                <I18nText k="wizard.nameWarningProceed" />
+              </button>
+            </p>
           </div>
 
           <!-- Step 6: On-site event (Future only) -->
@@ -3587,6 +3665,34 @@ html[data-theme='dark'] .wizard-sticky-top {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
   color: #dc2626;
+}
+.wizard-name-warning {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.85rem;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #92400e;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.wizard-name-warning--event-step {
+  margin-top: 1rem;
+}
+.wizard-name-warning-dismiss {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid #f59e0b;
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  color: #92400e;
+  cursor: pointer;
+}
+.wizard-name-warning-dismiss:hover {
+  background: #fef3c7;
 }
 .wizard-zip-lookup-state {
   display: inline-flex;

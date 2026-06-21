@@ -103,6 +103,28 @@ export async function validateVoucher(code, program = null) {
 }
 
 /**
+ * Validate a proposed team name before enrollment.
+ *
+ * @param {string} name            - The name to validate
+ * @param {number|null} [eventId]  - Event ID to check for duplicates (omit / null to skip)
+ * @returns {Promise<{
+ *   blocked: boolean,
+ *   blockedReason: string|null,
+ *   warning: boolean,
+ *   warningType: 'placeholder'|'duplicate'|null,
+ *   duplicateCount: number
+ * }>}
+ */
+export async function validateTeamName(name, eventId = null) {
+  const params = { name: String(name ?? '') }
+  if (eventId != null && Number.isFinite(Number(eventId)) && Number(eventId) > 0) {
+    params.event_id = String(eventId)
+  }
+  const res = await api.get('/validate-team-name', { params })
+  return res.data
+}
+
+/**
  * List address book entries for the current user (for delivery/invoice).
  */
 export function getAddresses() {
