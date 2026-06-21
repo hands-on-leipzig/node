@@ -207,7 +207,7 @@ const foundersNeedsSeasonSets = computed(
 )
 
 const foundersTeamNameStepIndex = computed(() =>
-  (foundersTeamHasParticipantsStep.value ? 5 : -1),
+  (foundersTeamHasParticipantsStep.value ? 6 : -1),
 )
 
 const foundersSeasonSetsStep = computed(() => {
@@ -237,7 +237,7 @@ const foundersOrderStep = computed(() => {
 const institutionStepIndex = computed(() => (edition.value === 'founders' ? 4 : 3))
 const participantsStepIndex = computed(() => {
   if (edition.value === 'future') return 4
-  if (foundersTeamHasParticipantsStep.value) return 6
+  if (foundersTeamHasParticipantsStep.value) return 7
   return 5
 })
 
@@ -329,9 +329,9 @@ const wizardProgressSteps = computed(() => {
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.stepTeamClass', active: s === 3, done: s > 3 },
       { key: 'wizard.progressDetails', active: s === 4, done: s > 4 },
-      { key: 'wizard.progressTeamName', active: s === 5, done: s > 5 },
-      { key: 'wizard.progressParticipants', active: s === 6, done: s > 6 },
-      { key: 'wizard.progressEvent', active: s === 7, done: s > 7 },
+      { key: 'wizard.progressEvent', active: s === 5, done: s > 5 },
+      { key: 'wizard.progressTeamName', active: s === 6, done: s > 6 },
+      { key: 'wizard.progressParticipants', active: s === 7, done: s > 7 },
     ]
     if (foundersNeedsSeasonSets.value) {
       items.push({
@@ -390,12 +390,12 @@ const stepTitle = computed(() => {
     if (foundersClassEnrollment.value) {
       return foundersNeedsSeasonSets.value ? t('enrollFuture.stepSeasonSets') : t('wizard.stepAddresses')
     }
-    if (ft) return t('wizard.stepTeamName')
+    if (ft) return t('wizard.stepEvent')
     return ''
   }
   if (s === 6) {
     if (edition.value === 'future') return t('wizard.stepOnSiteEvent')
-    if (ft) return t('wizard.stepParticipants')
+    if (ft) return t('wizard.stepTeamName')
     if (foundersClassEnrollment.value) {
       return foundersNeedsSeasonSets.value ? t('wizard.stepAddresses') : t('wizard.stepOrder')
     }
@@ -403,7 +403,7 @@ const stepTitle = computed(() => {
   }
   if (s === 7) {
     if (edition.value === 'future') return t('wizard.stepAddresses')
-    if (ft) return t('wizard.stepEvent')
+    if (ft) return t('wizard.stepParticipants')
     if (foundersClassEnrollment.value) return t('wizard.stepOrder')
     return ''
   }
@@ -1222,7 +1222,7 @@ function canNext() {
       }
       return areAddressesValid()
     }
-    if (ft) return hasRequiredTeamName() && !nameValidation.value.blocked
+    if (ft) return true  // event step is optional
     return true
   }
   if (s === 6) {
@@ -1237,7 +1237,7 @@ function canNext() {
       }
       return true
     }
-    if (ft) return true
+    if (ft) return hasRequiredTeamName() && !nameValidation.value.blocked
     if (foundersClassEnrollment.value) {
       return foundersNeedsSeasonSets.value ? areAddressesValid() : false
     }
@@ -1279,6 +1279,9 @@ function next() {
     step4ValidationAttempted.value = true
     return
   }
+  if (step.value === foundersTeamNameStepIndex.value && nameValidation.value.blocked) {
+    return
+  }
   if (step.value === 0 && introSubStep.value === 'fll') {
     introSubStep.value = 'voucher'
     return
@@ -1291,15 +1294,15 @@ function next() {
     if (step.value >= participantsStepIndex.value && foundersTeamHasParticipantsStep.value && founderTeamPlayers.value.length === 0) {
       addFounderParticipant()
     }
-    if (step.value >= 7 && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
+    if (step.value >= 5 && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
     return
   }
   if (step.value === 2 && edition.value === 'future') loadAddresses()
   if (step.value === institutionStepIndex.value) loadAddresses()
+  if (step.value === institutionStepIndex.value && foundersTeamHasParticipantsStep.value) loadFounderTeamEventsNearest()
   if (step.value === 4 && edition.value === 'future') loadFutureEventsNearest()
   if (step.value === participantsStepIndex.value && foundersTeamHasParticipantsStep.value) {
     if (founderTeamPlayers.value.length === 0) addFounderParticipant()
-    loadFounderTeamEventsNearest()
   }
   if (step.value < lastStep.value) {
     if (step.value === institutionStepIndex.value && foundersClassEnrollment.value) {
@@ -1660,8 +1663,8 @@ function firstIncompleteEnrollmentStep() {
     if (!foundersType.value) return 3
     if (!hasRequiredInstitutionFields()) return 4
     if (foundersTeamHasParticipantsStep.value) {
-      if (!hasRequiredTeamName()) return 5
-      return 6
+      if (!hasRequiredTeamName()) return 6
+      return 7
     }
     if (foundersNeedsSeasonSets.value) {
       if (shouldSkipSeasonSetsWizardStep.value) return foundersAddressesStep.value
@@ -2570,8 +2573,8 @@ watch(deliveryAddressDifferent, (different) => {
             </div>
           </div>
 
-          <!-- Step 7: Event (Founder team only; Future uses step 6 for on-site event) -->
-          <div v-show="step === 7 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
+          <!-- Step 5 (Founders team): event selection — comes before team name for duplicate check -->
+          <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
             <div class="wizard-event-select-wrap">
               <EventSelectDropdown
