@@ -105,6 +105,21 @@ export function formatVenueDateDisplay(isoDate, locale, dateTbdText = '') {
   return formatVenueDate(raw, locale)
 }
 
+/**
+ * Return comments in given language
+ *
+ * @param {object} venue
+ * @param {string} locale
+ */
+export function venueComments(venue, locale) {
+  switch (locale) {
+    case 'en':
+      return venue.commentsEn
+    case 'de':
+      return venue.comments
+  }
+}
+
 export const OFFER_COLORS = {
   exhibition: '#2e7d32',
   competition: '#c62828',
