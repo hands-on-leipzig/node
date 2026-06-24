@@ -690,7 +690,7 @@ export default {
         "editionFutureDesc": "Mit den Angeboten 8+ (4. bis 10. Klasse) und 5+ (1. bis 3. Klasse) bei denen mit LEGO Education Informatik & KI gearbeitet wird.",
         "optionExploreDesc": "Das Founders Edition Angebot, bei dem LEGO Education SPIKE Essential oder ein entsprechendes Vorgängerprodukt verwendet wird.",
         "optionChallengeDesc": "Das Founders Edition Angebot, bei dem SPIKE Prime oder ein entsprechendes Vorgängerprodukte verwendet wird.",
-        "teamDesc": "Teilnahme als Team mit 2 bis 10 Teilnehmenden. Der Projektabschluss ist die Teilnahme an einem Regionalwettbewerb.",
+        "teamDesc": "Teilnahme als Team mit bis zu 6 Teilnehmenden. Der Projektabschluss ist die Teilnahme an einer regionalen Ausstellung.",
         "classDesc": "Teilnahme als Klasse bzw. große Gruppe mit bis zu 24 Teilnehmenden. Der Projektabschluss findet schulintern statt.",
         "futureGroup5Desc": "Das Future Edition Angebot bei dem Informatik & KI 5+ eingesetzt wird.\n\nACHTUNG: Die Anmeldung ist erst ab Oktober 2026 möglich.",
         "futureGroup8Desc": "Das Future Edition Angebot bei dem Informatik & KI 8+ oder Informatik & KI 11+ verwendet wird.",
