@@ -690,7 +690,7 @@ export default {
         "editionFutureDesc": "The 8+ program (grades 4–10) and 5+ program (grades 1–3) using LEGO Education Computer Science & AI.",
         "optionExploreDesc": "The Founders Edition program using LEGO Education SPIKE Essential or a comparable legacy product.",
         "optionChallengeDesc": "The Founders Edition program using LEGO Education SPIKE Prime or a comparable legacy product.",
-        "teamDesc": "Participation as a team with 2 up to 10 participants. The program concludes with participation in a regional tournament.",
+        "teamDesc": "Participation as a team with up to 6 participants. The program concludes with participation in a regional exhibition.",
         "classDesc": "Participation as a class or larger group with up to 24 participants. The project concludes with an internal school presentation or showcase.",
         "futureGroup5Desc": "The Future Edition program, in which Computer Science & AI 5+ is used.<br>\n\nPlease note: Registration opens in October 2026.",
         "futureGroup8Desc": "The Future Edition program using Computer Science [&] AI 8+ or Computer Science [&] AI 11+.",
