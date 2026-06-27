@@ -649,15 +649,19 @@ function selectFutureEventTeamCount(count) {
   const maxTeams = maxFutureEventTeamsByPupils.value
   if (!Number.isFinite(n) || n <= 0) return
   if (n <= maxTeams) {
+    if (futureTeamAutoUpgrade.value && n < futureTeamAutoUpgrade.value.teams) {
+      futurePupils.value = futureTeamAutoUpgrade.value.previousPupils
+      futureTeamAutoUpgrade.value = null
+    }
     futureEventTeamCount.value = n
-    futureTeamAutoUpgrade.value = null
     return
   }
   const neededPupils = n * FUTURE_EVENT_TEAM_SIZE
   if (!FUTURE_PUPIL_OPTIONS.includes(neededPupils)) return
+  const previousPupils = futureTeamAutoUpgrade.value?.previousPupils ?? futurePupils.value
   futurePupils.value = neededPupils
   futureEventTeamCount.value = n
-  futureTeamAutoUpgrade.value = { teams: n, pupils: neededPupils }
+  futureTeamAutoUpgrade.value = { teams: n, pupils: neededPupils, previousPupils }
 }
 
 function normalizeFutureEventTeamCount() {
