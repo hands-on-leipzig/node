@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -20,6 +20,7 @@ import {
   formatVenueDateDisplay,
   isFutureEditionVenue,
 } from '@/utils/venueFilters'
+import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory } from '@/utils/spaBrowserBack'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -119,10 +120,22 @@ function toggleAccordion(section, country) {
 function openVenueDetail(venue) {
   if (!venue?.id) return
   selectedVenue.value = venue
+  pushOverlayHistory('venue')
 }
 
-function closeVenueDetail() {
+function closeVenueDetail(fromBrowserBack = false) {
+  if (!fromBrowserBack && popOverlayHistory('venue')) return
   selectedVenue.value = null
+}
+
+function handleBrowserBackRequest(event) {
+  if (!selectedVenue.value) return
+  closeVenueDetail(true)
+  if (event?.detail) {
+    event.detail.handled = true
+    event.detail.skipRestore = true
+    event.detail.rearmRootTrap = true
+  }
 }
 
 function onMapVenueSelect(venue) {
@@ -152,6 +165,15 @@ function doLogin() {
 
 onMounted(() => {
   loadVenues()
+  if (typeof window !== 'undefined') {
+    window.addEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
+  }
 })
 </script>
 
@@ -305,7 +327,7 @@ onMounted(() => {
     <VenueDetailModal
       :show="!!selectedVenue"
       :venue="selectedVenue"
-      @close="closeVenueDetail"
+      @close="() => closeVenueDetail()"
     />
   </div>
 </template>

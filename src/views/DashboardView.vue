@@ -23,6 +23,7 @@ import DocumentsFileOpeningOverlay from '@/components/DocumentsFileOpeningOverla
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
+import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory, pushWizardHistorySnapshot } from '@/utils/spaBrowserBack'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -30,6 +31,7 @@ const route = useRoute()
 
 const wizardOpen = ref(false)
 const wizardRef = ref(null)
+const wizardHistoryDepth = ref(0)
 const coCoachModalOpen = ref(false)
 const selectedRegistrationTarget = ref('')
 const coCoachEmail = ref('')
@@ -108,6 +110,7 @@ async function loadRegistrationWindow() {
 
 function openWizard() {
   if (!registrationAllowed.value) return
+  wizardHistoryDepth.value = 0
   wizardOpen.value = true
 }
 function clearWizardQuery() {
@@ -119,6 +122,7 @@ function clearWizardQuery() {
 function openCoCoachModal() {
   resetCoCoachInviteForm()
   coCoachModalOpen.value = true
+  pushOverlayHistory('coCoach')
   const list = coCoachTargets.value
   if (list.length === 1) {
     selectedRegistrationTarget.value = list[0].value
@@ -128,7 +132,8 @@ function openCoCoachModal() {
     selectedRegistrationTarget.value = ''
   }
 }
-function closeCoCoachModal() {
+function closeCoCoachModal(fromBrowserBack = false) {
+  if (!fromBrowserBack && popOverlayHistory('coCoach')) return
   coCoachModalOpen.value = false
 }
 
@@ -244,20 +249,77 @@ function coCoachTargetLabel(item) {
   if (item.type === 'group') return `${t('dashboard.coCoachTypeGroup')}: ${label}`
   return `${t('dashboard.coCoachTypeTeam')}: ${label}`
 }
-function onWizardClose() {
+function resetWizardHistory(fromBrowserBack = false) {
+  const depth = wizardHistoryDepth.value
+  wizardHistoryDepth.value = 0
+  if (!fromBrowserBack && depth > 0 && typeof window !== 'undefined') {
+    window.history.go(-depth)
+  }
+}
+function onWizardClose(fromBrowserBack = false) {
   wizardOpen.value = false
   clearWizardQuery()
+  resetWizardHistory(fromBrowserBack)
 }
-function onWizardSuccess() {
+function onWizardSuccess(fromBrowserBack = false) {
   loadLists()
+  wizardOpen.value = false
   clearWizardQuery()
+  resetWizardHistory(fromBrowserBack)
+}
+function onWizardHistoryChange(snapshot) {
+  pushWizardHistorySnapshot(snapshot)
+  wizardHistoryDepth.value += 1
 }
 
 function handleBrowserBackRequest(event) {
-  if (!wizardOpen.value) return
-  const handled = wizardRef.value?.handleBrowserBack?.()
-  if (handled && event?.detail) {
-    event.detail.handled = true
+  if (wizardOpen.value) {
+    const state = event?.detail?.state
+    if (state?.hotWizard && state.wizardSnapshot) {
+      wizardRef.value?.applyWizardSnapshot?.(state.wizardSnapshot)
+      wizardHistoryDepth.value = Math.max(0, wizardHistoryDepth.value - 1)
+      if (event?.detail) {
+        event.detail.handled = true
+        event.detail.skipRestore = true
+      }
+      return
+    }
+    onWizardClose(true)
+    if (event?.detail) {
+      event.detail.handled = true
+      event.detail.skipRestore = true
+      event.detail.rearmRootTrap = true
+    }
+    return
+  }
+
+  if (pdfModalOpen.value) {
+    closeDocumentsPdf(true)
+    if (event?.detail) {
+      event.detail.handled = true
+      event.detail.skipRestore = true
+      event.detail.rearmRootTrap = true
+    }
+    return
+  }
+
+  if (documentsModalOpen.value) {
+    closeDocumentsModal(true)
+    if (event?.detail) {
+      event.detail.handled = true
+      event.detail.skipRestore = true
+      event.detail.rearmRootTrap = true
+    }
+    return
+  }
+
+  if (coCoachModalOpen.value) {
+    closeCoCoachModal(true)
+    if (event?.detail) {
+      event.detail.handled = true
+      event.detail.skipRestore = true
+      event.detail.rearmRootTrap = true
+    }
   }
 }
 
@@ -437,12 +499,13 @@ onMounted(async () => {
   loadUpcomingCalendar()
   await loadRegistrationWindow()
   if (route.query?.wizard === '1' && registrationAllowed.value) {
+    wizardHistoryDepth.value = 0
     wizardOpen.value = true
   } else if (route.query?.wizard === '1') {
     clearWizardQuery()
   }
   if (typeof window !== 'undefined') {
-    window.addEventListener('hot-browser-back', handleBrowserBackRequest)
+    window.addEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
   }
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
     mobileMediaQuery = window.matchMedia('(max-width: 768px)')
@@ -465,7 +528,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
-    window.removeEventListener('hot-browser-back', handleBrowserBackRequest)
+    window.removeEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
   }
   if (detachMobileListener) detachMobileListener()
   if (pdfModalBlobUrl.value) {
@@ -485,6 +548,7 @@ watch(
   (wizardFlag) => {
     if (wizardFlag === '1') {
       if (registrationAllowed.value) {
+        wizardHistoryDepth.value = 0
         wizardOpen.value = true
       } else {
         clearWizardQuery()
@@ -506,10 +570,12 @@ async function ensureDocumentsLoaded() {
 
 async function openDocumentsModal() {
   documentsModalOpen.value = true
+  pushOverlayHistory('documents')
   await ensureDocumentsLoaded()
 }
 
-function closeDocumentsModal() {
+function closeDocumentsModal(fromBrowserBack = false) {
+  if (!fromBrowserBack && popOverlayHistory('documents')) return
   documentsModalOpen.value = false
 }
 
@@ -523,6 +589,7 @@ async function openPdfFromBlob(blob, title) {
   pdfModalUrl.value = pdfModalBlobUrl.value
   pdfModalTitle.value = title
   pdfModalOpen.value = true
+  pushOverlayHistory('pdf')
   return true
 }
 
@@ -538,6 +605,7 @@ const { openDocumentFile } = useDocumentFileOpen({
     pdfModalUrl.value = url
     pdfModalTitle.value = title
     pdfModalOpen.value = true
+    pushOverlayHistory('pdf')
   },
 })
 
@@ -559,7 +627,8 @@ async function openDocumentsPdf(payload) {
   await handleOpenDocumentFile(payload || {})
 }
 
-function closeDocumentsPdf() {
+function closeDocumentsPdf(fromBrowserBack = false) {
+  if (!fromBrowserBack && popOverlayHistory('pdf')) return
   pdfModalOpen.value = false
   pdfModalUrl.value = ''
   pdfModalTitle.value = ''
@@ -981,7 +1050,13 @@ const hasDocumentTreeContent = computed(() => {
       </div>
     </Teleport>
 
-    <EnrollWizard ref="wizardRef" :open="wizardOpen" @close="onWizardClose" @success="onWizardSuccess" />
+    <EnrollWizard
+      ref="wizardRef"
+      :open="wizardOpen"
+      @close="onWizardClose"
+      @success="onWizardSuccess"
+      @history-change="onWizardHistoryChange"
+    />
     <PdfViewerModal
       :show="pdfModalOpen"
       :pdf-url="pdfModalUrl"

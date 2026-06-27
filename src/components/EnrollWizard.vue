@@ -43,7 +43,7 @@ const props = defineProps({
   open: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'history-change'])
 const previousBodyOverflow = ref('')
 const previousHtmlOverflow = ref('')
 
@@ -1366,18 +1366,34 @@ function prev() {
   }
 }
 
-function handleBrowserBack() {
-  if (!props.open) return false
-  if (step.value > 0) {
-    prev()
-    return true
-  }
-  close()
-  return true
+const suppressHistoryPush = ref(false)
+
+function applyWizardSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return
+  suppressHistoryPush.value = true
+  if (typeof snapshot.step === 'number') step.value = snapshot.step
+  if (typeof snapshot.introSubStep === 'string') introSubStep.value = snapshot.introSubStep
+  nextTick(() => {
+    suppressHistoryPush.value = false
+  })
 }
 
+function goWizardBack() {
+  if (typeof window !== 'undefined') window.history.back()
+  else prev()
+}
+
+watch(
+  [step, introSubStep, () => props.open],
+  ([s, intro, open]) => {
+    if (!open || suppressHistoryPush.value) return
+    emit('history-change', { step: s, introSubStep: intro })
+  },
+  { flush: 'post' },
+)
+
 defineExpose({
-  handleBrowserBack,
+  applyWizardSnapshot,
 })
 
 async function loadFutureEventsNearest() {
@@ -2119,7 +2135,7 @@ watch(deliveryAddressDifferent, (different) => {
             <!--<button type="button" class="wizard-close" aria-label="Close" @click="close">
               <i class="bi bi-x-lg"></i>
             </button>-->
-            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="prev">
+            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="goWizardBack">
               <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
             </button>
             <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== foundersTeamNameStepIndex && step !== participantsStepIndex && !canNext()" @click="next">

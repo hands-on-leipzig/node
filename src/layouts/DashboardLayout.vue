@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getUserProfile, logout, hasAdminRole, isAuthenticated, hasCoachRole, login } from '@/auth/keycloak'
@@ -14,6 +14,13 @@ import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry, getNodeCoachMe } from '@/services/draht'
 import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey } from '@/utils/enrollmentDisplay'
 import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'
+import {
+  dispatchBrowserBackRequest,
+  isSpaRootRoute,
+  isSpaShellRoute,
+  pushOverlayHistory,
+  pushRootBackTrap,
+} from '@/utils/spaBrowserBack'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import CoachImpersonationBanner from '@/components/CoachImpersonationBanner.vue'
 import AdminViewAsCoachPanel from '@/components/AdminViewAsCoachPanel.vue'
@@ -270,10 +277,17 @@ function isActive(item) {
 }
 
 function closeSidebar() {
+  if (!sidebarOpen.value) return
+  const hadOverlay = typeof window !== 'undefined' && window.history.state?.hotOverlay === 'sidebar'
   sidebarOpen.value = false
+  if (hadOverlay) window.history.back()
 }
 function toggleSidebar() {
-  sidebarOpen.value = !sidebarOpen.value
+  const willOpen = !sidebarOpen.value
+  sidebarOpen.value = willOpen
+  if (willOpen && typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+    pushOverlayHistory('sidebar')
+  }
 }
 
 let profileMenuHideTimer = null
@@ -309,42 +323,46 @@ function handleClickOutside(e) {
   }
 }
 
-function pushBackTrapState() {
-  if (typeof window === 'undefined') return
-  if (!route.path.startsWith('/dashboard')) return
-  window.history.pushState({ hotBackTrap: true }, '', window.location.href)
+function restoreCurrentRouteInHistory() {
+  void router.replace(route.fullPath).finally(() => {
+    if (isSpaRootRoute(route)) pushRootBackTrap()
+  })
 }
 
-function handleBrowserBack() {
+function handleBrowserBack(event) {
   if (typeof window === 'undefined') return
-  if (!route.path.startsWith('/dashboard')) return
+  if (!isSpaShellRoute(route)) return
 
-  const backEvent = new CustomEvent('hot-browser-back', { detail: { handled: false } })
-  window.dispatchEvent(backEvent)
-  if (backEvent.detail?.handled) {
-    pushBackTrapState()
+  if (sidebarOpen.value) {
+    sidebarOpen.value = false
     return
   }
 
-  if (route.name !== 'dashboard') {
-    router.replace({ name: 'dashboard' }).finally(() => {
-      pushBackTrapState()
-    })
+  const detail = dispatchBrowserBackRequest(event.state)
+  if (detail.handled) {
+    event.stopImmediatePropagation()
+    if (!detail.skipRestore) {
+      restoreCurrentRouteInHistory()
+    } else if (detail.rearmRootTrap && isSpaRootRoute(route)) {
+      pushRootBackTrap()
+    }
     return
   }
 
-  pushBackTrapState()
+  void nextTick(() => {
+    if (isSpaRootRoute(route)) pushRootBackTrap()
+  })
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  window.addEventListener('popstate', handleBrowserBack)
+  window.addEventListener('popstate', handleBrowserBack, true)
   window.addEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
-  pushBackTrapState()
+  if (isSpaRootRoute(route)) pushRootBackTrap()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('popstate', handleBrowserBack)
+  window.removeEventListener('popstate', handleBrowserBack, true)
   window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
   if (sidebarRefreshTimer) clearTimeout(sidebarRefreshTimer)
   if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
@@ -355,8 +373,14 @@ watch(
     if (path === '/dashboard' || path === '/dashboard/' || path === '/' || path === '') {
       scheduleSidebarRefresh({ silent: true })
     }
-    pushBackTrapState()
   }
+)
+watch(
+  () => route.name,
+  (name, prevName) => {
+    if (name === prevName) return
+    if (name === 'dashboard' || name === 'venues') pushRootBackTrap()
+  },
 )
 watch(
   isCoachApp,
