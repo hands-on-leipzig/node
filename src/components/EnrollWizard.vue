@@ -924,14 +924,20 @@ const founderGenderOptions = computed(() => [
 
 let zipLookupTimer = null
 let zipLookupAbort = null
+/** True after user picked a place from the PLZ list — ignore stale lookup results. */
+let institutionZipPlaceSelected = false
 const institutionZipPlaces = ref([])
 const institutionZipLoading = ref(false)
 
 function applyInstitutionPlace(item) {
   if (!item) return
+  institutionZipPlaceSelected = true
+  if (zipLookupAbort) zipLookupAbort.abort()
+  if (zipLookupTimer) clearTimeout(zipLookupTimer)
+  institutionZipLoading.value = false
+  institutionZipPlaces.value = []
   if (item.city) formData.value.city = item.city
   if (item.state) formData.value.state = item.state
-  institutionZipPlaces.value = []
 }
 
 async function lookupInstitutionPlaces() {
@@ -951,6 +957,7 @@ async function lookupInstitutionPlaces() {
   institutionZipLoading.value = true
   try {
     const places = await fetchPlacesForPostalCode(country, zip, { signal: zipLookupAbort.signal })
+    if (institutionZipPlaceSelected) return
     institutionZipPlaces.value = places
     if (places.length === 1) {
       applyInstitutionPlace(places[0])
@@ -2070,6 +2077,7 @@ watch(founderTeamEventId, (eventId) => {
 watch(
   () => [formData.value.country, formData.value.zip],
   () => {
+    institutionZipPlaceSelected = false
     institutionZipPlaces.value = []
     if (zipLookupTimer) clearTimeout(zipLookupTimer)
     zipLookupTimer = setTimeout(() => {
@@ -2414,6 +2422,7 @@ watch(deliveryAddressDifferent, (different) => {
                       :key="'wizard-inst-zip-' + idx"
                       type="button"
                       class="wizard-zip-place-item"
+                      @mousedown.prevent
                       @click="applyInstitutionPlace(place)"
                     >
                       <span class="wizard-zip-place-item-main">{{ place.postalCode }} {{ place.city }}</span>

@@ -15,6 +15,22 @@ const INVOICE_EINVOICE_DEFAULTS = {
 }
 
 /**
+ * Split a single address line like "Musterstraße 12a" into street and house number.
+ *
+ * @param {string} line
+ * @returns {{ street: string, houseNumber: string }}
+ */
+export function splitStreetAndHouseNumber(line) {
+  const raw = String(line || '').trim()
+  if (!raw) return { street: '', houseNumber: '' }
+  const match = raw.match(/^(.+?)\s+(\d+[a-zA-Z]?(?:-\d+[a-zA-Z]?)?)$/)
+  if (match) {
+    return { street: match[1].trim(), houseNumber: match[2].trim() }
+  }
+  return { street: raw, houseNumber: '' }
+}
+
+/**
  * @param {AddressFormMode} mode
  */
 export function emptyAddressNewFields(mode) {

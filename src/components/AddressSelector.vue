@@ -13,6 +13,7 @@ import {
   invoiceNeedsRegisteredAsCompany,
   invoiceNeedsVatId,
   syncExistingAddressSelection,
+  splitStreetAndHouseNumber,
 } from '@/utils/addressForm'
 import {
   fetchPlacesForPostalCode,
@@ -63,6 +64,10 @@ let zipDebounceTimer = null
 let streetDebounceTimer = null
 let zipAbortController = null
 let streetAbortController = null
+/** True after user picked a place from the PLZ list — ignore stale lookup results. */
+let zipPlaceSelected = false
+/** True after user picked a street suggestion — ignore stale lookup results. */
+let streetSuggestionSelected = false
 
 function addressIdOf(addr, fallback = '') {
   if (!addr || typeof addr !== 'object') return fallback
@@ -163,6 +168,13 @@ function setNewField(field, value) {
   })
 }
 
+function patchNewFields(fields) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    new: { ...(props.modelValue.new || {}), ...fields },
+  })
+}
+
 function patchInvoiceCountryDependentFields(newBlock, country) {
   const next = { ...newBlock }
   if (!invoiceCountryUsesVatId(country)) {
@@ -194,6 +206,8 @@ function yesNoGroupValue(field) {
 }
 
 function clearAutocompleteState() {
+  zipPlaceSelected = false
+  streetSuggestionSelected = false
   zipSuggestions.value = []
   streetSuggestions.value = []
   zipLoading.value = false
@@ -207,6 +221,7 @@ function clearAutocompleteState() {
 }
 
 function onCountryChange(value) {
+  zipPlaceSelected = false
   const base = { ...(props.modelValue.new || {}), country: value }
   emit('update:modelValue', {
     ...props.modelValue,
@@ -221,10 +236,11 @@ function onCountryChange(value) {
 }
 
 function onZipInput(value) {
-  setNewField('postalCode', value)
+  zipPlaceSelected = false
   zipQuery.value = value || ''
   zipSuggestions.value = []
   streetSuggestions.value = []
+  patchNewFields({ postalCode: value })
   if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
   const country = normalizeCountryForZipLookup(props.modelValue.new?.country, value)
   if (!country || !value || String(value).trim().length < 3) return
@@ -242,15 +258,18 @@ async function lookupZip(rawZip, country) {
     const places = await fetchPlacesForPostalCode(resolvedCountry, zip, {
       signal: zipAbortController.signal,
     })
+    if (zipPlaceSelected) return
     zipSuggestions.value = places
     if (places.length === 1) {
       const only = places[0]
-      if (only.city) setNewField('city', only.city)
-      if (only.state) setNewField('state', only.state)
+      const fields = {}
+      if (only.city) fields.city = only.city
+      if (only.state) fields.state = only.state
+      if (only.country) fields.country = only.country
+      if (Object.keys(fields).length) patchNewFields(fields)
       zipSuggestions.value = []
     } else if (places.length > 1) {
-      setNewField('city', '')
-      setNewField('state', '')
+      patchNewFields({ city: '', state: '' })
     }
   } catch (_) {
     zipSuggestions.value = []
@@ -260,14 +279,23 @@ async function lookupZip(rawZip, country) {
 }
 
 function applyZipSuggestion(item) {
-  setNewField('postalCode', item.postalCode || props.modelValue.new?.postalCode || '')
-  if (item.city) setNewField('city', item.city)
-  if (item.country) setNewField('country', item.country)
-  if (item.state) setNewField('state', item.state)
+  if (!item) return
+  zipPlaceSelected = true
+  if (zipAbortController) zipAbortController.abort()
+  if (zipDebounceTimer) clearTimeout(zipDebounceTimer)
+  zipLoading.value = false
+  const fields = {}
+  const postalCode = item.postalCode || props.modelValue.new?.postalCode || ''
+  if (postalCode) fields.postalCode = postalCode
+  if (item.city) fields.city = item.city
+  if (item.country) fields.country = item.country
+  if (item.state) fields.state = item.state
+  patchNewFields(fields)
   zipSuggestions.value = []
 }
 
 function onStreetInput(value) {
+  streetSuggestionSelected = false
   setNewField('street', value)
   streetQuery.value = value || ''
   streetSuggestions.value = []
@@ -305,20 +333,23 @@ async function lookupStreet(street) {
     }
     const list = await res.json()
     const items = Array.isArray(list) ? list : []
+    if (streetSuggestionSelected) return
     streetSuggestions.value = items.map((it) => {
       const a = it.address || {}
       const road = a.road || a.pedestrian || a.footway || a.path || a.cycleway || ''
       const houseNo = a.house_number || ''
-      const st = [road, houseNo].filter(Boolean).join(' ').trim() || street
+      const fallbackStreet = [road, houseNo].filter(Boolean).join(' ').trim() || street
       const zipCode = a.postcode || zip || ''
       const town = a.city || a.town || a.village || a.hamlet || city || ''
       const countryCode = (a.country_code || country || '').toLowerCase()
       return {
-        label: it.display_name || st,
-        street: st,
+        label: it.display_name || fallbackStreet,
+        street: road || street,
+        houseNumber: houseNo,
         postalCode: zipCode,
         city: town,
         country: countryCode,
+        state: a.state || '',
       }
     })
   } catch (_) {
@@ -329,10 +360,26 @@ async function lookupStreet(street) {
 }
 
 function applyStreetSuggestion(item) {
-  if (item.street) setNewField('street', item.street)
-  if (item.postalCode) setNewField('postalCode', item.postalCode)
-  if (item.city) setNewField('city', item.city)
-  if (item.country) setNewField('country', item.country)
+  if (!item) return
+  streetSuggestionSelected = true
+  if (streetAbortController) streetAbortController.abort()
+  if (streetDebounceTimer) clearTimeout(streetDebounceTimer)
+  streetLoading.value = false
+  const fields = {}
+  let streetName = String(item.street || '').trim()
+  let houseNumber = String(item.houseNumber || '').trim()
+  if (!houseNumber && streetName) {
+    const split = splitStreetAndHouseNumber(streetName)
+    streetName = split.street
+    houseNumber = split.houseNumber
+  }
+  if (streetName) fields.street = streetName
+  if (houseNumber) fields.houseNumber = houseNumber
+  if (item.postalCode) fields.postalCode = item.postalCode
+  if (item.city) fields.city = item.city
+  if (item.country) fields.country = item.country
+  if (item.state) fields.state = item.state
+  patchNewFields(fields)
   streetSuggestions.value = []
   zipSuggestions.value = []
 }
@@ -529,6 +576,7 @@ onBeforeUnmount(() => {
                   :key="idPrefix + '-zip-s-' + i"
                   type="button"
                   class="autocomplete-item"
+                  @mousedown.prevent
                   @click="applyZipSuggestion(s)"
                 >
                   <span class="autocomplete-item-main">{{ s.postalCode }} {{ s.city }}</span>
@@ -579,6 +627,7 @@ onBeforeUnmount(() => {
                   :key="idPrefix + '-street-s-' + i"
                   type="button"
                   class="autocomplete-item"
+                  @mousedown.prevent
                   @click="applyStreetSuggestion(s)"
                 >
                   <span class="autocomplete-item-main">{{ s.street }}</span>
