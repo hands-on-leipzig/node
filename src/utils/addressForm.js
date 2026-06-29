@@ -150,6 +150,8 @@ export function buildNewAddressPayload(addr, mode) {
     city: String(n.city || '').trim(),
     country: String(n.country || '').trim(),
   }
+  const state = String(n.state || '').trim()
+  if (state) payload.state = state
   if (mode === ADDRESS_MODE_INVOICE) {
     payload.institution = String(n.institution || '').trim()
     const contactPerson = String(n.contactPerson || '').trim()
@@ -178,8 +180,6 @@ export function buildNewAddressPayload(addr, mode) {
     if (addressLine2) payload.addressLine2 = addressLine2
     const addressLine3 = String(n.addressLine3 || '').trim()
     if (addressLine3) payload.addressLine3 = addressLine3
-    const state = String(n.state || '').trim()
-    if (state) payload.state = state
   }
   return payload
 }
