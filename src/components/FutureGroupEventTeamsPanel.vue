@@ -12,7 +12,7 @@ import {
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import { extractEventList, normalizeEvents, formatEventOptionLabel } from '@/utils/events'
+import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity } from '@/utils/events'
 import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 
 const props = defineProps({
@@ -184,7 +184,7 @@ async function loadEvents() {
     const country = String(props.group?.country || '').trim() || undefined
     const zip = String(props.group?.zip || '').trim() || undefined
     const res = await getEventsNearest(country, zip, futureProgramId())
-    events.value = normalizeEvents(extractEventList(res?.data))
+    events.value = filterEventsWithCapacity(normalizeEvents(extractEventList(res?.data)))
   } catch {
     events.value = []
   } finally {

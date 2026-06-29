@@ -1,4 +1,42 @@
 /**
+ * Capacity fields from an event list row (nearest API, venues, flow).
+ * @param {Record<string, unknown>|null|undefined} ev
+ */
+export function eventCapacityFromEvent(ev) {
+  const maxRaw = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
+  const max = maxRaw != null && maxRaw !== '' ? Number(maxRaw) : null
+  const registeredRaw = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
+  const registered = registeredRaw != null && registeredRaw !== '' ? Number(registeredRaw) : null
+  let available = ev?.available
+  if (available != null && available !== '') available = Number(available)
+  else if (typeof max === 'number' && !Number.isNaN(max) && max > 0 && typeof registered === 'number' && !Number.isNaN(registered)) {
+    available = Math.max(0, max - registered)
+  } else {
+    available = null
+  }
+  const unlimited = max == null || Number.isNaN(max) || max <= 0
+  const full = ev?.full === true || (!unlimited && typeof available === 'number' && available <= 0)
+  return {
+    max: unlimited ? null : max,
+    registered: typeof registered === 'number' && !Number.isNaN(registered) ? registered : 0,
+    available: unlimited ? null : available,
+    unlimited,
+    full,
+    canRegister(slotsNeeded = 1) {
+      const need = Math.max(1, Number(slotsNeeded) || 1)
+      if (unlimited) return true
+      return typeof available === 'number' && !Number.isNaN(available) && available >= need
+    },
+  }
+}
+
+/** Events that still have at least `slotsNeeded` free team slots. */
+export function filterEventsWithCapacity(events, slotsNeeded = 1) {
+  const list = Array.isArray(events) ? events : []
+  return list.filter((ev) => eventCapacityFromEvent(ev).canRegister(slotsNeeded))
+}
+
+/**
  * Normalize flow / events API list payloads.
  * @param {unknown} data
  * @returns {unknown[]}
@@ -46,10 +84,9 @@ export function normalizeEvents(rawList) {
  */
 export function formatEventOptionLabel(ev, t) {
   const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
-  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
-  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
-  if (typeof used === 'number' && typeof max === 'number') {
-    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
+  const cap = eventCapacityFromEvent(ev)
+  if (!cap.unlimited && cap.max != null) {
+    return `${name} (${t('wizard.eventCapacitySlots', { used: cap.registered, max: cap.max })})`
   }
   return String(name)
 }

@@ -33,6 +33,10 @@ import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInsti
 import { extractLockedSeasonSetCount } from '@/utils/voucherPreset'
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import { buildCountryOptions } from '@/utils/countryOptions'
+import {
+  filterEventsWithCapacity,
+  formatEventOptionLabel,
+} from '@/utils/events'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -848,15 +852,9 @@ const centeredOptionStep = computed(() => {
     || (foundersTeamNameStepIndex.value >= 0 && step.value === foundersTeamNameStepIndex.value)
 })
 
-/** Event display label with optional capacity (from flow API). */
+/** Event display label with optional capacity (from nearest API). */
 function futureEventOptionLabel(ev) {
-  const name = ev?.label || ev?.name || ev?.title || ev?.ref || (ev?.id != null ? `Event ${ev.id}` : '')
-  const used = ev?.registered ?? ev?.used ?? ev?.count ?? ev?.teams_count
-  const max = ev?.capacity ?? ev?.max ?? ev?.max_teams ?? ev?.slots
-  if (typeof used === 'number' && typeof max === 'number') {
-    return `${name} (${t('wizard.eventCapacitySlots', { used, max })})`
-  }
-  return name
+  return formatEventOptionLabel(ev, t)
 }
 
 function extractEventList(data) {
@@ -1417,7 +1415,7 @@ async function loadFutureEventsNearest() {
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = extractEventList(data)
-    futureEventsNearest.value = normalizeEvents(list)
+    futureEventsNearest.value = filterEventsWithCapacity(normalizeEvents(list))
   } catch (_) {
     futureEventsNearest.value = []
   } finally {
@@ -1435,7 +1433,7 @@ async function loadFounderTeamEventsNearest() {
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = extractEventList(data)
-    founderEventsNearest.value = normalizeEvents(list)
+    founderEventsNearest.value = filterEventsWithCapacity(normalizeEvents(list))
   } catch (_) {
     founderEventsNearest.value = []
   } finally {
