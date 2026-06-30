@@ -112,6 +112,8 @@ const voucherPresetInvoiceName = ref(null)
 const presetSeasonSetCount = ref(null)
 /** User-chosen season sets (0–2); overridden in payload when voucher preset sets count. */
 const wizardSeasonSetCount = ref(1)
+/** Future pupils per group fixed by voucher preset — user must not choose, step is skipped. */
+const presetPupilsCount = ref(null)
 
 const effectiveSeasonSetCount = computed(() => {
   if (edition.value === 'founders' && foundersVariant.value === 'explore') return 0
@@ -128,6 +130,20 @@ const seasonSetsPresetLocked = computed(() => {
   return n != null && [0, 1, 2].includes(n)
 })
 
+/** Voucher/form preset fixes Future pupils count — user must not choose, step is skipped. */
+const pupilsPresetLocked = computed(() => {
+  if (edition.value !== 'future') return false
+  const n = presetPupilsCount.value
+  return n != null && FUTURE_PUPIL_OPTIONS.includes(Number(n))
+})
+
+/** Future participants (pupils) step. */
+function isPupilsWizardStep(s) {
+  return edition.value === 'future' && s === 4
+}
+
+const shouldSkipPupilsWizardStep = computed(() => pupilsPresetLocked.value)
+
 function isSeasonSetsWizardStep(s) {
   if (edition.value === 'future' && s === 5) return true
   return edition.value === 'founders'
@@ -141,21 +157,30 @@ const shouldSkipSeasonSetsWizardStep = computed(() => {
   return foundersNeedsSeasonSets.value
 })
 
-/** Step index after moving forward/backward, skipping the season-sets step when preset-locked. */
+/** True when step `n` is a preset-locked step that should be skipped (pupils or season-sets). */
+function isSkippablePresetStep(n) {
+  if (shouldSkipPupilsWizardStep.value && isPupilsWizardStep(n)) return true
+  if (shouldSkipSeasonSetsWizardStep.value && isSeasonSetsWizardStep(n)) return true
+  return false
+}
+
+/** Step index after moving forward/backward, skipping any preset-locked steps (pupils, season-sets). */
 function adjustStepForSeasonSetsSkip(s, direction) {
   let n = s + direction
-  if (shouldSkipSeasonSetsWizardStep.value && isSeasonSetsWizardStep(n)) {
+  let guard = 0
+  while (guard++ < 10 && isSkippablePresetStep(n)) {
     n += direction
   }
   return n
 }
 
-/** If we landed on the season-sets step although count is voucher-locked, advance once more. */
+/** If we landed on a preset-locked step (pupils/season-sets), advance past it. */
 function skipSeasonSetsStepIfNeeded() {
-  if (!shouldSkipSeasonSetsWizardStep.value) return
-  if (!isSeasonSetsWizardStep(step.value)) return
-  if (!canNext()) return
-  step.value = adjustStepForSeasonSetsSkip(step.value, 1)
+  let guard = 0
+  while (guard++ < 10 && isSkippablePresetStep(step.value)) {
+    if (!canNext()) return
+    step.value = adjustStepForSeasonSetsSkip(step.value, 1)
+  }
 }
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
@@ -314,7 +339,11 @@ const wizardProgressSteps = computed(() => {
     return withIndex([
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.progressDetails', active: s === 3, done: s > 3 },
-      { key: 'wizard.progressParticipants', active: s === 4, done: s > 4 },
+      {
+        key: 'wizard.progressParticipants',
+        active: s === 4 && !shouldSkipPupilsWizardStep.value,
+        done: s > 4 || shouldSkipPupilsWizardStep.value,
+      },
       {
         key: 'wizard.progressSeasonSets',
         active: s === 5 && !shouldSkipSeasonSetsWizardStep.value,
@@ -757,11 +786,10 @@ watch(
 )
 
 watch(
-  [seasonSetsPresetLocked, () => step.value, edition, foundersNeedsSeasonSets],
+  [seasonSetsPresetLocked, pupilsPresetLocked, () => step.value, edition, foundersNeedsSeasonSets],
   () => {
     if (!props.open) return
-    if (!shouldSkipSeasonSetsWizardStep.value) return
-    if (!isSeasonSetsWizardStep(step.value)) return
+    if (!isSkippablePresetStep(step.value)) return
     nextTick(() => {
       skipSeasonSetsStepIfNeeded()
     })
@@ -1073,6 +1101,7 @@ function openWizard() {
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
   wizardSeasonSetCount.value = 1
+  presetPupilsCount.value = null
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   deliveryAddress.value = emptyAddressState(ADDRESS_MODE_DELIVERY)
@@ -1214,7 +1243,10 @@ function canNext() {
     return foundersType.value != null
   }
   if (s === 4) {
-    if (edition.value === 'future') return hasRequiredParticipantFields()
+    if (edition.value === 'future') {
+      if (shouldSkipPupilsWizardStep.value) return true
+      return hasRequiredParticipantFields()
+    }
     return hasRequiredInstitutionFields()
   }
   if (s === 5) {
@@ -1349,6 +1381,7 @@ function prev() {
     voucherPresetInvoiceId.value = null
     voucherPresetInvoiceName.value = null
     presetSeasonSetCount.value = null
+    presetPupilsCount.value = null
     presetRegisterEventTeams.value = null
     presetEventTeamCount.value = null
     return
@@ -1584,6 +1617,7 @@ function applyVoucherPreset(raw) {
     const pupilsNum = Number(data.pupils)
     if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
       futurePupils.value = pupilsNum
+      presetPupilsCount.value = pupilsNum
     }
     presetBranch = 'edition_future'
   } else if (program === 6 || program === 7) {
@@ -1592,6 +1626,7 @@ function applyVoucherPreset(raw) {
     const pupilsNum = Number(data.pupils)
     if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
       futurePupils.value = pupilsNum
+      presetPupilsCount.value = pupilsNum
     }
     presetBranch = 'program_6_or_7_future'
   } else if (program === 1 || program === 2 || program === 4 || program === 5) {
@@ -1713,6 +1748,7 @@ function clearVoucherValidationState() {
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
   wizardSeasonSetCount.value = 1
+  presetPupilsCount.value = null
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
 }
@@ -1776,6 +1812,7 @@ async function validateVoucherCode() {
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
   wizardSeasonSetCount.value = 1
+  presetPupilsCount.value = null
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   try {
