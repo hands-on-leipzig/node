@@ -1,6 +1,16 @@
 # Deploy workflow:
 # - Push/merge to main → deploy to TEST (secrets: TEST_DEPLOY_*)
 # - Publish a Release → deploy to PROD (secrets: DEPLOY_*)
+#
+# Optional e-mail on published GitHub Release only (repository variable DEPLOY_NOTIFY_ENABLED=true).
+# Microsoft 365 via Graph OAuth (client credentials) — no SMTP.
+# Entra app: Application permission Mail.Send + admin consent.
+# Secrets:
+#   DEPLOY_NOTIFY_MS_TENANT_ID
+#   DEPLOY_NOTIFY_MS_CLIENT_ID
+#   DEPLOY_NOTIFY_MS_CLIENT_SECRET
+#   DEPLOY_NOTIFY_MAIL_FROM   — sender mailbox UPN (e.g. noreply@…)
+#   DEPLOY_NOTIFY_EMAIL_TO    — recipient(s), comma-separated
 
 name: Deploy
 
@@ -112,3 +122,22 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p $PORT" \
             dist/ \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: Notify release deploy by email (Microsoft Graph)
+        if: always() && github.event_name == 'release' && vars.DEPLOY_NOTIFY_ENABLED == 'true'
+        continue-on-error: true
+        env:
+          MS_TENANT_ID: ${{ secrets.DEPLOY_NOTIFY_MS_TENANT_ID }}
+          MS_CLIENT_ID: ${{ secrets.DEPLOY_NOTIFY_MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.DEPLOY_NOTIFY_MS_CLIENT_SECRET }}
+          MAIL_FROM: ${{ secrets.DEPLOY_NOTIFY_MAIL_FROM }}
+          MAIL_TO: ${{ secrets.DEPLOY_NOTIFY_EMAIL_TO }}
+          JOB_STATUS: ${{ job.status }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          ACTOR: ${{ github.actor }}
+          DEPLOY_TARGET: ${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash deploy/notify-release-email-graph.sh
