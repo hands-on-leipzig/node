@@ -30,7 +30,7 @@ import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
-import { extractLockedSeasonSetCount } from '@/utils/voucherPreset'
+import { extractLockedPupils, extractLockedSeasonSetCount } from '@/utils/voucherPreset'
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import { buildCountryOptions } from '@/utils/countryOptions'
 import {
@@ -110,10 +110,10 @@ const voucherPresetInvoiceId = ref(null)
 const voucherPresetInvoiceName = ref(null)
 /** 0|1|2 — maps to seasonSetCount / num_boards in enrollment API payloads. */
 const presetSeasonSetCount = ref(null)
-/** User-chosen season sets (0–2); overridden in payload when voucher preset sets count. */
-const wizardSeasonSetCount = ref(1)
 /** Future pupils per group fixed by voucher preset — user must not choose, step is skipped. */
 const presetPupilsCount = ref(null)
+/** User-chosen season sets (0–2); overridden in payload when voucher preset sets count. */
+const wizardSeasonSetCount = ref(1)
 
 const effectiveSeasonSetCount = computed(() => {
   if (edition.value === 'founders' && foundersVariant.value === 'explore') return 0
@@ -176,6 +176,7 @@ function adjustStepForSeasonSetsSkip(s, direction) {
 
 /** If we landed on a preset-locked step (pupils/season-sets), advance past it. */
 function skipSeasonSetsStepIfNeeded() {
+  if (!props.open) return
   let guard = 0
   while (guard++ < 10 && isSkippablePresetStep(step.value)) {
     if (!canNext()) return
@@ -184,6 +185,8 @@ function skipSeasonSetsStepIfNeeded() {
 }
 const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
+/** When set via voucher preset, only this event rowid may be chosen (null = all events). */
+const presetLockedEventId = ref(null)
 // Founder team: participants (first name, last name, date of birth, gender)
 const founderTeamPlayers = ref([])
 // Founder team: event to register for
@@ -293,6 +296,38 @@ const futureTeamOptionCounts = computed(() =>
       .map((n) => Math.floor(Number(n) / FUTURE_EVENT_TEAM_SIZE))
       .filter((n) => Number.isFinite(n) && n > 0),
   )).sort((a, b) => a - b),
+)
+
+/** Team-count pills: voucher preset can lock to a single value (e.g. 1 event team). */
+const futureTeamCountOptions = computed(() => {
+  const all = futureTeamOptionCounts.value
+  const locked = presetEventTeamCount.value
+  if (locked != null) {
+    const p = Number(locked)
+    if (Number.isFinite(p) && p > 0) {
+      if (all.includes(p)) return [p]
+      const max = maxFutureEventTeamsByPupils.value
+      if (p <= max) return [p]
+      return all.length ? [all[all.length - 1]] : [1]
+    }
+  }
+  return all
+})
+
+/** Events for dropdown: all when no voucher event lock; single event when preset eventId is set. */
+const futureEventsForSelect = computed(() => {
+  const list = futureEventsNearest.value
+  const locked = presetLockedEventId.value
+  if (locked == null || !Number.isFinite(Number(locked)) || Number(locked) <= 0) {
+    return list
+  }
+  const match = list.find((e) => String(e.id) === String(locked))
+  if (match) return [match]
+  return [{ id: Number(locked), label: `Event ${locked}` }]
+})
+
+const futureEventSelectDisabled = computed(
+  () => presetLockedEventId.value != null && Number(presetLockedEventId.value) > 0,
 )
 const maxFutureEventTeamsByPupils = computed(() => {
   const pupils = Number(futurePupils.value)
@@ -678,6 +713,10 @@ function selectWizardSeasonSetCount(count) {
 }
 
 function selectFutureEventTeamCount(count) {
+  const locked = presetEventTeamCount.value
+  if (locked != null && Number(locked) > 0 && Number(count) !== Number(locked)) {
+    return
+  }
   const n = Number(count)
   const maxTeams = maxFutureEventTeamsByPupils.value
   if (!Number.isFinite(n) || n <= 0) return
@@ -1100,10 +1139,11 @@ function openWizard() {
   voucherPresetInvoiceId.value = null
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
-  wizardSeasonSetCount.value = 1
   presetPupilsCount.value = null
+  wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
+  presetLockedEventId.value = null
   deliveryAddress.value = emptyAddressState(ADDRESS_MODE_DELIVERY)
   invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
   deliveryAddressDifferent.value = false
@@ -1384,6 +1424,7 @@ function prev() {
     presetPupilsCount.value = null
     presetRegisterEventTeams.value = null
     presetEventTeamCount.value = null
+    presetLockedEventId.value = null
     return
   }
   if (step.value > 1) {
@@ -1448,7 +1489,19 @@ async function loadFutureEventsNearest() {
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = extractEventList(data)
-    futureEventsNearest.value = filterEventsWithCapacity(normalizeEvents(list))
+    const slots = Math.max(
+      1,
+      Number(presetEventTeamCount.value) || Number(futureEventTeamCount.value) || 1,
+    )
+    let normalized = filterEventsWithCapacity(normalizeEvents(list), slots)
+    const locked = presetLockedEventId.value
+    if (locked != null && Number(locked) > 0) {
+      const lockedEv = normalizeEvents(list).find((e) => String(e.id) === String(locked))
+      if (lockedEv && !normalized.some((e) => String(e.id) === String(locked))) {
+        normalized = [lockedEv, ...normalized]
+      }
+    }
+    futureEventsNearest.value = normalized
   } catch (_) {
     futureEventsNearest.value = []
   } finally {
@@ -1598,6 +1651,14 @@ function applyVoucherSeasonSetLock(sources) {
   return true
 }
 
+function applyVoucherPupilsLock(sources) {
+  const pupilsNum = extractLockedPupils(sources)
+  if (pupilsNum == null) return false
+  futurePupils.value = pupilsNum
+  presetPupilsCount.value = pupilsNum
+  return true
+}
+
 function applyVoucherPreset(raw) {
   const data = raw && typeof raw === 'object' && raw.preset && typeof raw.preset === 'object' ? raw.preset : raw
   if (!data || typeof data !== 'object') {
@@ -1614,20 +1675,12 @@ function applyVoucherPreset(raw) {
     const g = data.group != null ? String(data.group) : ''
     if (g === '8') futureGroup.value = '8'
     if (g === '5' && FUTURE_GROUP_5_ENABLED) futureGroup.value = '5'
-    const pupilsNum = Number(data.pupils)
-    if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
-      futurePupils.value = pupilsNum
-      presetPupilsCount.value = pupilsNum
-    }
+    applyVoucherPupilsLock(data)
     presetBranch = 'edition_future'
   } else if (program === 6 || program === 7) {
     edition.value = 'future'
     futureGroup.value = program === 7 ? '8' : (FUTURE_GROUP_5_ENABLED ? '5' : null)
-    const pupilsNum = Number(data.pupils)
-    if (Number.isFinite(pupilsNum) && FUTURE_PUPIL_OPTIONS.includes(pupilsNum)) {
-      futurePupils.value = pupilsNum
-      presetPupilsCount.value = pupilsNum
-    }
+    applyVoucherPupilsLock(data)
     presetBranch = 'program_6_or_7_future'
   } else if (program === 1 || program === 2 || program === 4 || program === 5) {
     edition.value = 'founders'
@@ -1656,17 +1709,41 @@ function applyVoucherPreset(raw) {
   } else if (data.eventTeamCount == null) {
     presetEventTeamCount.value = null
   }
+
+  const evId = Number(data.eventId)
+  presetLockedEventId.value = (Number.isFinite(evId) && evId > 0) ? evId : null
+
   if (data.futureOnSiteEvent === 'yes' || data.futureOnSiteEvent === 'later') {
     futureOnSiteEvent.value = data.futureOnSiteEvent
+  } else if (data.registerEventTeams === true || (Number.isFinite(etc) && etc > 0)) {
+    futureOnSiteEvent.value = 'yes'
   }
-  const evId = Number(data.eventId)
-  if (Number.isFinite(evId) && evId > 0) {
-    futureEventId.value = evId
-    const teamCount = Number.isFinite(Number(futureEventTeamCount.value)) && Number(futureEventTeamCount.value) > 0
-      ? Number(futureEventTeamCount.value)
-      : 1
-    futureTeamEvents.value = Array.from({ length: teamCount }, () => ({ eventId: evId, name: '' }))
+
+  if (futureOnSiteEvent.value === 'yes') {
+    if (!Number.isFinite(Number(futureEventTeamCount.value)) || Number(futureEventTeamCount.value) < 1) {
+      futureEventTeamCount.value = (Number.isFinite(etc) && etc > 0) ? etc : 1
+    }
+    if (presetLockedEventId.value) {
+      const teamCount = Number.isFinite(etc) && etc > 0
+        ? etc
+        : Math.max(1, Number(futureEventTeamCount.value) || 1)
+      futureEventTeamCount.value = teamCount
+      futureTeamEvents.value = Array.from(
+        { length: teamCount },
+        () => ({ eventId: presetLockedEventId.value, name: '' }),
+      )
+      futureEventId.value = presetLockedEventId.value
+    } else {
+      syncFutureTeamEventsArray()
+      updateDerivedFutureEventId()
+    }
+    if (props.open && edition.value === 'future' && step.value >= 4) {
+      loadFutureEventsNearest()
+    }
+  } else if (presetLockedEventId.value) {
+    futureEventId.value = presetLockedEventId.value
   }
+
   const invId = Number(data.invoiceAddressId)
   if (Number.isFinite(invId) && invId > 0) {
     voucherPresetInvoiceId.value = invId
@@ -1699,8 +1776,10 @@ function applyVoucherPreset(raw) {
       foundersVariant: foundersVariant.value,
       foundersType: foundersType.value,
       presetSeasonSetCount: presetSeasonSetCount.value,
+      presetPupilsCount: presetPupilsCount.value,
       presetRegisterEventTeams: presetRegisterEventTeams.value,
       presetEventTeamCount: presetEventTeamCount.value,
+      presetLockedEventId: presetLockedEventId.value,
       futureOnSiteEvent: futureOnSiteEvent.value,
       futureEventId: futureEventId.value,
       voucherPresetInvoiceId: voucherPresetInvoiceId.value,
@@ -1747,10 +1826,11 @@ function clearVoucherValidationState() {
   voucherPresetInvoiceId.value = null
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
-  wizardSeasonSetCount.value = 1
   presetPupilsCount.value = null
+  wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
+  presetLockedEventId.value = null
 }
 
 function scheduleVoucherValidation(delayMs = 450) {
@@ -1811,10 +1891,11 @@ async function validateVoucherCode() {
   voucherPresetInvoiceId.value = null
   voucherPresetInvoiceName.value = null
   presetSeasonSetCount.value = null
-  wizardSeasonSetCount.value = 1
   presetPupilsCount.value = null
+  wizardSeasonSetCount.value = 1
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
+  presetLockedEventId.value = null
   try {
     const result = await validateVoucher(code)
     if (seq !== voucherValidateSeq) return
@@ -2048,14 +2129,25 @@ onBeforeUnmount(() => {
   }
 })
 
+watch(
+  [step, () => edition.value, () => props.open],
+  ([s, ed, open]) => {
+    if (!open || ed !== 'future') return
+    if (s === 6 && futureOnSiteEvent.value === 'yes') {
+      loadFutureEventsNearest()
+    }
+  },
+)
+
 watch(futureOnSiteEvent, (val) => {
   if (!props.open || edition.value !== 'future') return
   if (step.value !== 6) return
   if (val === 'yes') {
     if (!Number.isFinite(Number(futureEventTeamCount.value)) || Number(futureEventTeamCount.value) < 1) {
-      futureEventTeamCount.value = 1
+      futureEventTeamCount.value = presetEventTeamCount.value > 0 ? presetEventTeamCount.value : 1
     }
     syncFutureTeamEventsArray()
+    loadFutureEventsNearest()
     return
   }
   if (val === 'later') {
@@ -2483,7 +2575,7 @@ watch(deliveryAddressDifferent, (different) => {
           </div>
 
           <!-- Step 4 (Future): pupils -->
-          <div v-show="step === 4 && edition === 'future'" class="wizard-step wizard-step-animate wizard-step-pupils">
+          <div v-show="step === 4 && edition === 'future' && !shouldSkipPupilsWizardStep" class="wizard-step wizard-step-animate wizard-step-pupils">
             <p class="wizard-question"><I18nText k="enrollFuture.howManyPupils" /></p>
             <p class="wizard-hint"><I18nText k="enrollFuture.pupilsFlexibleHint" /></p>
             <div class="wizard-options wizard-options-three wizard-options-vertical">
@@ -2690,7 +2782,7 @@ watch(deliveryAddressDifferent, (different) => {
                   </p>
                   <div class="wizard-event-team-count-row" role="group" :aria-label="t('wizard.onSiteEventTeamCountLabel')">
                     <button
-                      v-for="count in futureTeamOptionCounts"
+                      v-for="count in futureTeamCountOptions"
                       :key="'future-event-team-' + count"
                       type="button"
                       class="wizard-event-team-count-pill"
@@ -2743,11 +2835,12 @@ watch(deliveryAddressDifferent, (different) => {
                         <div class="wizard-event-team-combined-dropdown">
                           <EventSelectDropdown
                             :title="futureEventTeamCount > 1 ? t('wizard.onSiteEventDropdownTitleTeam', { team: idx + 1 }) : ''"
-                            :events="futureEventsNearest"
+                            :events="futureEventsForSelect"
                             :loading="futureEventsNearestLoading"
                             :model-value="entry.eventId"
                             :placeholder="t('wizard.onSiteEventPlaceholder')"
                             :event-label-fn="futureEventOptionLabel"
+                            :disabled="futureEventSelectDisabled"
                             @update:model-value="selectFutureTeamEvent(idx, $event)"
                           />
                         </div>
