@@ -34,7 +34,6 @@ import { extractLockedPupils, extractLockedSeasonSetCount } from '@/utils/vouche
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import { buildCountryOptions } from '@/utils/countryOptions'
 import {
-  filterEventsWithCapacity,
   formatEventOptionLabel,
 } from '@/utils/events'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -329,6 +328,11 @@ const futureEventsForSelect = computed(() => {
 const futureEventSelectDisabled = computed(
   () => presetLockedEventId.value != null && Number(presetLockedEventId.value) > 0,
 )
+
+const futureEventSlotsNeeded = computed(() => Math.max(
+  1,
+  Number(presetEventTeamCount.value) || Number(futureEventTeamCount.value) || 1,
+))
 const maxFutureEventTeamsByPupils = computed(() => {
   const pupils = Number(futurePupils.value)
   if (!Number.isFinite(pupils) || pupils <= 0) return 0
@@ -1489,19 +1493,7 @@ async function loadFutureEventsNearest() {
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = extractEventList(data)
-    const slots = Math.max(
-      1,
-      Number(presetEventTeamCount.value) || Number(futureEventTeamCount.value) || 1,
-    )
-    let normalized = filterEventsWithCapacity(normalizeEvents(list), slots)
-    const locked = presetLockedEventId.value
-    if (locked != null && Number(locked) > 0) {
-      const lockedEv = normalizeEvents(list).find((e) => String(e.id) === String(locked))
-      if (lockedEv && !normalized.some((e) => String(e.id) === String(locked))) {
-        normalized = [lockedEv, ...normalized]
-      }
-    }
-    futureEventsNearest.value = normalized
+    futureEventsNearest.value = normalizeEvents(list)
   } catch (_) {
     futureEventsNearest.value = []
   } finally {
@@ -1519,7 +1511,7 @@ async function loadFounderTeamEventsNearest() {
     const res = await getEventsNearest(country, zip, program)
     const data = res.data
     const list = extractEventList(data)
-    founderEventsNearest.value = filterEventsWithCapacity(normalizeEvents(list))
+    founderEventsNearest.value = normalizeEvents(list)
   } catch (_) {
     founderEventsNearest.value = []
   } finally {
@@ -2740,6 +2732,7 @@ watch(deliveryAddressDifferent, (different) => {
                 :model-value="founderTeamEventId"
                 :placeholder="t('wizard.founderTeamEventPlaceholder')"
                 :event-label-fn="futureEventOptionLabel"
+                :slots-needed="1"
                 @update:model-value="founderTeamEventId = $event"
               />
             </div>
@@ -2840,6 +2833,7 @@ watch(deliveryAddressDifferent, (different) => {
                             :model-value="entry.eventId"
                             :placeholder="t('wizard.onSiteEventPlaceholder')"
                             :event-label-fn="futureEventOptionLabel"
+                            :slots-needed="futureEventSlotsNeeded"
                             :disabled="futureEventSelectDisabled"
                             @update:model-value="selectFutureTeamEvent(idx, $event)"
                           />

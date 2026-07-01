@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition'
-import { organizeEventsForSelect, flatEventSelectOptions } from '@/utils/events'
+import { organizeEventsForSelect, flatEventSelectOptions, eventCapacityFromEvent } from '@/utils/events'
 
 const { t, locale } = useI18n()
 
@@ -16,6 +16,8 @@ const props = defineProps({
   title: { type: String, default: '' },
   /** Function (ev) => string to display each event (e.g. name + capacity) */
   eventLabelFn: { type: Function, default: (ev) => ev?.label || ev?.name || ev?.title || ev?.ref || `Event ${ev?.id ?? ''}` },
+  /** Minimum free team slots required for an event to be selectable. */
+  slotsNeeded: { type: Number, default: 1 },
   disabled: { type: Boolean, default: false },
 })
 
@@ -63,17 +65,45 @@ function getEventLabel(ev) {
   return props.eventLabelFn(ev)
 }
 
+function isEventDisabled(ev) {
+  if (!ev) return true
+  if (String(ev.id) === String(props.modelValue)) return false
+  const need = Math.max(1, Number(props.slotsNeeded) || 1)
+  return !eventCapacityFromEvent(ev).canRegister(need)
+}
+
+function nextSelectableIndex(from, direction) {
+  const n = flatOptions.value.length
+  if (n === 0) return -1
+  let i = from
+  for (let step = 0; step < n; step++) {
+    if (direction > 0) {
+      if (i >= n - 1) break
+      i += 1
+    } else {
+      if (i <= 0) break
+      i -= 1
+    }
+    if (!isEventDisabled(flatOptions.value[i])) return i
+  }
+  return from
+}
+
 function toggle() {
   if (props.disabled || props.loading) return
   open.value = !open.value
   if (open.value) {
-    highlightedIndex.value = flatOptions.value.findIndex((e) => String(e.id) === String(props.modelValue))
+    const current = flatOptions.value.findIndex((e) => String(e.id) === String(props.modelValue))
+    highlightedIndex.value = current >= 0 && !isEventDisabled(flatOptions.value[current])
+      ? current
+      : nextSelectableIndex(-1, 1)
     if (highlightedIndex.value < 0) highlightedIndex.value = 0
     updatePanelPosition()
   }
 }
 
 function select(ev) {
+  if (isEventDisabled(ev)) return
   const id = ev?.id ?? ev?.rowid
   if (id == null || id === '') return
   emit('update:modelValue', Number.isFinite(Number(id)) ? Number(id) : id)
@@ -96,18 +126,18 @@ function onKeydown(e) {
   }
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    highlightedIndex.value = Math.min(highlightedIndex.value + 1, flatOptions.value.length - 1)
+    highlightedIndex.value = nextSelectableIndex(highlightedIndex.value, 1)
     return
   }
   if (e.key === 'ArrowUp') {
     e.preventDefault()
-    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0)
+    highlightedIndex.value = nextSelectableIndex(highlightedIndex.value, -1)
     return
   }
   if (e.key === 'Enter') {
     e.preventDefault()
     const ev = flatOptions.value[highlightedIndex.value]
-    if (ev) select(ev)
+    if (ev && !isEventDisabled(ev)) select(ev)
     return
   }
 }
@@ -174,12 +204,16 @@ watch(() => flatOptions.value.length, () => {
                 :class="{
                   selected: String(ev.id) === String(modelValue),
                   highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                  disabled: isEventDisabled(ev),
                 }"
+                :disabled="isEventDisabled(ev)"
                 :aria-selected="String(ev.id) === String(modelValue)"
+                :aria-disabled="isEventDisabled(ev)"
                 @click="select(ev)"
                 @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
               >
                 <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+                <span v-if="isEventDisabled(ev)" class="event-select-option-badge"><I18nText k="wizard.eventSelectFull" /></span>
               </button>
             </template>
             <template v-for="group in eventSections.countryGroups" :key="'country-' + group.country">
@@ -193,12 +227,16 @@ watch(() => flatOptions.value.length, () => {
                 :class="{
                   selected: String(ev.id) === String(modelValue),
                   highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                  disabled: isEventDisabled(ev),
                 }"
+                :disabled="isEventDisabled(ev)"
                 :aria-selected="String(ev.id) === String(modelValue)"
+                :aria-disabled="isEventDisabled(ev)"
                 @click="select(ev)"
                 @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
               >
                 <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+                <span v-if="isEventDisabled(ev)" class="event-select-option-badge"><I18nText k="wizard.eventSelectFull" /></span>
               </button>
             </template>
             <p v-if="!loading && flatOptions.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
@@ -342,6 +380,25 @@ watch(() => flatOptions.value.length, () => {
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-weight: 600;
+}
+.event-select-option.disabled,
+.event-select-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.event-select-option.disabled:hover,
+.event-select-option.disabled.highlighted,
+.event-select-option:disabled:hover {
+  background: none;
+  color: var(--color-text);
+}
+.event-select-option-badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .event-select-option-label {
   flex: 1;

@@ -780,6 +780,7 @@ export default {
         "eventSelectCountryOther": "Other countries",
         "eventSelectSimple": "Select event",
         "eventSelectNoEvents": "No events",
+        "eventSelectFull": "Full",
         "back": "Back",
         "next": "Next",
         "submit": "Submit",
