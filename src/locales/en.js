@@ -268,6 +268,7 @@ export default {
         "invoiceStatusOpen": "Open",
         "invoiceStatusNotNeeded": "Not needed",
         "invoiceStatusPending": "Not yet created",
+        "orderDraft": "Order (draft)",
         "event": "Event",
         "eventSectionComingSoon": "Event registration and changes are temporarily disabled here and will be enabled later.",
         "statusRegistration": "Registration status",

@@ -92,6 +92,20 @@ function isPdfDoc(item) {
   return t === 'order' || t === 'invoice'
 }
 
+/** True for provisional draft refs like "(PROV5256)". */
+function isDraftRef(label) {
+  const s = String(label || '').trim()
+  return s.startsWith('(') || /PROV/i.test(s)
+}
+
+/** Display label: friendly text for draft orders, otherwise the raw ref. */
+function itemLabel(item) {
+  if ((item?.type || '').toLowerCase() === 'order' && isDraftRef(item?.label)) {
+    return t('detail.orderDraft')
+  }
+  return item?.label ?? ''
+}
+
 /** Invoice/order document status for display: 'paid' | 'open' | 'not_needed'. Null if not applicable. */
 function docStatus(item) {
   if (!item) return null
@@ -114,17 +128,22 @@ async function openPdf(item) {
   if (docType !== 'order' && docType !== 'invoice') return
   pdfError.value = null
   pdfLoading.value = true
+  // Address the document by numeric id when available: draft orders have
+  // provisional refs like "(PROV5256)" whose parentheses are rejected by
+  // DRAHT's injection filter. The id is always URL-safe.
+  const docId =
+    item.id !== undefined && item.id !== null && item.id !== '' ? String(item.id) : item.label
   try {
     let blobUrl
     if (props.teklaType === 'classes') {
-      blobUrl = await getClassDocumentBlobUrl(props.teklaId, docType, item.label)
+      blobUrl = await getClassDocumentBlobUrl(props.teklaId, docType, docId)
     } else if (props.teklaType === 'groups') {
-      blobUrl = await getGroupDocumentBlobUrl(props.teklaId, docType, item.label)
+      blobUrl = await getGroupDocumentBlobUrl(props.teklaId, docType, docId)
     } else {
-      blobUrl = await getTeamDocumentBlobUrl(props.teklaId, docType, item.label)
+      blobUrl = await getTeamDocumentBlobUrl(props.teklaId, docType, docId)
     }
     pdfModalUrl.value = blobUrl
-    pdfModalTitle.value = item.label
+    pdfModalTitle.value = itemLabel(item)
     pdfModalOpen.value = true
   } catch (e) {
     pdfError.value = e.response?.status === 404 ? 'Document not found' : (e.message || 'Failed to load document')
@@ -286,7 +305,7 @@ function resetToStandardShipment() {
                       class="tekla-doc-link"
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
-                      <span>{{ item.label }}</span>
+                      <span>{{ itemLabel(item) }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
@@ -301,7 +320,7 @@ function resetToStandardShipment() {
                       @click="openPdf(item)"
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
-                      <span>{{ item.label }}</span>
+                      <span>{{ itemLabel(item) }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
@@ -309,7 +328,7 @@ function resetToStandardShipment() {
                     </button>
                     <span v-else class="tekla-doc-label">
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
-                      <span>{{ item.label }}</span>
+                      <span>{{ itemLabel(item) }}</span>
                       <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
