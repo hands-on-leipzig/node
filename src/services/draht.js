@@ -398,7 +398,7 @@ export function isFutureEnrollmentEntry(row) {
 /**
  * One list row from GET /teams|/classes|/groups (id + display fields).
  * @param {unknown} row
- * @returns {{ id: number, name: string, organization: string|null, ref: string|null, program: number|null, edition: 'future'|'founders'|null }|null}
+ * @returns {{ id: number, name: string, organization: string|null, ref: string|null, program: number|null, edition: 'future'|'founders'|null, status_team: number|null }|null}
  */
 export function normalizeNodeListRow(row) {
   if (!row || typeof row !== 'object') return null
@@ -413,6 +413,8 @@ export function normalizeNodeListRow(row) {
     : (program != null && isFutureProgram(program) ? 'future' : null)
   const groupIdRaw = row.groupId ?? row.group_id
   const groupId = groupIdRaw != null && groupIdRaw !== '' ? Number(groupIdRaw) : null
+  const statusTeamRaw = row.status_team ?? row.statusTeam
+  const statusTeam = statusTeamRaw != null && statusTeamRaw !== '' ? Number(statusTeamRaw) : null
   const rawEventTeamIds = row.eventTeamIds ?? row.event_team_ids
   let eventTeamIds = null
   if (Array.isArray(rawEventTeamIds)) {
@@ -429,6 +431,7 @@ export function normalizeNodeListRow(row) {
     program: Number.isFinite(program) ? program : null,
     edition,
     groupId: Number.isFinite(groupId) && groupId > 0 ? groupId : null,
+    status_team: Number.isFinite(statusTeam) ? statusTeam : null,
     ...(eventTeamIds ? { eventTeamIds } : {}),
   }
 }

@@ -15,6 +15,7 @@ import {
   getRegistrationWindow,
 } from '@/services/draht'
 import { fetchDocumentsConfig } from '@/services/documentsConfig'
+import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
@@ -329,9 +330,13 @@ const groups = ref([])
 const loading = ref(true)
 const error = ref(null)
 const coCoachTargets = computed(() => {
-  const teamTargets = teams.value.map((item) => ({ ...item, type: 'team', value: `team:${item.id}` }))
-  const classTargets = classes.value.map((item) => ({ ...item, type: 'class', value: `class:${item.id}` }))
-  const groupTargets = groups.value.map((item) => ({ ...item, type: 'group', value: `group:${item.id}` }))
+  // Deregistered ("abgemeldet") enrollments are inactive — no co-coach can be added.
+  const activeTeams = teams.value.filter((item) => !isTeklaCancelled(item))
+  const activeClasses = classes.value.filter((item) => !isTeklaCancelled(item))
+  const activeGroups = groups.value.filter((item) => !isTeklaCancelled(item))
+  const teamTargets = activeTeams.map((item) => ({ ...item, type: 'team', value: `team:${item.id}` }))
+  const classTargets = activeClasses.map((item) => ({ ...item, type: 'class', value: `class:${item.id}` }))
+  const groupTargets = activeGroups.map((item) => ({ ...item, type: 'group', value: `group:${item.id}` }))
   return [...teamTargets, ...classTargets, ...groupTargets]
 })
 

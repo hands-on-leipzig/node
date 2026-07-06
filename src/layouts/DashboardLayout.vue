@@ -12,7 +12,7 @@ import {
 } from '@/i18n'
 import { theme, setTheme } from '@/theme'
 import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry, getNodeCoachMe } from '@/services/draht'
-import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey } from '@/utils/enrollmentDisplay'
+import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey, isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'
 import {
   dispatchBrowserBackRequest,
@@ -242,12 +242,18 @@ function sidebarTeklaAccent(item) {
   return resolveSidebarAccentTone(item)
 }
 
+/** Deregistered ("abgemeldet") enrollment — struck through in the sidebar. */
+function sidebarTeklaCancelled(item) {
+  return isTeklaCancelled(item)
+}
+
 function sidebarTeklaAriaLabel(item, kind) {
   const bold = sidebarTeklaBoldLabel(item, kind)
-  const ref = sidebarTeklaRefLabel(item)
-  if (kind === 'team') return t('nav.sidebarOpenTeam', { name: bold })
-  if (kind === 'class') return t('nav.sidebarOpenClass', { name: bold })
-  return t('nav.sidebarOpenGroup', { name: bold })
+  let base
+  if (kind === 'team') base = t('nav.sidebarOpenTeam', { name: bold })
+  else if (kind === 'class') base = t('nav.sidebarOpenClass', { name: bold })
+  else base = t('nav.sidebarOpenGroup', { name: bold })
+  return sidebarTeklaCancelled(item) ? `${base} (${t('detail.cancelledBadge')})` : base
 }
 function goTeam(id) {
   closeSidebar()
@@ -550,6 +556,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   class="sidebar-tekla-tile"
                   :class="[
                     { active: isTeamActive(team.id) },
+                    { 'sidebar-tekla-tile--cancelled': sidebarTeklaCancelled(team) },
                     `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
                   ]"
                   :title="sidebarTeklaAriaLabel(team, 'team')"
@@ -568,6 +575,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   class="sidebar-tekla-tile"
                   :class="[
                     { active: isClassActive(cls.id) },
+                    { 'sidebar-tekla-tile--cancelled': sidebarTeklaCancelled(cls) },
                     `sidebar-tekla-tile--${sidebarTeklaAccent(cls)}`,
                   ]"
                   :title="sidebarTeklaAriaLabel(cls, 'class')"
@@ -607,6 +615,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                     class="sidebar-tekla-tile"
                     :class="[
                       { active: isGroupActive(entry.group.id) },
+                      { 'sidebar-tekla-tile--cancelled': sidebarTeklaCancelled(entry.group) },
                       `sidebar-tekla-tile--${sidebarTeklaAccent(entry.group)}`,
                     ]"
                     :title="sidebarTeklaAriaLabel(entry.group, 'group')"
@@ -629,6 +638,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                       class="sidebar-tekla-tile sidebar-tekla-tile--nested"
                       :class="[
                         { active: isTeamActive(team.id) },
+                        { 'sidebar-tekla-tile--cancelled': sidebarTeklaCancelled(team) },
                         `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
                       ]"
                       :title="sidebarTeklaAriaLabel(team, 'team')"
@@ -649,6 +659,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   class="sidebar-tekla-tile"
                   :class="[
                     { active: isTeamActive(team.id) },
+                    { 'sidebar-tekla-tile--cancelled': sidebarTeklaCancelled(team) },
                     `sidebar-tekla-tile--${sidebarTeklaAccent(team)}`,
                   ]"
                   :title="sidebarTeklaAriaLabel(team, 'team')"
@@ -1207,6 +1218,15 @@ const { canInstall, promptInstall } = usePwaInstall()
   color: var(--color-text);
   text-align: left;
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sidebar-tekla-tile--cancelled {
+  opacity: 0.6;
+  border-left-color: var(--color-text-muted) !important;
+}
+.sidebar-tekla-tile--cancelled .sidebar-tekla-tile-title,
+.sidebar-tekla-tile--cancelled .sidebar-tekla-tile-ref {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
 }
 .sidebar-tekla-tile--challenge {
   border-left-color: #c62828;

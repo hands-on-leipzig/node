@@ -11,6 +11,8 @@ const props = defineProps({
   editableTeamName: { type: Boolean, default: false },
   savingTeamName: { type: Boolean, default: false },
   teamNameError: { type: String, default: '' },
+  /** Deregistered ("abgemeldet"): show badge and disable name editing. */
+  cancelled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['save-team-name', 'clear-team-name-error'])
@@ -25,7 +27,7 @@ const draftName = ref('')
 const nameInputRef = ref(null)
 const localNameError = ref('')
 
-const showTeamNameEdit = computed(() => props.editableTeamName && props.kind === 'team')
+const showTeamNameEdit = computed(() => props.editableTeamName && props.kind === 'team' && !props.cancelled)
 
 watch(
   () => props.card?.label ?? props.card?.name,
@@ -83,7 +85,7 @@ watch(
 </script>
 
 <template>
-  <header class="detail-header" :class="`detail-header--${accent}`">
+  <header class="detail-header" :class="[`detail-header--${accent}`, { 'detail-header--cancelled': cancelled }]">
     <div class="detail-header-top">
       <div class="detail-header-titles">
         <div v-if="showTeamNameEdit" class="detail-title-row">
@@ -131,6 +133,10 @@ watch(
           <template v-else>{{ headline.text }}</template>
         </h1>
         <span v-if="headline.ref" class="detail-ref">{{ headline.ref }}</span>
+        <span v-if="cancelled" class="detail-status-badge detail-status-badge--cancelled">
+          <i class="bi bi-slash-circle" aria-hidden="true"></i>
+          <I18nText k="detail.cancelledBadge" />
+        </span>
       </div>
     </div>
     <p v-if="nameError" class="detail-name-error">{{ nameError }}</p>
@@ -193,6 +199,36 @@ watch(
 
 .detail-title--muted {
   color: var(--color-text-muted);
+}
+
+.detail-header--cancelled {
+  --detail-accent-bar: var(--color-text-muted);
+}
+.detail-header--cancelled .detail-title {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  color: var(--color-text-muted);
+}
+
+.detail-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+.detail-status-badge--cancelled {
+  color: #b91c1c;
+  background: color-mix(in srgb, #b91c1c 12%, transparent);
+  border: 1px solid color-mix(in srgb, #b91c1c 35%, transparent);
+}
+.detail-status-badge .bi {
+  font-size: 0.85rem;
 }
 
 .detail-title-input {

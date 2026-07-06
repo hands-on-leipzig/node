@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getTeam, updateTeamPlayers, updateTeamVersandaufschub, updateTeamLabel } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
@@ -29,6 +30,9 @@ const savingTeamName = ref(false)
 const teamNameError = ref('')
 
 const id = computed(() => route.params.id)
+
+/** Deregistered ("abgemeldet"): all editing functions are disabled. */
+const cancelled = computed(() => isTeklaCancelled(team.value))
 
 const displayedPlayers = computed(() => {
   const list = editingPlayers.value.length ? editingPlayers.value : (team.value?.players || [])
@@ -268,12 +272,17 @@ watch(
         :card="team"
         kind="team"
         editable-team-name
+        :cancelled="cancelled"
         :saving-team-name="savingTeamName"
         :team-name-error="teamNameError"
         @save-team-name="saveTeamName"
         @clear-team-name-error="teamNameError = ''"
       />
-      <FutureEnrollmentContextBanner kind="team" :card="team" />
+      <p v-if="cancelled" class="detail-cancelled-banner" role="status">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+        <span><I18nText k="detail.cancelledBanner" /></span>
+      </p>
+      <FutureEnrollmentContextBanner v-if="!cancelled" kind="team" :card="team" />
 
       <!-- 2) Timeline -->
       <TeklaTimeline
@@ -284,6 +293,7 @@ watch(
         :tekla-id="team.id"
         :shipment-schedule="shipmentScheduleProp"
         :versandaufschub="showShipmentSchedule ? (team.versandaufschub ?? null) : undefined"
+        :read-only="cancelled"
         class="detail-timeline-first"
         @versandaufschub-save="saveVersandaufschub"
       />
@@ -373,7 +383,7 @@ watch(
               <template v-else>
                 <span class="detail-player-name">{{ playerDisplayName(p) }}</span>
                 <span class="detail-player-meta">{{ playerMeta(p) }}</span>
-                <div class="detail-player-actions">
+                <div v-if="!cancelled" class="detail-player-actions">
                   <button type="button" class="detail-btn detail-btn-ghost" @click="startEditPlayer(idx)" :aria-label="t('detail.edit')"><i class="bi bi-pencil"></i></button>
                   <button type="button" class="detail-btn detail-btn-ghost" @click="removePlayer(idx)" :aria-label="t('detail.remove')"><i class="bi bi-trash"></i></button>
                 </div>
@@ -381,7 +391,7 @@ watch(
             </li>
           </ul>
           <p v-else class="detail-empty-hint"><I18nText k="detail.noData" /></p>
-          <div class="detail-players-toolbar">
+          <div v-if="!cancelled" class="detail-players-toolbar">
             <button v-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer"><I18nText k="detail.addPlayer" /></button>
             <template v-else>
               <input v-model="newPlayer.firstname" class="detail-player-input" :placeholder="t('detail.firstname')" />
@@ -430,6 +440,24 @@ watch(
 }
 .detail-section-wide {
   grid-column: 1 / -1;
+}
+.detail-cancelled-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, #b91c1c 35%, transparent);
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+  color: #b91c1c;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.detail-cancelled-banner .bi {
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 .detail-loading,
 .detail-error {

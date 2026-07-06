@@ -24,6 +24,8 @@ const props = defineProps({
   shipmentSchedule: { type: Object, default: null },
   /** @deprecated use shipmentSchedule – kept for backward compatibility */
   versandaufschub: { type: [Number, null], default: undefined },
+  /** Deregistered ("abgemeldet"): hide interactive shipment controls, keep info read-only. */
+  readOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['versandaufschub-save', 'shipment-date-save'])
@@ -357,7 +359,7 @@ function resetToStandardShipment() {
                   <p v-if="hasShipmentDate" class="tekla-shipment-hint">
                     <I18nText k="detail.shipmentWednesdayHint" />
                   </p>
-                  <div v-if="hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
+                  <div v-if="!readOnly && hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
                     <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
                         <I18nText k="detail.shipmentPickWednesday" />
                       </label>

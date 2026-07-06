@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getGroup, updateGroupVersandaufschub } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
+import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaTimeline from '@/components/TeklaTimeline.vue'
@@ -16,6 +17,9 @@ const group = ref(null)
 const loading = ref(true)
 const error = ref(null)
 const id = computed(() => route.params.id)
+
+/** Deregistered ("abgemeldet"): all editing functions are disabled. */
+const cancelled = computed(() => isTeklaCancelled(group.value))
 
 const timelineSteps = computed(() => {
   const tl = group.value?.timeline
@@ -88,7 +92,11 @@ watch(
       {{ error }}
     </div>
     <template v-else-if="group">
-      <DetailTeklaHeader :card="group" kind="group" />
+      <DetailTeklaHeader :card="group" kind="group" :cancelled="cancelled" />
+      <p v-if="cancelled" class="detail-cancelled-banner" role="status">
+        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+        <span><I18nText k="detail.cancelledBanner" /></span>
+      </p>
 
       <TeklaTimeline
         v-if="timelineSteps.length"
@@ -98,6 +106,7 @@ watch(
         :tekla-id="group.id"
         :shipment-schedule="shipmentScheduleProp"
         :versandaufschub="showShipmentSchedule ? (group.versandaufschub ?? null) : undefined"
+        :read-only="cancelled"
         class="detail-timeline-first"
         @versandaufschub-save="saveVersandaufschub"
       />
@@ -131,7 +140,11 @@ watch(
           </dl>
         </section>
 
-        <section class="detail-section detail-section--wide">
+        <section
+          class="detail-section detail-section--wide"
+          :class="{ 'detail-section--disabled': cancelled }"
+          :inert="cancelled"
+        >
           <FutureGroupEventTeamsPanel
             :group-id="group.id"
             :group="group"
@@ -180,6 +193,22 @@ watch(
 <style scoped>
 .detail-view { max-width: 42rem; }
 .detail-overview { display: grid; gap: 1.5rem 2rem; }
+.detail-cancelled-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, #b91c1c 35%, transparent);
+  background: color-mix(in srgb, #b91c1c 10%, transparent);
+  color: #b91c1c;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.detail-cancelled-banner .bi { font-size: 1.1rem; flex-shrink: 0; }
+.detail-section--disabled { opacity: 0.55; filter: grayscale(0.35); }
 .detail-loading,
 .detail-error { display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted); }
 .detail-error { color: var(--color-error, #dc2626); }

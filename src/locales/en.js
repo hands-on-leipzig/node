@@ -314,7 +314,9 @@ export default {
         "teamNameRequired": "Team name is required",
         "teamNameSaveFailed": "Could not save team name",
         "remove": "Remove",
-        "coCoaches": "Co-coaches"
+        "coCoaches": "Co-coaches",
+        "cancelledBadge": "Deregistered",
+        "cancelledBanner": "This registration has been deregistered. All functions are disabled."
     },
     "teamDetail": {
         "event": "Event",

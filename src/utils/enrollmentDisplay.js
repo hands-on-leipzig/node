@@ -49,6 +49,24 @@ const BY_PROGRAM = {
 }
 
 /**
+ * Dolibarr Tekla::STATUS_ABGEMELDET — a deregistered ("abgemeldet") enrollment.
+ * Mirrors the backend constant in class/tekla.class.php.
+ */
+export const TEKLA_STATUS_ABGEMELDET = 3
+
+/**
+ * True when a team/class/group card or list row is deregistered (abgemeldet).
+ * Accepts both detail cards and normalized list rows (both carry `status_team`).
+ *
+ * @param {Record<string, unknown>|null|undefined} source
+ * @returns {boolean}
+ */
+export function isTeklaCancelled(source) {
+  if (!source || typeof source !== 'object') return false
+  return Number(source.status_team) === TEKLA_STATUS_ABGEMELDET
+}
+
+/**
  * @param {unknown} source Card or raw program id
  * @returns {number|null}
  */
