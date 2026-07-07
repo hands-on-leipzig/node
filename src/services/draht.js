@@ -176,6 +176,7 @@ function normalizeAddressItem(raw) {
     return null
   }
   const street = firstDefined(raw.street, raw.address, raw.address1, raw.line1, raw.addr1, raw.adresse) || ''
+  const houseNumber = firstDefined(raw.houseNumber) || ''
   const postalCode = firstDefined(raw.postalCode, raw.zip, raw.zipcode, raw.cp) || ''
   const city = firstDefined(raw.city, raw.town) || ''
   const country = firstDefined(raw.country, raw.countryCode, raw.country_code, raw.countrycode) || ''
@@ -202,6 +203,7 @@ function normalizeAddressItem(raw) {
     id: String(Number(String(idRaw).trim())),
     label: String(label || '').trim(),
     street: String(street || '').trim(),
+    houseNumber: String(houseNumber || '').trim(),
     postalCode: String(postalCode || '').trim(),
     city: String(city || '').trim(),
     country: String(country || '').trim().toLowerCase(),

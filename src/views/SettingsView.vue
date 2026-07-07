@@ -237,9 +237,10 @@ onMounted(() => {
                 <li v-for="item in sec.items" :key="sec.key + '-' + item.id" class="settings-list-item">
                   <div class="settings-address-lines">
                     <strong>{{ item.label || t('settings.addressDefaultLabel') }}</strong>
-                    <span>{{ item.street }}</span>
+                    <span>{{ item.street }} {{ item.houseNumber }}</span>
+                    <span>{{ item.addressLine3 }}</span>
                     <span>{{ item.postalCode }} {{ item.city }}</span>
-                    <span>{{ item.country?.toUpperCase() }}</span>
+                    <span>{{ item.state }} {{ item.country?.toUpperCase() }}</span>
                   </div>
                   <div class="settings-actions">
                     <button type="button" class="btn btn-ghost btn-sm" @click="applyAddressToForm(item)">
