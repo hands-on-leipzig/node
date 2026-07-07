@@ -1307,7 +1307,14 @@ function canNext() {
       }
       return areAddressesValid()
     }
-    if (ft) return true  // event step is optional
+    if (ft) {
+      // Event-Auswahl ist für Challenge-/Explore-Team ein Pflichtfeld.
+      const evId = Number(founderTeamEventId.value)
+      if (Number.isFinite(evId) && evId > 0) return true
+      // Keine Sackgasse: wenn (fertig geladen) keine Events verfügbar sind, trotzdem weiter.
+      if (!founderEventsNearestLoading.value && founderEventsNearest.value.length === 0) return true
+      return false
+    }
     return true
   }
   if (s === 6) {
@@ -2723,7 +2730,7 @@ watch(deliveryAddressDifferent, (different) => {
 
           <!-- Step 5 (Founders team): event selection — comes before team name for duplicate check -->
           <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
-            <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /></p>
+            <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /> <span class="field-required" :title="t('enroll.requiredField')">*</span></p>
             <div class="wizard-event-select-wrap">
               <EventSelectDropdown
                 :title="t('wizard.eventSelectSimple')"
