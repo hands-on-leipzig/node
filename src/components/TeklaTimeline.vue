@@ -108,20 +108,63 @@ function itemLabel(item) {
   return item?.label ?? ''
 }
 
-/** Invoice/order document status for display: 'paid' | 'open' | 'not_needed'. Null if not applicable. */
+/**
+ * Semantic document status coming from DRAHT (getPublicStatus).
+ * Orders:    'draft' | 'validated' | 'shipment' | 'closed'
+ * Invoices:  'open' | 'paid' | 'canceled' | 'not_needed' | 'draft'
+ * Shipments: 'draft' | 'sent' | 'delivered'
+ * Returns null when no badge should be shown for this item.
+ */
 function docStatus(item) {
   if (!item) return null
   const t = (item.type || '').toLowerCase()
-  if (t !== 'order' && t !== 'invoice') return null
-  if (item.payed === true) return 'paid'
-  if (item.not_needed === true) return 'not_needed'
-  return 'open'
+  if (t !== 'order' && t !== 'invoice' && t !== 'shipment') return null
+
+  // Prefer the pre-mapped status string sent by DRAHT.
+  const s = String(item.status || '').toLowerCase()
+  if (s) return s
+
+  // Legacy fallback for older API payloads without `status`.
+  // Tolerate `payed` as boolean, integer (0/1) or string.
+  if (t === 'invoice') {
+    const payed = item.payed
+    if (payed === true || payed === 1 || payed === '1') return 'paid'
+    if (item.not_needed === true) return 'not_needed'
+    return 'open'
+  }
+  // Orders/shipments without a status get no (misleading) badge.
+  return null
+}
+
+/** Visual tone class for the badge, grouping the many statuses into done/progress/muted. */
+function docStatusClass(item) {
+  const s = docStatus(item)
+  if (!s) return null
+  if (s === 'paid' || s === 'closed' || s === 'delivered') return 'done'
+  if (s === 'draft' || s === 'canceled' || s === 'not_needed') return 'muted'
+  return 'progress'
 }
 
 function docStatusLabelKey(item) {
   const s = docStatus(item)
   if (!s) return null
-  return s === 'paid' ? 'detail.invoiceStatusPaid' : s === 'not_needed' ? 'detail.invoiceStatusNotNeeded' : 'detail.invoiceStatusOpen'
+  const t = (item.type || '').toLowerCase()
+  if (t === 'order') {
+    if (s === 'draft') return 'detail.orderStatusDraft'
+    if (s === 'shipment') return 'detail.orderStatusShipment'
+    if (s === 'closed') return 'detail.orderStatusClosed'
+    return 'detail.orderStatusValidated'
+  }
+  if (t === 'shipment') {
+    if (s === 'draft') return 'detail.shipmentStatusDraft'
+    if (s === 'delivered') return 'detail.shipmentStatusDelivered'
+    return 'detail.shipmentStatusSent'
+  }
+  // invoice
+  if (s === 'paid') return 'detail.invoiceStatusPaid'
+  if (s === 'not_needed') return 'detail.invoiceStatusNotNeeded'
+  if (s === 'canceled') return 'detail.invoiceStatusCanceled'
+  return 'detail.invoiceStatusOpen'
 }
 
 async function openPdf(item) {
@@ -308,7 +351,7 @@ function resetToStandardShipment() {
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ itemLabel(item) }}</span>
-                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatusClass(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                       <span v-if="item.link_text" class="tekla-doc-extra">{{ item.link_text }}</span>
@@ -323,7 +366,7 @@ function resetToStandardShipment() {
                     >
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ itemLabel(item) }}</span>
-                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatusClass(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                       <i class="bi bi-box-arrow-up-right tekla-doc-external"></i>
@@ -331,7 +374,7 @@ function resetToStandardShipment() {
                     <span v-else class="tekla-doc-label">
                       <i class="bi tekla-doc-icon" :class="itemIcon(item)"></i>
                       <span>{{ itemLabel(item) }}</span>
-                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatus(item)" :title="t(docStatusLabelKey(item))">
+                      <span v-if="docStatusLabelKey(item)" class="tekla-doc-status" :class="docStatusClass(item)" :title="t(docStatusLabelKey(item))">
                         <I18nText :k="docStatusLabelKey(item)" />
                       </span>
                     </span>
@@ -647,13 +690,13 @@ function resetToStandardShipment() {
   font-size: 0.8em;
   opacity: 0.9;
 }
-.tekla-doc-status.paid {
+.tekla-doc-status.done {
   color: var(--color-success, #16a34a);
 }
-.tekla-doc-status.open {
+.tekla-doc-status.progress {
   color: var(--color-warn, #ca8a04);
 }
-.tekla-doc-status.not_needed {
+.tekla-doc-status.muted {
   color: var(--color-fg-muted);
   font-style: italic;
 }
