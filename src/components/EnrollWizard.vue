@@ -30,7 +30,7 @@ import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
 import { usePrivateInstitutionOrganization } from '@/composables/usePrivateInstitutionOrganization'
-import { extractLockedPupils, extractLockedSeasonSetCount } from '@/utils/voucherPreset'
+import { extractEventMode, extractLockedPupils, extractLockedSeasonSetCount } from '@/utils/voucherPreset'
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import { buildCountryOptions } from '@/utils/countryOptions'
 import {
@@ -156,10 +156,21 @@ const shouldSkipSeasonSetsWizardStep = computed(() => {
   return foundersNeedsSeasonSets.value
 })
 
-/** True when step `n` is a preset-locked step that should be skipped (pupils or season-sets). */
+/** Future on-site event step. */
+function isOnSiteEventWizardStep(s) {
+  return edition.value === 'future' && s === 6
+}
+
+/** Quicklaunch preset "kein Event" → skip the Future on-site event step entirely. */
+const shouldSkipOnSiteEventWizardStep = computed(
+  () => edition.value === 'future' && presetEventMode.value === 'none',
+)
+
+/** True when step `n` is a preset-locked step that should be skipped (pupils, season-sets, on-site event). */
 function isSkippablePresetStep(n) {
   if (shouldSkipPupilsWizardStep.value && isPupilsWizardStep(n)) return true
   if (shouldSkipSeasonSetsWizardStep.value && isSeasonSetsWizardStep(n)) return true
+  if (shouldSkipOnSiteEventWizardStep.value && isOnSiteEventWizardStep(n)) return true
   return false
 }
 
@@ -186,6 +197,8 @@ const presetRegisterEventTeams = ref(null)
 const presetEventTeamCount = ref(null)
 /** When set via voucher preset, only this event rowid may be chosen (null = all events). */
 const presetLockedEventId = ref(null)
+/** Team-event mode from the Quicklaunch preset: 'any' | 'teamCount' | 'specific' | 'none' | null. */
+const presetEventMode = ref(null)
 // Founder team: participants (first name, last name, date of birth, gender)
 const founderTeamPlayers = ref([])
 // Founder team: event to register for
@@ -388,7 +401,11 @@ const wizardProgressSteps = computed(() => {
         active: s === 5 && !shouldSkipSeasonSetsWizardStep.value,
         done: s > 5 || shouldSkipSeasonSetsWizardStep.value,
       },
-      { key: 'wizard.progressOnSite', active: s === 6, done: s > 6 },
+      {
+        key: 'wizard.progressOnSite',
+        active: s === 6 && !shouldSkipOnSiteEventWizardStep.value,
+        done: s > 6 || shouldSkipOnSiteEventWizardStep.value,
+      },
       { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
       { key: 'wizard.progressReview', active: s === 8, done: success.value },
     ])
@@ -829,7 +846,7 @@ watch(
 )
 
 watch(
-  [seasonSetsPresetLocked, pupilsPresetLocked, () => step.value, edition, foundersNeedsSeasonSets],
+  [seasonSetsPresetLocked, pupilsPresetLocked, shouldSkipOnSiteEventWizardStep, () => step.value, edition, foundersNeedsSeasonSets],
   () => {
     if (!props.open) return
     if (!isSkippablePresetStep(step.value)) return
@@ -1148,6 +1165,7 @@ function openWizard() {
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   presetLockedEventId.value = null
+  presetEventMode.value = null
   deliveryAddress.value = emptyAddressState(ADDRESS_MODE_DELIVERY)
   invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
   deliveryAddressDifferent.value = false
@@ -1436,6 +1454,7 @@ function prev() {
     presetRegisterEventTeams.value = null
     presetEventTeamCount.value = null
     presetLockedEventId.value = null
+    presetEventMode.value = null
     return
   }
   if (step.value > 1) {
@@ -1571,12 +1590,15 @@ function buildAddressPayload(addr, mode) {
   return buildNewAddressPayload(addr, mode)
 }
 
+/**
+ * Invoice payload for enrollment.
+ * When the voucher covers billing we do NOT send an address — Tekla.invoice_adr must stay empty
+ * so later flows can detect that a real invoice address was never collected.
+ * @returns {Record<string, unknown>|null}
+ */
 function buildInvoicePayload() {
-  if (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value)) {
-    return { addressId: String(Number(String(voucherInvoiceId.value).trim())) }
-  }
-  if (isDolibarrRowId(voucherPresetInvoiceId.value)) {
-    return { addressId: String(Number(String(voucherPresetInvoiceId.value).trim())) }
+  if (voucherForcesInvoiceAddress.value) {
+    return null
   }
   return buildAddressPayload(invoiceAddress.value, ADDRESS_MODE_INVOICE)
 }
@@ -1605,10 +1627,13 @@ function syncDeliveryRequiredForVoucherInvoice() {
   deliveryAddressDifferent.value = true
 }
 
-/** Invoice address is valid when voucher forces it (and we have id), or same as delivery. */
+/** Invoice address is valid when voucher covers billing, or a real address was provided. */
 function isInvoiceAddressValid() {
-  if (voucherType.value === '1') return isDolibarrRowId(voucherInvoiceId.value)
-  if (isDolibarrRowId(voucherPresetInvoiceId.value)) return true
+  if (voucherForcesInvoiceAddress.value) {
+    // Type-1 vouchers still need a resolvable thirdparty on the voucher itself.
+    if (voucherType.value === '1') return isDolibarrRowId(voucherInvoiceId.value)
+    return true
+  }
   return !!buildAddressPayload(invoiceAddress.value, ADDRESS_MODE_INVOICE)
 }
 
@@ -1712,7 +1737,16 @@ function applyVoucherPreset(raw) {
   const evId = Number(data.eventId)
   presetLockedEventId.value = (Number.isFinite(evId) && evId > 0) ? evId : null
 
-  if (data.futureOnSiteEvent === 'yes' || data.futureOnSiteEvent === 'later') {
+  presetEventMode.value = extractEventMode(raw)
+
+  if (presetEventMode.value === 'none') {
+    // "Kein Event": no team event at all — skip the on-site event step and clear any event lock.
+    futureOnSiteEvent.value = 'later'
+    presetRegisterEventTeams.value = false
+    presetEventTeamCount.value = null
+    presetLockedEventId.value = null
+    futureEventId.value = null
+  } else if (data.futureOnSiteEvent === 'yes' || data.futureOnSiteEvent === 'later') {
     futureOnSiteEvent.value = data.futureOnSiteEvent
   } else if (data.registerEventTeams === true || (Number.isFinite(etc) && etc > 0)) {
     futureOnSiteEvent.value = 'yes'
@@ -1792,9 +1826,10 @@ function firstIncompleteEnrollmentStep() {
   if (edition.value === 'future') {
     if (!futureGroup.value) return 2
     if (!hasRequiredInstitutionFields()) return 3
-    if (futurePupils.value == null) return 4
-    if (shouldSkipSeasonSetsWizardStep.value) return 6
-    return 5
+    if (futurePupils.value == null && !shouldSkipPupilsWizardStep.value) return 4
+    if (!shouldSkipSeasonSetsWizardStep.value) return 5
+    if (!shouldSkipOnSiteEventWizardStep.value) return 6
+    return 7
   }
   if (edition.value === 'founders') {
     if (!foundersVariant.value) return 2
@@ -1830,6 +1865,7 @@ function clearVoucherValidationState() {
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   presetLockedEventId.value = null
+  presetEventMode.value = null
 }
 
 function scheduleVoucherValidation(delayMs = 450) {
@@ -1895,6 +1931,7 @@ async function validateVoucherCode() {
   presetRegisterEventTeams.value = null
   presetEventTeamCount.value = null
   presetLockedEventId.value = null
+  presetEventMode.value = null
   try {
     const result = await validateVoucher(code)
     if (seq !== voucherValidateSeq) return
@@ -1994,13 +2031,14 @@ async function submit() {
         state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: buildDeliveryPayload(),
-        deliverySameAsInvoice: !deliveryAddressDifferent.value,
-        invoiceAddress: buildInvoicePayload(),
+        deliverySameAsInvoice: voucherForcesInvoiceAddress.value ? false : !deliveryAddressDifferent.value,
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
         ...buildParticipationPayload(),
       }
+      const invoicePayload = buildInvoicePayload()
+      if (invoicePayload) payload.invoiceAddress = invoicePayload
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
       payload.num_boards = sc
@@ -2053,13 +2091,13 @@ async function submit() {
         state: (formData.value.state || '').trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
-        deliverySameAsInvoice: !deliveryAddressDifferent.value,
-        invoiceAddress: invoicePayload ?? undefined,
+        deliverySameAsInvoice: voucherForcesInvoiceAddress.value ? false : !deliveryAddressDifferent.value,
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
         ...buildParticipationPayload(),
       }
+      if (invoicePayload) payload.invoiceAddress = invoicePayload
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
       payload.num_boards = sc

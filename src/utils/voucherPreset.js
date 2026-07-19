@@ -97,6 +97,29 @@ export function extractLockedEventTeamCount(raw) {
   return null
 }
 
+const EVENT_MODES = ['any', 'teamCount', 'specific', 'none']
+
+/**
+ * Team-event mode configured in the Quicklaunch preset.
+ * @param {unknown} raw
+ * @returns {'any'|'teamCount'|'specific'|'none'|null}
+ */
+export function extractEventMode(raw) {
+  const body = normalizeVoucherApiBody(raw)
+  if (!body) return null
+
+  const preset = body.preset && typeof body.preset === 'object'
+    ? /** @type {Record<string, unknown>} */ (body.preset)
+    : null
+
+  for (const src of [preset, body]) {
+    if (!src) continue
+    const m = src.eventMode
+    if (typeof m === 'string' && EVENT_MODES.includes(m)) return /** @type {'any'|'teamCount'|'specific'|'none'} */ (m)
+  }
+  return null
+}
+
 /**
  * @param {unknown} raw
  * @returns {number|null} fixed event rowid from voucher preset
