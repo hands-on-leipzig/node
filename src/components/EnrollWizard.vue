@@ -2472,11 +2472,11 @@ watch(deliveryAddressDifferent, (different) => {
             <div class="wizard-options wizard-options-two">
               <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'team' }" @click="selectFoundersType('team')">
                 <div class="wizard-option-main"><I18nText k="dashboard.team" /></div>
-                <div class="wizard-option-desc"><I18nText k="wizard.teamDesc" /></div>
+                <div class="wizard-option-desc"><I18nText :k="foundersVariant === 'challenge' ? 'wizard.teamDescChallenge' : 'wizard.teamDescExplore'" /></div>
               </button>
               <button type="button" class="wizard-option wizard-option-card" :class="{ active: foundersType === 'class' }" @click="selectFoundersType('class')">
                 <div class="wizard-option-main"><I18nText k="dashboard.class" /></div>
-                <div class="wizard-option-desc"><I18nText k="wizard.classDesc" /></div>
+                <div class="wizard-option-desc"><I18nText :k="foundersVariant === 'challenge' ? 'wizard.classDescChallenge' : 'wizard.classDescExplore'" /></div>
               </button>
             </div>
           </div>
