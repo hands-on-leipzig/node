@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, shallowRef, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, shallowRef, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -32,6 +32,44 @@ const legendEl = ref(null)
 const mapInstance = shallowRef(null)
 const markersLayer = shallowRef(null)
 let resizeObserver = null
+
+/**
+ * Wheel-zoom only while Ctrl/⌘ is held, so scrolling the page over the map
+ * doesn't get trapped. A short hint is shown when the user scrolls without it.
+ */
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || '')
+const zoomHintText = computed(() =>
+  t('venues.mapZoomHint', { key: isMac ? '⌘' : t('venues.mapZoomHintKey') })
+)
+const showZoomHint = ref(false)
+let zoomHintTimer = null
+
+function enableWheelZoom() {
+  mapInstance.value?.scrollWheelZoom.enable()
+}
+function disableWheelZoom() {
+  mapInstance.value?.scrollWheelZoom.disable()
+}
+function onModifierDown(e) {
+  if (e.key === 'Control' || e.key === 'Meta') enableWheelZoom()
+}
+function onModifierUp(e) {
+  if (e.key === 'Control' || e.key === 'Meta') disableWheelZoom()
+}
+function onWindowBlur() {
+  disableWheelZoom()
+}
+function onMapWheel(e) {
+  if (e.ctrlKey || e.metaKey) {
+    showZoomHint.value = false
+    return
+  }
+  showZoomHint.value = true
+  if (zoomHintTimer) clearTimeout(zoomHintTimer)
+  zoomHintTimer = setTimeout(() => {
+    showZoomHint.value = false
+  }, 1400)
+}
 
 /** On small screens the legend starts collapsed so it doesn't cover the map. */
 const LEGEND_COLLAPSE_QUERY = '(max-width: 640px)'
@@ -222,7 +260,7 @@ onMounted(() => {
 
   if (!mapRoot.value) return
   const map = L.map(mapRoot.value, {
-    scrollWheelZoom: true,
+    scrollWheelZoom: false,
     attributionControl: true,
   }).setView(EUROPE_CENTER, DEFAULT_ZOOM)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -244,6 +282,11 @@ onMounted(() => {
     }
   })
   if (mapWrap.value) resizeObserver.observe(mapWrap.value)
+
+  mapRoot.value.addEventListener('wheel', onMapWheel, { passive: true })
+  window.addEventListener('keydown', onModifierDown)
+  window.addEventListener('keyup', onModifierUp)
+  window.addEventListener('blur', onWindowBlur)
 })
 
 watch(() => props.clusters, syncMarkers, { deep: true })
@@ -260,10 +303,15 @@ watch(legendCollapsed, () => {
 
 onUnmounted(() => {
   if (resizeFitTimer) clearTimeout(resizeFitTimer)
+  if (zoomHintTimer) clearTimeout(zoomHintTimer)
   resizeObserver?.disconnect()
   resizeObserver = null
   legendMedia?.removeEventListener('change', onLegendMediaChange)
   legendMedia = null
+  mapRoot.value?.removeEventListener('wheel', onMapWheel)
+  window.removeEventListener('keydown', onModifierDown)
+  window.removeEventListener('keyup', onModifierUp)
+  window.removeEventListener('blur', onWindowBlur)
   mapInstance.value?.remove()
   mapInstance.value = null
   markersLayer.value = null
@@ -273,6 +321,11 @@ onUnmounted(() => {
 <template>
   <div ref="mapWrap" class="venues-map-wrap">
     <div ref="mapRoot" class="venues-map" role="img" :aria-label="t('venues.mapLabel')" />
+    <Transition name="venues-map-hint">
+      <div v-if="showZoomHint" class="venues-map-zoom-hint" role="status" aria-hidden="true">
+        {{ zoomHintText }}
+      </div>
+    </Transition>
     <div
       ref="legendEl"
       class="venues-map-legend"
@@ -568,6 +621,32 @@ html[data-theme='dark'] .venues-map-switch-input:checked + .venues-map-switch-tr
   font-size: 0.72rem;
   color: var(--color-text-muted);
   line-height: 1.35;
+}
+.venues-map-zoom-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 600;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-full);
+  background: rgba(12, 10, 8, 0.72);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.venues-map-hint-enter-active,
+.venues-map-hint-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.venues-map-hint-enter-from,
+.venues-map-hint-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
 }
 @media (max-width: 640px) {
   .venues-map-legend {

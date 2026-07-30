@@ -86,6 +86,8 @@ export default {
         "mapLabel": "Karte der Austragungsorte",
         "mapLegendTitle": "Legende",
         "mapLegendToggle": "Legende und Filter ein-/ausklappen",
+        "mapZoomHint": "Zum Zoomen {key} halten und scrollen",
+        "mapZoomHintKey": "Strg",
         "detailClose": "Schließen",
         "detailAddress": "Adresse",
         "detailContact": "Kontakt",

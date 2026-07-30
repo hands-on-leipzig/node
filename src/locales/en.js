@@ -86,6 +86,8 @@ export default {
         "mapLabel": "Map of tournament venues",
         "mapLegendTitle": "Legend",
         "mapLegendToggle": "Toggle legend and filters",
+        "mapZoomHint": "Hold {key} and scroll to zoom",
+        "mapZoomHintKey": "Ctrl",
         "detailClose": "Close",
         "detailAddress": "Address",
         "detailContact": "Contact",
