@@ -85,6 +85,7 @@ export default {
         "noFinal": "Kein Finale für die aktuelle Filterauswahl.",
         "mapLabel": "Karte der Austragungsorte",
         "mapLegendTitle": "Legende",
+        "mapLegendToggle": "Legende und Filter ein-/ausklappen",
         "detailClose": "Schließen",
         "detailAddress": "Adresse",
         "detailContact": "Kontakt",

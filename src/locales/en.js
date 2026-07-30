@@ -85,6 +85,7 @@ export default {
         "noFinal": "No finals match your filters.",
         "mapLabel": "Map of tournament venues",
         "mapLegendTitle": "Legend",
+        "mapLegendToggle": "Toggle legend and filters",
         "detailClose": "Close",
         "detailAddress": "Address",
         "detailContact": "Contact",

@@ -33,6 +33,19 @@ const mapInstance = shallowRef(null)
 const markersLayer = shallowRef(null)
 let resizeObserver = null
 
+/** On small screens the legend starts collapsed so it doesn't cover the map. */
+const LEGEND_COLLAPSE_QUERY = '(max-width: 640px)'
+const legendCollapsed = ref(false)
+let legendMedia = null
+
+function onLegendMediaChange(event) {
+  legendCollapsed.value = event.matches
+}
+
+function toggleLegend() {
+  legendCollapsed.value = !legendCollapsed.value
+}
+
 /** Only used when there are no markers (initial + empty filters). Changing this has no effect while points are shown. */
 const EUROPE_CENTER = [51.1, 10.4]
 const DEFAULT_ZOOM = 5
@@ -201,6 +214,12 @@ function syncMarkers() {
 }
 
 onMounted(() => {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    legendMedia = window.matchMedia(LEGEND_COLLAPSE_QUERY)
+    legendCollapsed.value = legendMedia.matches
+    legendMedia.addEventListener('change', onLegendMediaChange)
+  }
+
   if (!mapRoot.value) return
   const map = L.map(mapRoot.value, {
     scrollWheelZoom: true,
@@ -229,10 +248,22 @@ onMounted(() => {
 
 watch(() => props.clusters, syncMarkers, { deep: true })
 
+/** Re-fit markers into the changed free space when the legend collapses/expands. */
+watch(legendCollapsed, () => {
+  const map = mapInstance.value
+  if (!map) return
+  nextTick(() => {
+    map.invalidateSize({ animate: false })
+    if (props.clusters.length) scheduleMapRefit(props.clusters)
+  })
+})
+
 onUnmounted(() => {
   if (resizeFitTimer) clearTimeout(resizeFitTimer)
   resizeObserver?.disconnect()
   resizeObserver = null
+  legendMedia?.removeEventListener('change', onLegendMediaChange)
+  legendMedia = null
   mapInstance.value?.remove()
   mapInstance.value = null
   markersLayer.value = null
@@ -245,6 +276,7 @@ onUnmounted(() => {
     <div
       ref="legendEl"
       class="venues-map-legend"
+      :class="{ 'is-collapsed': legendCollapsed }"
       role="region"
       :aria-label="t('venues.mapLegendTitle')"
       @click.stop
@@ -253,8 +285,23 @@ onUnmounted(() => {
       @mousedown.stop
       @touchstart.stop
     >
-      <p class="venues-map-legend-title">{{ t('venues.mapLegendTitle') }}</p>
+      <button
+        type="button"
+        class="venues-map-legend-toggle"
+        :aria-expanded="!legendCollapsed"
+        :aria-label="t('venues.mapLegendToggle')"
+        @click="toggleLegend"
+      >
+        <span class="venues-map-legend-title">{{ t('venues.mapLegendTitle') }}</span>
+        <span v-if="legendCollapsed && resultCount != null" class="venues-map-legend-toggle-count">{{ resultCount }}</span>
+        <i
+          class="bi venues-map-legend-chevron"
+          :class="legendCollapsed ? 'bi-chevron-up' : 'bi-chevron-down'"
+          aria-hidden="true"
+        ></i>
+      </button>
 
+      <div v-show="!legendCollapsed" class="venues-map-legend-body">
       <div class="venues-map-legend-block">
         <span class="venues-map-legend-label">{{ t('venues.filterOffers') }}</span>
         <ul class="venues-map-legend-list">
@@ -301,6 +348,7 @@ onUnmounted(() => {
       <p v-if="resultCount != null" class="venues-map-legend-footer">
         <I18nText k="venues.resultsCount" :values="{ count: resultCount }" />
       </p>
+      </div>
     </div>
   </div>
 </template>
@@ -333,13 +381,46 @@ onUnmounted(() => {
   box-shadow: var(--shadow-md);
   pointer-events: auto;
 }
+.venues-map-legend-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  text-align: left;
+}
 .venues-map-legend-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text);
+}
+.venues-map-legend-toggle-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.venues-map-legend-chevron {
+  display: none;
+  margin-left: auto;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+.venues-map-legend-toggle-count + .venues-map-legend-chevron {
+  margin-left: 0.35rem;
+}
+.venues-map-legend-body {
+  margin-top: 0.5rem;
 }
 .venues-map-legend-block {
   margin-bottom: 0.5rem;
@@ -487,6 +568,36 @@ html[data-theme='dark'] .venues-map-switch-input:checked + .venues-map-switch-tr
   font-size: 0.72rem;
   color: var(--color-text-muted);
   line-height: 1.35;
+}
+@media (max-width: 640px) {
+  .venues-map-legend {
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100% - 1.2rem);
+  }
+  .venues-map-legend.is-collapsed {
+    width: auto;
+    right: auto;
+    max-width: calc(100% - 1.2rem);
+  }
+  .venues-map-legend-toggle {
+    cursor: pointer;
+    min-height: 1.75rem;
+    align-items: center;
+  }
+  .venues-map-legend-chevron {
+    display: inline-flex;
+  }
+  .venues-map-legend-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>
 
