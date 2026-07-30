@@ -1,7 +1,8 @@
 <script setup>
-import {computed, nextTick, onUnmounted, ref, watch} from 'vue'
+import {computed, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import VenueDetailMap from '@/components/VenueDetailMap.vue'
+import {useModalDismiss} from '@/composables/useModalDismiss'
 import {
   formatVenueDate,
   formatVenueDateDisplay,
@@ -32,68 +33,14 @@ const contacts = computed(() => {
 })
 
 const dialogEl = ref(null)
-let lastFocused = null
 
 function onBackdropClick(e) {
   if (e.target === e.currentTarget) emit('close')
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-
-function focusableElements() {
-  if (!dialogEl.value) return []
-  return Array.from(dialogEl.value.querySelectorAll(FOCUSABLE)).filter(
-      (el) => el.offsetParent !== null || el === document.activeElement,
-  )
-}
-
-function onKeydown(e) {
-  if (e.key === 'Escape') {
-    e.stopPropagation()
-    emit('close')
-    return
-  }
-  if (e.key !== 'Tab') return
-  const items = focusableElements()
-  if (!items.length) {
-    e.preventDefault()
-    dialogEl.value?.focus()
-    return
-  }
-  const first = items[0]
-  const last = items[items.length - 1]
-  const active = document.activeElement
-  if (e.shiftKey && (active === first || !dialogEl.value?.contains(active))) {
-    e.preventDefault()
-    last.focus()
-  } else if (!e.shiftKey && active === last) {
-    e.preventDefault()
-    first.focus()
-  }
-}
-
-watch(
-    () => props.show,
-    (visible) => {
-      document.body.style.overflow = visible ? 'hidden' : ''
-      if (visible) {
-        lastFocused = document.activeElement
-        document.addEventListener('keydown', onKeydown, true)
-        nextTick(() => {
-          const items = focusableElements()
-          ;(items[0] || dialogEl.value)?.focus()
-        })
-      } else {
-        document.removeEventListener('keydown', onKeydown, true)
-        if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus()
-        lastFocused = null
-      }
-    },
-)
-
-onUnmounted(() => {
-  document.body.style.overflow = ''
-  document.removeEventListener('keydown', onKeydown, true)
+useModalDismiss(() => props.show, {
+  dialogRef: dialogEl,
+  onClose: () => emit('close'),
 })
 </script>
 

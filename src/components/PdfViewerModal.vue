@@ -1,5 +1,7 @@
 <script setup>
-import { watch } from 'vue'
+import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useModalDismiss } from '@/composables/useModalDismiss'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -9,17 +11,17 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+const { t } = useI18n()
+const dialogEl = ref(null)
+
 function onBackdropClick(e) {
   if (e.target === e.currentTarget) emit('close')
 }
 
-watch(
-  () => props.show,
-  (visible) => {
-    if (visible) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-  }
-)
+useModalDismiss(() => props.show, {
+  dialogRef: dialogEl,
+  onClose: () => emit('close'),
+})
 </script>
 
 <template>
@@ -30,16 +32,16 @@ watch(
         class="pdf-modal-backdrop"
         role="dialog"
         aria-modal="true"
-        :aria-label="title || 'PDF viewer'"
+        :aria-label="title || t('common.closeDialog')"
         @click="onBackdropClick"
       >
-        <div class="pdf-modal-box">
+        <div ref="dialogEl" class="pdf-modal-box" tabindex="-1">
           <div class="pdf-modal-header">
             <span v-if="title" class="pdf-modal-title">{{ title }}</span>
             <button
               type="button"
               class="pdf-modal-close"
-              aria-label="Close"
+              :aria-label="t('common.closeDialog')"
               @click="emit('close')"
             >
               <i class="bi bi-x-lg"></i>

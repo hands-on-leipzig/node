@@ -26,7 +26,8 @@ export default {
         "githubExportBannerCta": "Open translation editor",
         "githubExportBannerDismiss": "Dismiss",
         "settings": "Settings",
-        "help": "Help"
+        "help": "Help",
+        "menu": "Menu"
     },
     "auth": {
         "forbiddenMessage": "Only users with the \"Coach\" role can use this app. Sign in with a coach account or contact your administrator.",

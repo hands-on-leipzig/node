@@ -3,8 +3,20 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getUserProfile, getCoachDolibarrContactId } from '@/auth/keycloak'
 import { listAddressBookGrouped, createAddress, updateAddress, deleteAddress, getNodeCoachMe } from '@/services/draht'
+import CountryNativeSelect from '@/components/CountryNativeSelect.vue'
+import { buildCountryOptions } from '@/utils/countryOptions'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+const countryGroups = computed(() => {
+  const { top, rest } = buildCountryOptions(locale.value)
+  return {
+    topLabel: t('enroll.countriesTop'),
+    top,
+    restLabel: t('enroll.countriesOther'),
+    rest,
+  }
+})
 
 const profile = computed(() => getUserProfile())
 const coachContactIdFromApi = ref(null)
@@ -278,7 +290,14 @@ onMounted(() => {
           </div>
           <div class="field">
             <label for="addr-country"><I18nText k="enroll.country" /></label>
-            <input id="addr-country" v-model="form.country" type="text" maxlength="2" required>
+            <CountryNativeSelect
+              id="addr-country"
+              v-model="form.country"
+              name="addr-country"
+              :groups="countryGroups"
+              :placeholder="t('enroll.country')"
+              required
+            />
           </div>
           <div class="settings-form-actions">
             <button v-if="isEditing" type="button" class="btn btn-ghost" @click="resetForm">

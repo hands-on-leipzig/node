@@ -499,7 +499,8 @@ const { canInstall, promptInstall } = usePwaInstall()
     <button
       type="button"
       class="menu-toggle"
-      aria-label="Menu"
+      :aria-label="t('common.menu')"
+      :aria-expanded="sidebarOpen"
       @click="toggleSidebar"
     >
       <i class="bi bi-list"></i>

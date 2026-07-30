@@ -26,7 +26,8 @@ export default {
         "githubExportBannerCta": "Übersetzungseditor öffnen",
         "githubExportBannerDismiss": "Ausblenden",
         "settings": "Einstellungen",
-        "help": "Hilfe"
+        "help": "Hilfe",
+        "menu": "Menü"
     },
     "auth": {
         "forbiddenMessage": "Nur Nutzer mit der Rolle „Coach“ können diese App nutzen. Melde dich mit einem Coach-Account an oder wende dich an deinen Administrator.",

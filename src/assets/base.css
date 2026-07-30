@@ -90,6 +90,17 @@
   --color-accent-soft: rgba(255, 122, 0, 0.14);
   --color-on-accent: #ffffff;
 
+  /* Status colors (error/danger are aliases) */
+  --color-error: #dc2626;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #b45309;
+
+  /* Informational callout (e.g. registration-closed hint) */
+  --color-info-text: #1e40af;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+
   --color-sidebar: transparent;
   --color-sidebar-border: rgba(255, 255, 255, 0.35);
 
@@ -174,6 +185,17 @@ html[data-theme='dark'] {
   --color-accent-muted: rgba(255, 159, 77, 0.22);
   --color-accent-soft: rgba(255, 159, 77, 0.14);
   --color-on-accent: #1c1917;
+
+  /* Status colors (brightened for dark surfaces) */
+  --color-error: #f87171;
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+
+  /* Informational callout */
+  --color-info-text: #bfdbfe;
+  --color-info-bg: rgba(59, 130, 246, 0.16);
+  --color-info-border: rgba(96, 165, 250, 0.4);
 
   --color-sidebar: transparent;
   --color-sidebar-border: rgba(255, 255, 255, 0.12);

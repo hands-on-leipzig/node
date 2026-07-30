@@ -24,6 +24,7 @@ import DocumentsFileOpeningOverlay from '@/components/DocumentsFileOpeningOverla
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
 import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
+import { useModalDismiss } from '@/composables/useModalDismiss'
 import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory, pushWizardHistorySnapshot } from '@/utils/spaBrowserBack'
 
 const { t, locale } = useI18n()
@@ -367,6 +368,17 @@ const pdfModalOpen = ref(false)
 const pdfModalUrl = ref('')
 const pdfModalTitle = ref('')
 const pdfModalBlobUrl = ref('')
+const documentsModalEl = ref(null)
+const coCoachModalEl = ref(null)
+
+useModalDismiss(() => documentsModalOpen.value, {
+  dialogRef: documentsModalEl,
+  onClose: () => closeDocumentsModal(),
+})
+useModalDismiss(() => coCoachModalOpen.value, {
+  dialogRef: coCoachModalEl,
+  onClose: () => closeCoCoachModal(),
+})
 const isMobileDashboard = ref(false)
 let mobileMediaQuery = null
 let detachMobileListener = null
@@ -870,7 +882,7 @@ const hasDocumentTreeContent = computed(() => {
         :aria-label="t('dashboard.documentsForDownload')"
         @click.self="closeDocumentsModal"
       >
-        <div class="dashboard-documents-modal" @click.stop>
+        <div ref="documentsModalEl" class="dashboard-documents-modal" tabindex="-1" @click.stop>
           <header class="dashboard-documents-modal-head">
             <h2 class="dashboard-documents-modal-title">
               <template v-if="documentsConfig.title">{{ documentsConfig.title }}</template>
@@ -953,7 +965,7 @@ const hasDocumentTreeContent = computed(() => {
         :aria-label="t('dashboard.addCoCoachModalTitle')"
         @click.self="closeCoCoachModal"
       >
-        <div class="co-coach-modal-dialog" @click.stop>
+        <div ref="coCoachModalEl" class="co-coach-modal-dialog" tabindex="-1" @click.stop>
           <header class="co-coach-modal-head">
             <h2 class="co-coach-modal-title"><I18nText k="dashboard.addCoCoachModalTitle" /></h2>
             <button type="button" class="co-coach-modal-close" :aria-label="t('dashboard.addCoCoachClose')" @click="closeCoCoachModal">
@@ -1408,9 +1420,9 @@ const hasDocumentTreeContent = computed(() => {
   padding: 0.75rem 0.9rem;
   font-size: 0.9375rem;
   line-height: 1.45;
-  color: #1e40af;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  color: var(--color-info-text);
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info-border);
   border-radius: var(--radius);
 }
 

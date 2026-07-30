@@ -40,7 +40,8 @@ function doLogin() {
           :class="{ active: theme === 'light' }"
           @click="setTheme('light')"
           :title="t('common.light')"
-          aria-label="Light"
+          :aria-label="t('common.light')"
+          :aria-pressed="theme === 'light'"
         >
           <i class="bi bi-sun-fill"></i>
         </button>
@@ -50,7 +51,8 @@ function doLogin() {
           :class="{ active: theme === 'dark' }"
           @click="setTheme('dark')"
           :title="t('common.dark')"
-          aria-label="Dark"
+          :aria-label="t('common.dark')"
+          :aria-pressed="theme === 'dark'"
         >
           <i class="bi bi-moon-fill"></i>
         </button>
@@ -60,6 +62,8 @@ function doLogin() {
           type="button"
           class="pill-btn"
           :class="{ active: locale === 'de' }"
+          :aria-label="t('common.german')"
+          :aria-pressed="locale === 'de'"
           @click="setLocaleUserChoice('de')"
         >
           DE
@@ -68,6 +72,8 @@ function doLogin() {
           type="button"
           class="pill-btn"
           :class="{ active: locale === 'en' }"
+          :aria-label="t('common.english')"
+          :aria-pressed="locale === 'en'"
           @click="setLocaleUserChoice('en')"
         >
           EN
