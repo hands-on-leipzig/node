@@ -234,10 +234,15 @@ const schedule = computed(() => {
     storedDate: stored,
     coachMinDate: s.coachMinDate || null,
     isCustom: s.isCustom === true || !!(standard && stored && stored !== standard),
+    preparationStartDate: s.preparationStartDate || null,
+    locked: s.locked === true,
   }
 })
 
 const isShipmentPickerEnabled = computed(() => shipmentControlsEnabled.value)
+
+/** Ab Vorbereitungsbeginn (Versandtermin - Vorlauf) kann der Coach den Termin nicht mehr ändern. */
+const shipmentLocked = computed(() => !!schedule.value?.locked)
 
 /** Aktuell geltender Versandtermin (Standard, sofern kein abweichender gespeichert). */
 const plannedYmd = computed(() => schedule.value?.earliestDate || schedule.value?.standardDate || '')
@@ -399,10 +404,13 @@ function resetToStandardShipment() {
                   <p v-else-if="hasShipmentDate && standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
                     <I18nText k="detail.shipmentEarliestIsStandard" />
                   </p>
-                  <p v-if="hasShipmentDate" class="tekla-shipment-hint">
+                  <p v-if="shipmentLocked && hasShipmentDate" class="tekla-shipment-preparing">
+                    <i class="bi bi-truck"></i>&nbsp;<I18nText k="detail.shipmentPreparing" />
+                  </p>
+                  <p v-if="!shipmentLocked && hasShipmentDate" class="tekla-shipment-hint">
                     <I18nText k="detail.shipmentWednesdayHint" />
                   </p>
-                  <div v-if="!readOnly && hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
+                  <div v-if="!readOnly && !shipmentLocked && hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
                     <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
                         <I18nText k="detail.shipmentPickWednesday" />
                       </label>
@@ -762,6 +770,14 @@ function resetToStandardShipment() {
 
 .tekla-shipment-current--standard {
   color: var(--color-success, #16a34a);
+}
+
+.tekla-shipment-preparing {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  line-height: 1.45;
 }
 
 .tekla-shipment-select-label {

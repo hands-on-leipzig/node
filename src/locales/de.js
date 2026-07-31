@@ -305,6 +305,7 @@ export default {
         "shipmentEarliestChosen": "Gewähltes frühestes Versanddatum: ",
         "shipmentEarliestIsStandard": "Standardtermin (erster Mittwoch nach Sommerferien).",
         "shipmentWednesdayHint": "Der Versand erfolgt automatisch am ersten Mittwoch nach den Sommerferien deines Bundeslands. Du kannst optional einen anderen Mittwoch wählen (früher oder später).",
+        "shipmentPreparing": "Der Versand wird nun vorbereitet – der Termin kann nicht mehr geändert werden.",
         "shipmentPickWednesday": "Abweichenden Mittwoch wählen",
         "shipmentChangeEarliest": "Versanddatum ändern",
         "shipmentResetStandard": "Auf Standard zurücksetzen",
