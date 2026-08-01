@@ -31,6 +31,7 @@ import {
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import logoHot from '@/assets/hot.png'
+import AppShell from '@hands-on/glass/components/AppShell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -296,6 +297,11 @@ function toggleSidebar() {
   }
 }
 
+function onShellOpen(open) {
+  if (open) sidebarOpen.value = true
+  else closeSidebar()
+}
+
 let profileMenuHideTimer = null
 
 function showProfileMenu() {
@@ -495,39 +501,30 @@ const { canInstall, promptInstall } = usePwaInstall()
 </script>
 
 <template>
-  <div class="dashboard-layout">
-    <button
-      type="button"
-      class="menu-toggle"
-      :aria-label="t('common.menu')"
-      :aria-expanded="sidebarOpen"
-      @click="toggleSidebar"
-    >
-      <i class="bi bi-list"></i>
-    </button>
-    <div
-      v-if="sidebarOpen"
-      class="sidebar-backdrop"
-      aria-hidden="true"
-      @click="closeSidebar"
-    ></div>
-    <aside class="sidebar" :class="{ open: sidebarOpen }">
-      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="sidebar-brand" @click="closeSidebar">
-        <img :src="logoJoin" alt="JOIN" class="sidebar-brand-logo sidebar-brand-logo--join" />
+  <AppShell
+    :open="sidebarOpen"
+    :menu-aria-label="t('common.menu')"
+    @toggle="toggleSidebar"
+    @update:open="onShellOpen"
+  >
+    <template #brand>
+      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="closeSidebar">
+        <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
-      <nav class="sidebar-nav">
+    </template>
+    <template #nav>
         <RouterLink
           v-for="item in navItems"
           :key="item.nameKey"
           :to="item.path"
-          class="nav-link sidebar-item"
-          :class="{ active: isActive(item) }"
+          class="glass-sidebar__item"
+          :class="{ 'glass-sidebar__item--active': isActive(item) }"
           @click="closeSidebar"
         >
-          <span class="sidebar-item-icon">
+          <span class="glass-sidebar__item-icon">
             <i class="bi" :class="item.icon" aria-hidden="true"></i>
           </span>
-          <span class="sidebar-item-label"><I18nText :k="item.nameKey" /></span>
+          <span class="glass-sidebar__item-label"><I18nText :k="item.nameKey" /></span>
         </RouterLink>
         <template v-if="isCoachApp">
           <div v-if="sidebarLoading" class="sidebar-list-loading">
@@ -676,26 +673,26 @@ const { canInstall, promptInstall } = usePwaInstall()
             </template>
           </template>
         </template>
-      </nav>
-      <div class="sidebar-lower">
-        <div class="sidebar-bottom" :class="{ 'sidebar-bottom--guest': isGuestShell }">
+    </template>
+    <template #lower>
+        <div class="glass-sidebar__footer" :class="{ 'glass-sidebar__footer--guest': isGuestShell }">
         <button
           v-if="isGuestShell && !isAuthenticated()"
           type="button"
-          class="sidebar-login-btn sidebar-item"
+          class="sidebar-login-btn glass-sidebar__item"
           @click="doLogin(); closeSidebar()"
         >
-          <span class="sidebar-item-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
-          <span class="sidebar-item-label"><I18nText k="nav.login" /></span>
+          <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
+          <span class="glass-sidebar__item-label"><I18nText k="nav.login" /></span>
         </button>
         <button
           v-else-if="isGuestShell"
           type="button"
-          class="sidebar-login-btn sidebar-item"
+          class="sidebar-login-btn glass-sidebar__item"
           @click="doLogout(); closeSidebar()"
         >
-          <span class="sidebar-item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
-          <span class="sidebar-item-label"><I18nText k="auth.logout" /></span>
+          <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
+          <span class="glass-sidebar__item-label"><I18nText k="auth.logout" /></span>
         </button>
         <div
           v-else
@@ -705,17 +702,17 @@ const { canInstall, promptInstall } = usePwaInstall()
         >
           <button
             type="button"
-            class="profile-trigger sidebar-item"
+            class="profile-trigger glass-sidebar__item"
             aria-haspopup="true"
             :aria-expanded="profileMenuOpen"
             :aria-label="sidebarProfileLabel || t('common.coach')"
             @click="showProfileMenu"
             @focus="showProfileMenu"
           >
-            <span class="sidebar-item-icon profile-account-icon" aria-hidden="true">
+            <span class="glass-sidebar__item-icon profile-account-icon" aria-hidden="true">
               <i class="bi bi-person-circle" />
             </span>
-            <span class="sidebar-item-label">
+            <span class="glass-sidebar__item-label">
               <template v-if="sidebarProfileLabel">{{ sidebarProfileLabel }}</template>
               <I18nText v-else k="common.coach" />
             </span>
@@ -825,250 +822,51 @@ const { canInstall, promptInstall } = usePwaInstall()
           </Transition>
         </div>
         </div>
-        <div class="sidebar-partner">
+        <div class="glass-sidebar__partners">
           <img
             :src="logoFll"
             alt="FIRST LEGO League"
-            class="sidebar-partner-logo sidebar-partner-logo--fll"
+            class="glass-sidebar__partner-logo glass-sidebar__partner-logo--primary"
             decoding="async"
           >
           <a
             href="https://www.hands-on-technology.org"
             target="_blank"
             rel="noopener noreferrer"
-            class="sidebar-partner-link"
+            class="glass-sidebar__partner-link"
           >
-            <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="sidebar-partner-logo sidebar-partner-logo--hot" />
+            <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="glass-sidebar__partner-logo glass-sidebar__partner-logo--secondary" />
           </a>
         </div>
+    </template>
+
+    <div class="glass-app__panel" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
+      <div class="content-actions">
+        <button
+          v-if="canInstall"
+          type="button"
+          class="header-install-btn"
+          @click="promptInstall"
+          title="Install app"
+          aria-label="Install app"
+        >
+          <i class="bi bi-phone"></i>
+          <span>Install App</span>
+        </button>
       </div>
-    </aside>
-    <main class="main">
-      <div class="content" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
-        <div class="content-actions">
-          <button
-            v-if="canInstall"
-            type="button"
-            class="header-install-btn"
-            @click="promptInstall"
-            title="Install app"
-            aria-label="Install app"
-          >
-            <i class="bi bi-phone"></i>
-            <span>Install App</span>
-          </button>
-        </div>
-        <CoachImpersonationBanner />
-        <RouterView />
-      </div>
-    </main>
-  </div>
+      <CoachImpersonationBanner />
+      <RouterView />
+    </div>
+  </AppShell>
 </template>
 
 <style scoped>
-.dashboard-layout {
-  display: flex;
-  min-height: 100dvh;
-  height: 100dvh;
-  overflow: hidden;
-  background: transparent;
-  position: relative;
-  gap: 1rem;
-  padding: 0.85rem 1rem 1rem;
-  box-sizing: border-box;
-}
-.menu-toggle {
-  display: none;
-  position: fixed;
-  top: max(0.75rem, env(safe-area-inset-top, 0px));
-  left: max(0.75rem, env(safe-area-inset-left, 0px));
-  z-index: 102;
-  width: var(--touch-lg);
-  height: var(--touch-lg);
-  padding: 0;
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-lg);
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  color: var(--color-text);
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.35rem;
-  box-shadow: var(--liquid-shadow);
-}
-.sidebar-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+/* JOIN-specific sidebar extras on top of @hands-on/glass app shell */
+
+.glass-sidebar__footer--guest {
+  gap: 0.75rem;
 }
 
-.sidebar {
-  --sidebar-width: 16.75rem;
-  width: var(--sidebar-width);
-  align-self: stretch;
-  min-height: 0;
-  flex-shrink: 0;
-  background: var(--liquid-tile-bg);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  border: 1px solid var(--liquid-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--liquid-shadow);
-  padding: 1rem 0;
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 0.75rem;
-  padding: 0.35rem 0 0.85rem;
-  border-bottom: 1px solid var(--color-border);
-  text-decoration: none;
-}
-.sidebar-brand-logo {
-  height: 4.5rem;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-  display: block;
-}
-.sidebar-brand-logo--join {
-  width: 100%;
-  height: auto;
-  max-height: 3.25rem;
-  object-fit: contain;
-  object-position: center;
-}
-.sidebar-lower {
-  flex-shrink: 0;
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-}
-.sidebar-partner {
-  margin: 0 0.5rem max(0.5rem, env(safe-area-inset-bottom, 0px));
-  padding: 0.75rem 0.5rem 0.5rem;
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: -1rem;
-  text-align: center;
-}
-.sidebar-partner-link {
-  display: block;
-  width: 100%;
-  line-height: 0;
-}
-.sidebar-partner-logo {
-  object-fit: contain;
-  object-position: center;
-  transition: opacity 0.15s;
-}
-.sidebar-partner-logo--fll {
-  width: auto;
-  max-width: 100%;
-  max-height: 4.5rem;
-  opacity: 0.98;
-}
-.sidebar-partner-logo--hot {
-  width: 100%;
-  height: auto;
-  max-height: 4.85rem;
-  opacity: 0.95;
-}
-.sidebar-partner-link:hover .sidebar-partner-logo--hot {
-  opacity: 1;
-}
-
-/* Icon + label row; full-width click target */
-.sidebar-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.6rem;
-  width: calc(100% - 1rem);
-  max-width: 100%;
-  box-sizing: border-box;
-  min-height: 2.75rem;
-  margin: 0 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
-}
-.sidebar-item-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 2.25rem;
-  min-width: 2.25rem;
-}
-.sidebar-item:hover .sidebar-item-icon .bi {
-  opacity: 1;
-}
-.sidebar-item-label {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  line-height: 1.25;
-  color: inherit;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-.nav-link .sidebar-item-label {
-  font-weight: 600;
-}
-.sidebar-item-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.1rem;
-  text-align: left;
-}
-.sidebar-item-sublabel {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--color-text-subtle);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  margin-top: 0.85rem;
-}
-.sidebar-nav-top-spacer {
-  flex-shrink: 0;
-  min-height: 1.35rem;
-  width: 100%;
-}
 .sidebar-section-toggle {
   display: flex;
   align-items: center;
@@ -1132,7 +930,7 @@ const { canInstall, promptInstall } = usePwaInstall()
   margin: 0.1rem 0 0 0.15rem;
   padding: 0.15rem 0 0.2rem 1.05rem;
   border-left: 3px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
-  border-radius: 0 0 0 var(--radius-sm);
+  border-radius: 0 0 0 var(--radius-sm, 8px);
   background: color-mix(in srgb, var(--color-bg-muted) 35%, transparent);
 }
 .sidebar-tekla-tile--nested {
@@ -1165,29 +963,6 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 .sidebar-section-hint .bi {
   margin-right: 0.25rem;
-}
-.nav-link {
-  padding: 0;
-  min-height: 2.75rem;
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-  text-decoration: none;
-  align-self: stretch;
-}
-.nav-link .bi {
-  font-size: 1.35rem;
-  opacity: 0.9;
-}
-.nav-link:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text);
-}
-.nav-link.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-.nav-link.active .bi {
-  opacity: 1;
 }
 .sidebar-list-loading {
   display: flex;
@@ -1229,21 +1004,12 @@ const { canInstall, promptInstall } = usePwaInstall()
   text-decoration: line-through;
   color: var(--color-text-muted);
 }
-.sidebar-tekla-tile--challenge {
-  border-left-color: #c62828;
-}
-.sidebar-tekla-tile--explore {
-  border-left-color: #2e7d32;
-}
-.sidebar-tekla-tile--future8 {
-  border-left-color: #1565c0;
-}
-.sidebar-tekla-tile--future5 {
-  border-left-color: #e6a800;
-}
+.sidebar-tekla-tile--challenge { border-left-color: #c62828; }
+.sidebar-tekla-tile--explore { border-left-color: #2e7d32; }
+.sidebar-tekla-tile--future8 { border-left-color: #1565c0; }
+.sidebar-tekla-tile--future5 { border-left-color: #e6a800; }
 .sidebar-tekla-tile:hover {
   background: color-mix(in srgb, var(--liquid-tile-bg-inner) 88%, var(--color-bg-hover));
-  box-shadow: var(--shadow-md), var(--liquid-shadow-inset);
 }
 .sidebar-tekla-tile:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -1251,7 +1017,6 @@ const { canInstall, promptInstall } = usePwaInstall()
 }
 .sidebar-tekla-tile.active {
   background: color-mix(in srgb, var(--color-accent-soft) 55%, var(--liquid-tile-bg-inner));
-  box-shadow: var(--shadow-md), var(--liquid-shadow-inset);
 }
 .sidebar-tekla-tile-text {
   display: flex;
@@ -1281,27 +1046,10 @@ const { canInstall, promptInstall } = usePwaInstall()
   white-space: nowrap;
   max-width: 100%;
 }
-.sidebar-tekla-tile.active .sidebar-tekla-tile-ref {
-  color: color-mix(in srgb, var(--color-text) 72%, var(--color-text-muted));
-}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.sidebar-bottom {
-  padding: 0.5rem 0.5rem 0.65rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--liquid-bg-subtle);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  flex-shrink: 0;
-}
-.sidebar-bottom--guest {
-  gap: 0.75rem;
-}
 .profile-account-icon .bi {
   font-size: 1.35rem;
   opacity: 0.9;
@@ -1379,7 +1127,7 @@ const { canInstall, promptInstall } = usePwaInstall()
   background: var(--color-bg-hover);
   border-color: var(--color-accent);
 }
-.sidebar-login-btn .sidebar-item-icon .bi {
+.sidebar-login-btn .glass-sidebar__item-icon .bi {
   font-size: 1.2rem;
 }
 
@@ -1426,14 +1174,11 @@ const { canInstall, promptInstall } = usePwaInstall()
   background: var(--liquid-bg-deep);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow:
-    var(--shadow-lg),
-    0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-lg), 0 12px 40px rgba(0, 0, 0, 0.18);
   padding: 0.5rem 0;
   z-index: 200;
   text-align: left;
   isolation: isolate;
-  -webkit-font-smoothing: antialiased;
 }
 .profile-menu-header {
   padding: 0.65rem 1rem 0.75rem;
@@ -1540,21 +1285,6 @@ const { canInstall, promptInstall } = usePwaInstall()
   transform: translateY(4px);
 }
 
-.main {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--liquid-border);
-  background: var(--liquid-tile-bg-strong);
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturate));
-  box-shadow: var(--liquid-shadow);
-}
 .content-actions {
   display: inline-flex;
   align-items: center;
@@ -1580,73 +1310,13 @@ const { canInstall, promptInstall } = usePwaInstall()
 .header-install-btn:hover {
   background: var(--color-bg-hover);
 }
-.content {
-  flex: 1;
-  min-height: 0;
-  padding: 1.25rem;
-  overflow: auto;
-  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
-  border-radius: calc(var(--radius-xl) - 3px);
-}
 
-/* Mobile: drawer overlay */
 @media (max-width: 768px) {
-  .dashboard-layout {
-    gap: 0;
-    padding: 0.5rem 0.65rem 0.65rem;
-  }
-  .menu-toggle {
-    display: flex;
-  }
   .header-install-btn {
     padding: 0.45rem 0.65rem;
   }
   .header-install-btn span {
     display: none;
-  }
-  .sidebar-backdrop {
-    display: block;
-  }
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 101;
-    width: min(var(--sidebar-width), 86vw);
-    height: 100dvh;
-    max-height: none;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: var(--shadow-lg);
-    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
-    border-left: none;
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .sidebar-brand {
-    padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
-  }
-  .sidebar-brand-logo--join {
-    max-height: 2.75rem;
-  }
-  .sidebar-partner-logo--fll {
-    max-height: 3.75rem;
-  }
-  .sidebar-partner-logo--hot {
-    max-height: 4rem;
-  }
-  .content {
-    padding: 1rem;
-    padding-left: max(1rem, env(safe-area-inset-left, 0px));
-    padding-right: max(1rem, env(safe-area-inset-right, 0px));
-  }
-}
-
-@media (max-width: 420px) {
-  .sidebar-brand-logo--join {
-    max-height: 2.35rem;
   }
 }
 </style>
