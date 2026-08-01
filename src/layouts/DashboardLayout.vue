@@ -31,7 +31,7 @@ import {
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import logoHot from '@/assets/hot.png'
-import AppShell from '@hands-on/glass/components/AppShell.vue'
+import AppShell from '@hands-on/glass/app-shell'
 
 const route = useRoute()
 const router = useRouter()

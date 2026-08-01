@@ -71,6 +71,10 @@ export default defineConfig(({ mode }) => {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  // Keep glass Vue SFCs out of the dep optimizer (exports resolve via Vite + vue plugin).
+  optimizeDeps: {
+    exclude: ['@hands-on/glass'],
+  },
   server: serverProxy ? { proxy: serverProxy } : undefined,
   }
 })
