@@ -10,7 +10,7 @@ import {
   translationEditMode,
   setTranslationEditMode,
 } from '@/i18n'
-import { theme, setTheme } from '@/theme'
+import { theme, setTheme } from '@hands-on/glass/theme'
 import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unwrapNodeCard, isFutureEnrollmentEntry, getNodeCoachMe } from '@/services/draht'
 import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey, isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'

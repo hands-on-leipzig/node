@@ -1,36 +1,8 @@
-@import './base.css';
-@import './liquid-surface.css';
+/* App shell on top of @hands-on/glass */
 
 #app {
   min-height: 100dvh;
   background: transparent;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-
-a {
-  text-decoration: none;
-  color: var(--color-accent);
-  transition: color 0.15s;
-}
-a:hover {
-  color: var(--color-accent-hover);
-}
-
-button {
-  font-family: inherit;
-  font-size: inherit;
-  -webkit-tap-highlight-color: transparent;
-}
-
-img,
-svg,
-video,
-canvas {
-  max-width: 100%;
-  height: auto;
-}
-
-.bi {
-  display: inline-block;
-  flex-shrink: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }

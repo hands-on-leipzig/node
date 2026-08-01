@@ -1,4 +1,5 @@
 import 'bootstrap-icons/font/bootstrap-icons.css'
+import '@hands-on/glass/styles.css'
 import './assets/main.css'
 
 import { createApp } from 'vue'
@@ -7,7 +8,7 @@ import router from './router'
 import { i18n } from './i18n'
 import { applyDraftsToI18nFromData } from './i18n/mergeLocaleDrafts.js'
 import { loadAllLocaleDrafts } from './utils/localeDrafts'
-import { initTheme } from './theme'
+import { initTheme } from '@hands-on/glass/theme'
 import I18nText from './components/I18nText.vue'
 import { registerSW } from 'virtual:pwa-register'
 

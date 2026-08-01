@@ -10,7 +10,7 @@ const props = defineProps({
   id: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   size: { type: String, default: 'md' }, // 'sm' | 'md'
-  /** Dashboard-style glass control (uses .liquid-surface-control from liquid-surface.css) */
+  /** Dashboard-style glass control (uses .liquid-surface-control from @hands-on/glass) */
   surface: { type: Boolean, default: false },
   /** Blue left accent rim (with surface), matches dashboard tile accent */
   surfaceAccent: { type: Boolean, default: false },

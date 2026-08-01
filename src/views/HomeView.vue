@@ -10,7 +10,7 @@ import {
   translationEditMode,
   setTranslationEditMode,
 } from '@/i18n'
-import { theme, setTheme } from '@/theme'
+import { theme, setTheme } from '@hands-on/glass/theme'
 import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoHot from '@/assets/hot.png'
 
