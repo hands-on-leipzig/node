@@ -72,7 +72,7 @@ void runSearch()
 
 <template>
   <div class="view-as-coach-panel">
-    <span class="profile-menu-label"><I18nText k="admin.viewAsCoachTitle" /></span>
+    <span class="glass-sidebar-footer__menu-label"><I18nText k="admin.viewAsCoachTitle" /></span>
     <p class="view-as-coach-lead"><I18nText k="admin.viewAsCoachLead" /></p>
     <input
       v-model="search"
@@ -123,7 +123,7 @@ void runSearch()
   background: color-mix(in srgb, var(--liquid-bg-deep) 90%, var(--color-bg-muted));
 }
 
-.view-as-coach-panel :deep(.profile-menu-label) {
+.view-as-coach-panel :deep(.glass-sidebar-footer__menu-label) {
   color: var(--color-text-muted);
 }
 

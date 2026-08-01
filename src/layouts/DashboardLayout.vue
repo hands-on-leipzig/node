@@ -32,6 +32,7 @@ import logoJoin from '@/assets/JOIN_v1.0.png'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import logoHot from '@/assets/hot.png'
 import AppShell from '@hands-on/glass/app-shell'
+import SidebarFooter from '@hands-on/glass/sidebar-footer'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,7 +45,6 @@ const isCoachApp = computed(() => isAuthenticated() && hasCoachRole())
 /** Logged-out (or non-coach) on public venues: minimal sidebar + login */
 const isGuestShell = computed(() => route.name === 'venues' && !isCoachApp.value)
 const sidebarOpen = ref(false)
-const profileMenuOpen = ref(false)
 const teams = ref([])
 const classes = ref([])
 const groups = ref([])
@@ -302,37 +302,10 @@ function onShellOpen(open) {
   else closeSidebar()
 }
 
-let profileMenuHideTimer = null
+const sidebarFooterRef = ref(null)
 
-function showProfileMenu() {
-  if (profileMenuHideTimer) {
-    clearTimeout(profileMenuHideTimer)
-    profileMenuHideTimer = null
-  }
-  profileMenuOpen.value = true
-}
-
-function scheduleHideProfileMenu() {
-  if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
-  profileMenuHideTimer = setTimeout(() => {
-    profileMenuOpen.value = false
-    profileMenuHideTimer = null
-  }, 220)
-}
-
-function closeProfileMenu() {
-  if (profileMenuHideTimer) {
-    clearTimeout(profileMenuHideTimer)
-    profileMenuHideTimer = null
-  }
-  profileMenuOpen.value = false
-}
-
-function handleClickOutside(e) {
-  const el = e.target
-  if (!el.closest('.sidebar-profile-wrap')) {
-    closeProfileMenu()
-  }
+function closeFooterMenus() {
+  sidebarFooterRef.value?.closeMenus?.()
 }
 
 function restoreCurrentRouteInHistory() {
@@ -367,17 +340,14 @@ function handleBrowserBack(event) {
 }
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
   window.addEventListener('popstate', handleBrowserBack, true)
   window.addEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
   if (isSpaRootRoute(route)) pushRootBackTrap()
 })
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
   window.removeEventListener('popstate', handleBrowserBack, true)
   window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleSidebarRefreshEvent)
   if (sidebarRefreshTimer) clearTimeout(sidebarRefreshTimer)
-  if (profileMenuHideTimer) clearTimeout(profileMenuHideTimer)
 })
 watch(
   () => route.path,
@@ -416,13 +386,13 @@ function switchToEn() {
 }
 
 function goSettings() {
-  closeProfileMenu()
+  closeFooterMenus()
   closeSidebar()
   router.push({ name: 'settings' })
 }
 
 function doLogout() {
-  closeProfileMenu()
+  closeFooterMenus()
   logout()
 }
 
@@ -675,154 +645,139 @@ const { canInstall, promptInstall } = usePwaInstall()
         </template>
     </template>
     <template #lower>
-        <div class="glass-sidebar__footer" :class="{ 'glass-sidebar__footer--guest': isGuestShell }">
-        <button
-          v-if="isGuestShell && !isAuthenticated()"
-          type="button"
-          class="sidebar-login-btn glass-sidebar__item"
-          @click="doLogin(); closeSidebar()"
-        >
-          <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
-          <span class="glass-sidebar__item-label"><I18nText k="nav.login" /></span>
-        </button>
-        <button
-          v-else-if="isGuestShell"
-          type="button"
-          class="sidebar-login-btn glass-sidebar__item"
-          @click="doLogout(); closeSidebar()"
-        >
-          <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
-          <span class="glass-sidebar__item-label"><I18nText k="auth.logout" /></span>
-        </button>
-        <div
-          v-else
-          class="sidebar-profile-wrap"
-          @mouseenter="showProfileMenu"
-          @mouseleave="scheduleHideProfileMenu"
-        >
+      <SidebarFooter
+        ref="sidebarFooterRef"
+        :guest="isGuestShell"
+        :identity-aria-label="sidebarProfileLabel || t('common.coach')"
+        :settings-aria-label="t('common.settings')"
+      >
+        <template #guest>
           <button
+            v-if="!isAuthenticated()"
             type="button"
-            class="profile-trigger glass-sidebar__item"
-            aria-haspopup="true"
-            :aria-expanded="profileMenuOpen"
-            :aria-label="sidebarProfileLabel || t('common.coach')"
-            @click="showProfileMenu"
-            @focus="showProfileMenu"
+            class="sidebar-login-btn glass-sidebar__item"
+            @click="doLogin(); closeSidebar()"
           >
-            <span class="glass-sidebar__item-icon profile-account-icon" aria-hidden="true">
-              <i class="bi bi-person-circle" />
-            </span>
-            <span class="glass-sidebar__item-label">
+            <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
+            <span class="glass-sidebar__item-label"><I18nText k="nav.login" /></span>
+          </button>
+          <button
+            v-else
+            type="button"
+            class="sidebar-login-btn glass-sidebar__item"
+            @click="doLogout(); closeSidebar()"
+          >
+            <span class="glass-sidebar__item-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
+            <span class="glass-sidebar__item-label"><I18nText k="auth.logout" /></span>
+          </button>
+        </template>
+
+        <template #identity="{ close }">
+          <div class="glass-sidebar-footer__menu-header">
+            <span class="glass-sidebar-footer__menu-title">
               <template v-if="sidebarProfileLabel">{{ sidebarProfileLabel }}</template>
               <I18nText v-else k="common.coach" />
             </span>
+          </div>
+          <AdminViewAsCoachPanel v-if="showAdminFeatures" />
+          <button
+            type="button"
+            class="glass-sidebar-footer__menu-item glass-sidebar-footer__menu-item--danger"
+            role="menuitem"
+            @click="doLogout(); close()"
+          >
+            <i class="bi bi-box-arrow-right"></i>
+            <span><I18nText k="nav.logOut" /></span>
           </button>
-          <Transition name="profile-menu">
-            <div v-if="profileMenuOpen" class="profile-menu" role="menu">
-              <div class="profile-menu-header">
-                <span class="profile-menu-name">
-                  <template v-if="sidebarProfileLabel">{{ sidebarProfileLabel }}</template>
-                  <I18nText v-else k="common.coach" />
-                </span>
+        </template>
+
+        <template #settings="{ close }">
+          <div class="glass-sidebar-footer__prefs">
+            <div class="glass-sidebar-footer__prefs-block">
+              <span class="glass-sidebar-footer__menu-label"><I18nText k="common.theme" /></span>
+              <div class="glass-sidebar-footer__prefs-row" role="group" :aria-label="t('common.theme')">
+                <button
+                  type="button"
+                  class="glass-sidebar-footer__pref-btn"
+                  :class="{ active: theme === 'light' }"
+                  :aria-pressed="theme === 'light'"
+                  @click="setTheme('light')"
+                >
+                  <i class="bi bi-sun-fill" aria-hidden="true" />
+                  <span><I18nText k="common.light" /></span>
+                </button>
+                <button
+                  type="button"
+                  class="glass-sidebar-footer__pref-btn"
+                  :class="{ active: theme === 'dark' }"
+                  :aria-pressed="theme === 'dark'"
+                  @click="setTheme('dark')"
+                >
+                  <i class="bi bi-moon-fill" aria-hidden="true" />
+                  <span><I18nText k="common.dark" /></span>
+                </button>
               </div>
-              <div class="profile-menu-prefs">
-                <div class="profile-menu-prefs-block">
-                  <span class="profile-menu-label"><I18nText k="common.theme" /></span>
-                  <div class="profile-menu-prefs-row" role="group" :aria-label="t('common.theme')">
-                    <button
-                      type="button"
-                      class="profile-pref-btn"
-                      :class="{ active: theme === 'light' }"
-                      :aria-pressed="theme === 'light'"
-                      @click="setTheme('light')"
-                    >
-                      <i class="bi bi-sun-fill" aria-hidden="true" />
-                      <span><I18nText k="common.light" /></span>
-                    </button>
-                    <button
-                      type="button"
-                      class="profile-pref-btn"
-                      :class="{ active: theme === 'dark' }"
-                      :aria-pressed="theme === 'dark'"
-                      @click="setTheme('dark')"
-                    >
-                      <i class="bi bi-moon-fill" aria-hidden="true" />
-                      <span><I18nText k="common.dark" /></span>
-                    </button>
-                  </div>
-                </div>
-                <div class="profile-menu-prefs-block">
-                  <span class="profile-menu-label"><I18nText k="common.language" /></span>
-                  <div class="profile-menu-prefs-row" role="group" :aria-label="t('common.language')">
-                    <button
-                      type="button"
-                      class="profile-pref-btn"
-                      :class="{ active: locale === 'de' }"
-                      :aria-pressed="locale === 'de'"
-                      @click="switchToDe"
-                    >
-                      DE
-                    </button>
-                    <button
-                      type="button"
-                      class="profile-pref-btn"
-                      :class="{ active: locale === 'en' }"
-                      :aria-pressed="locale === 'en'"
-                      @click="switchToEn"
-                    >
-                      EN
-                    </button>
-                  </div>
-                </div>
+            </div>
+            <div class="glass-sidebar-footer__prefs-block">
+              <span class="glass-sidebar-footer__menu-label"><I18nText k="common.language" /></span>
+              <div class="glass-sidebar-footer__prefs-row" role="group" :aria-label="t('common.language')">
+                <button
+                  type="button"
+                  class="glass-sidebar-footer__pref-btn"
+                  :class="{ active: locale === 'de' }"
+                  :aria-pressed="locale === 'de'"
+                  @click="switchToDe"
+                >
+                  DE
+                </button>
+                <button
+                  type="button"
+                  class="glass-sidebar-footer__pref-btn"
+                  :class="{ active: locale === 'en' }"
+                  :aria-pressed="locale === 'en'"
+                  @click="switchToEn"
+                >
+                  EN
+                </button>
               </div>
-              <button type="button" class="profile-menu-item" role="menuitem" @click="goSettings">
-                <i class="bi bi-gear-fill"></i>
-                <span><I18nText k="common.settings" /></span>
-              </button>
-              <button type="button" class="profile-menu-item" role="menuitem" disabled>
-                <i class="bi bi-question-circle"></i>
-                <span><I18nText k="common.help" /></span>
-              </button>
-              <div v-if="showAdminFeatures" class="profile-menu-section">
-                <span class="profile-menu-label"><I18nText k="nav.adminTranslations" /></span>
-                <div class="profile-menu-btns">
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: showTranslationKeys }"
-                    @click="setShowTranslationKeys(!showTranslationKeys)"
-                    :title="t('common.showTranslationKeys')"
-                  >
-                    <i class="bi" :class="showTranslationKeys ? 'bi-code-slash' : 'bi-translate'"></i>
-                    Keys
-                  </button>
-                  <button
-                    type="button"
-                    class="profile-pill"
-                    :class="{ active: translationEditMode }"
-                    @click="setTranslationEditMode(!translationEditMode)"
-                    :title="t('common.translationEditMode')"
-                  >
-                    <i class="bi bi-pencil-square"></i>
-                    Edit
-                  </button>
-                </div>
-              </div>
-              <AdminViewAsCoachPanel v-if="showAdminFeatures" />
+            </div>
+          </div>
+          <button type="button" class="glass-sidebar-footer__menu-item" role="menuitem" @click="goSettings(); close()">
+            <i class="bi bi-sliders"></i>
+            <span><I18nText k="common.settings" /></span>
+          </button>
+          <button type="button" class="glass-sidebar-footer__menu-item" role="menuitem" disabled>
+            <i class="bi bi-question-circle"></i>
+            <span><I18nText k="common.help" /></span>
+          </button>
+          <div v-if="showAdminFeatures" class="glass-sidebar-footer__menu-section">
+            <span class="glass-sidebar-footer__menu-label"><I18nText k="nav.adminTranslations" /></span>
+            <div class="glass-sidebar-footer__pills">
               <button
                 type="button"
-                class="profile-menu-item profile-menu-item-logout"
-                role="menuitem"
-                @click="doLogout"
+                class="glass-sidebar-footer__pill"
+                :class="{ active: showTranslationKeys }"
+                @click="setShowTranslationKeys(!showTranslationKeys)"
+                :title="t('common.showTranslationKeys')"
               >
-                <i class="bi bi-box-arrow-right"></i>
-                <span><I18nText k="nav.logOut" /></span>
+                <i class="bi" :class="showTranslationKeys ? 'bi-code-slash' : 'bi-translate'"></i>
+                Keys
+              </button>
+              <button
+                type="button"
+                class="glass-sidebar-footer__pill"
+                :class="{ active: translationEditMode }"
+                @click="setTranslationEditMode(!translationEditMode)"
+                :title="t('common.translationEditMode')"
+              >
+                <i class="bi bi-pencil-square"></i>
+                Edit
               </button>
             </div>
-          </Transition>
-        </div>
-        </div>
-        <div class="glass-sidebar__partners">
+          </div>
+        </template>
+
+        <template #partners>
           <img
             :src="logoFll"
             alt="FIRST LEGO League"
@@ -837,7 +792,8 @@ const { canInstall, promptInstall } = usePwaInstall()
           >
             <img :src="logoHot" alt="HANDS on TECHNOLOGY" class="glass-sidebar__partner-logo glass-sidebar__partner-logo--secondary" />
           </a>
-        </div>
+        </template>
+      </SidebarFooter>
     </template>
 
     <div class="glass-app__panel" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
@@ -862,10 +818,6 @@ const { canInstall, promptInstall } = usePwaInstall()
 
 <style scoped>
 /* JOIN-specific sidebar extras on top of @hands-on/glass app shell */
-
-.glass-sidebar__footer--guest {
-  gap: 0.75rem;
-}
 
 .sidebar-section-toggle {
   display: flex;
@@ -1050,63 +1002,6 @@ const { canInstall, promptInstall } = usePwaInstall()
   to { transform: rotate(360deg); }
 }
 
-.profile-account-icon .bi {
-  font-size: 1.35rem;
-  opacity: 0.9;
-}
-.profile-trigger:hover .profile-account-icon .bi {
-  opacity: 1;
-  color: var(--color-accent);
-}
-.profile-menu-prefs {
-  padding: 0.5rem 1rem 0.7rem;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 0.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  background: color-mix(in srgb, var(--liquid-bg-deep) 94%, var(--color-bg-muted));
-}
-.profile-menu-prefs-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-.profile-menu-prefs-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-}
-.profile-pref-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.25rem;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--liquid-tile-bg-inner);
-  font-family: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.profile-pref-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-accent));
-}
-.profile-pref-btn.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-on-accent);
-}
-.profile-pref-btn .bi {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
 .sidebar-login-btn {
   width: 100%;
   max-width: 100%;
