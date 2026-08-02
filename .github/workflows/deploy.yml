@@ -39,6 +39,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # package.json: "@hands-on/glass": "file:../glass" → sibling of workspace root
+      - name: Checkout glass design system
+        uses: actions/checkout@v4
+        with:
+          repository: hands-on-leipzig/glass
+          ref: main
+          path: .ci-glass
+          token: ${{ github.token }}
+
+      - name: Link glass for file:../glass
+        run: |
+          GLASS_TARGET="$(dirname "$GITHUB_WORKSPACE")/glass"
+          rm -rf "$GLASS_TARGET"
+          ln -sfn "$GITHUB_WORKSPACE/.ci-glass" "$GLASS_TARGET"
+          test -f "$GLASS_TARGET/package.json"
+          echo "Linked @hands-on/glass → $GLASS_TARGET"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -84,6 +101,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # package.json: "@hands-on/glass": "file:../glass" → sibling of workspace root
+      - name: Checkout glass design system
+        uses: actions/checkout@v4
+        with:
+          repository: hands-on-leipzig/glass
+          ref: main
+          path: .ci-glass
+          token: ${{ github.token }}
+
+      - name: Link glass for file:../glass
+        run: |
+          GLASS_TARGET="$(dirname "$GITHUB_WORKSPACE")/glass"
+          rm -rf "$GLASS_TARGET"
+          ln -sfn "$GITHUB_WORKSPACE/.ci-glass" "$GLASS_TARGET"
+          test -f "$GLASS_TARGET/package.json"
+          echo "Linked @hands-on/glass → $GLASS_TARGET"
 
       - name: Setup Node
         uses: actions/setup-node@v4
