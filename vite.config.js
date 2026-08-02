@@ -75,6 +75,15 @@ export default defineConfig(({ mode }) => {
   optimizeDeps: {
     exclude: ['@hands-on/glass'],
   },
-  server: serverProxy ? { proxy: serverProxy } : undefined,
+  server: {
+    // file:../glass lives outside the app root; allow /@fs font urls from tokens.css
+    fs: {
+      allow: [
+        fileURLToPath(new URL('.', import.meta.url)),
+        fileURLToPath(new URL('../glass', import.meta.url)),
+      ],
+    },
+    ...(serverProxy ? { proxy: serverProxy } : {}),
+  },
   }
 })

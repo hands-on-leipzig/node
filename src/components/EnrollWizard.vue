@@ -2392,7 +2392,7 @@ watch(deliveryAddressDifferent, (different) => {
                   <input
                     v-model="voucher"
                     type="text"
-                    class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                    class="wizard-form-field-input glass-input glass-input--lg liquid-surface-control liquid-surface-control--accent-blue"
                     :class="{ 'liquid-surface-control--invalid': voucherValid === false }"
                     :placeholder="t('enroll.placeholderVoucherCode')"
                     autocomplete="off"
@@ -2525,7 +2525,7 @@ watch(deliveryAddressDifferent, (different) => {
                   id="wizard-institution-name"
                   v-model="formData.organization"
                   type="text"
-                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                  class="wizard-form-field-input glass-input glass-input--lg liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('organization') }"
                   :disabled="isPrivateInstitution"
                   autocomplete="off"
@@ -2564,7 +2564,7 @@ watch(deliveryAddressDifferent, (different) => {
                   id="wizard-institution-zip"
                   v-model="formData.zip"
                   type="text"
-                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue"
+                  class="wizard-form-field-input glass-input glass-input--lg liquid-surface-control liquid-surface-control--accent-blue"
                   :class="{ 'liquid-surface-control--invalid': step4ValidationAttempted && isInstitutionFieldMissing('zip') }"
                   inputmode="numeric"
                   autocomplete="off"
@@ -2653,7 +2653,7 @@ watch(deliveryAddressDifferent, (different) => {
                   id="wizard-founder-team-name"
                   v-model="formData.name"
                   type="text"
-                  class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue wizard-team-name-input"
+                  class="wizard-form-field-input glass-input glass-input--lg liquid-surface-control liquid-surface-control--accent-blue wizard-team-name-input"
                   :class="{ 'liquid-surface-control--invalid': (step4ValidationAttempted && isStep4RequiredFieldMissing('name')) || nameValidation.blocked }"
                   :placeholder="t('wizard.teamNamePlaceholder')"
                   autocomplete="organization"
@@ -2865,7 +2865,7 @@ watch(deliveryAddressDifferent, (different) => {
                           <input
                             v-model="entry.name"
                             type="text"
-                            class="wizard-form-field-input liquid-surface-control liquid-surface-control--accent-blue wizard-event-team-name-input"
+                            class="wizard-form-field-input glass-input glass-input--lg liquid-surface-control liquid-surface-control--accent-blue wizard-event-team-name-input"
                             :placeholder="t('wizard.futureEventTeamNamePlaceholder')"
                             autocomplete="off"
                           >
@@ -3830,14 +3830,17 @@ html[data-theme='dark'] .wizard-sticky-top {
   color: var(--color-text);
   font-family: inherit;
 }
+/* Geometry from @hands-on/glass .glass-input--lg; keep class for existing markup */
 .wizard-form-field-input {
+  /* prefer: also add "glass-input glass-input--lg" on the element */
   display: block;
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 0.8rem 1rem;
-  min-height: 3rem;
-  font-size: 1rem;
+  min-height: var(--field-min-height-lg, var(--touch-lg));
+  padding: var(--field-padding-y-lg, 0.8rem) var(--field-padding-x-lg, 1rem);
+  border-radius: var(--field-radius-lg, var(--radius-lg));
+  font-size: var(--field-font-size-lg, 1rem);
   font-family: inherit;
   line-height: 1.4;
   color: var(--color-text);

@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@hands-on/glass": "github:hands-on-leipzig/glass#v1.2.1",
+    "@hands-on/glass": "file:../glass",
     "axios": "^1.13.4",
     "bootstrap-icons": "^1.13.1",
     "keycloak-js": "^26.2.2",
