@@ -495,16 +495,6 @@ onMounted(() => {
           />
         </p>
 
-        <p v-if="willAutoIncreasePupils" class="future-event-hint future-event-hint-accent">
-          <I18nText
-            k="groupDetail.eventTeamAutoPupilsHint"
-            :values="{
-              teams: totalTeamsAfterSubmit,
-              pupils: pupilsRequiredAfterSubmit,
-            }"
-          />
-        </p>
-
         <div v-if="teamAutoUpgrade" class="future-event-upgrade">
           <p>
             <I18nText
