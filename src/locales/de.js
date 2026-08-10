@@ -369,6 +369,8 @@ export default {
         "eventTeamsLabel": "Anzahl Event-Teams (je 8 Teilnehmende)",
         "eventCostHint": "Geschätzte Eventgebühr: {cost} EUR (100 EUR pro Event-Team).",
         "invoiceAddressRequiredHint": "Für die Eventgebühr benötigen wir eine Rechnungsadresse. Bei der Anmeldung (z. B. mit Gutschein) wurde noch keine hinterlegt — bitte hier ergänzen.",
+        "submitNeedsTeamAndEvent": "Bitte Teamnamen und Event für jedes Team auswählen.",
+        "submitNeedsInvoiceAddress": "Bitte eine gültige Rechnungsadresse angeben, damit die Anmeldung abgeschickt werden kann.",
         "registerForEventButton": "Gruppe zum Event anmelden",
         "registering": "Wird angemeldet…",
         "registerEventSuccess": "Gruppe wurde für das Event angemeldet.",

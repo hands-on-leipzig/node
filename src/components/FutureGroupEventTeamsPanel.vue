@@ -6,10 +6,13 @@ import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
 import {
   getEventsNearest,
+  getGroup,
   registerGroupForEvent,
   listAddressBookGrouped,
   isDolibarrRowId,
+  unwrapNodeCard,
 } from '@/services/draht'
+import { requestSidebarRefresh } from '@/utils/sidebarRefresh'
 import {
   FUTURE_TEAM_EVENT_UNIT_EUR,
   FUTURE_EVENT_TEAM_SIZE,
@@ -19,23 +22,22 @@ import {
 } from '@/config/futureEditionConfig'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity } from '@/utils/events'
-import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 import {
   emptyAddressState,
   buildNewAddressPayload,
   ADDRESS_MODE_INVOICE,
   syncExistingAddressSelection,
 } from '@/utils/addressForm'
-import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
-
 const props = defineProps({
   groupId: { type: [String, Number], required: true },
   group: { type: Object, required: true },
+  /** When true (e.g. abgemeldet), block registration actions without using HTML inert. */
+  disabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['updated'])
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 /** null | 'yes' | 'later' — wie Wizard Schritt Event */
 const registrationChoice = ref(null)
@@ -53,18 +55,26 @@ const submitting = ref(false)
 const submitError = ref(null)
 const submitSuccess = ref(false)
 
-const invoiceAddress = ref(emptyAddressState(ADDRESS_MODE_INVOICE))
+/** Start in "new address" mode so submit isn't blocked waiting for the address book. */
+const invoiceAddress = ref({ ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false })
 const invoiceAddresses = ref([])
 const addressesLoading = ref(false)
+const addressesLoadAttempted = ref(false)
 
 const registeredPupils = computed(() => {
   const n = Number(props.group?.registeredPupils || 0)
   return Number.isFinite(n) && n > 0 ? n : 0
 })
 
+const enrolledTeams = computed(() => {
+  const list = props.group?.eventTeams
+  return Array.isArray(list) ? list.filter((t) => t && t.id != null) : []
+})
+
+/** Prefer real team rows — meta eventTeamCount alone can be stale without teams. */
 const currentEventTeamCount = computed(() => {
-  const n = Number(props.group?.eventTeamCount || 0)
-  return Number.isFinite(n) && n > 0 ? n : 0
+  if (enrolledTeams.value.length > 0) return enrolledTeams.value.length
+  return 0
 })
 
 const maxTeamsByPupils = computed(() =>
@@ -73,14 +83,8 @@ const maxTeamsByPupils = computed(() =>
 
 const maxTeamsSelectable = computed(() => futureMaxSelectableEventTeams())
 
-const enrolledTeams = computed(() => {
-  const list = props.group?.eventTeams
-  return Array.isArray(list) ? list.filter((t) => t && t.id != null) : []
-})
-
-const hasEventRegistration = computed(
-  () => enrolledTeams.value.length > 0 || currentEventTeamCount.value > 0,
-)
+/** Only actual event teams count as registered (not a leftover meta eventTeamCount). */
+const hasEventRegistration = computed(() => enrolledTeams.value.length > 0)
 
 function firstEnrolledTeamEvent() {
   for (const team of enrolledTeams.value) {
@@ -101,22 +105,21 @@ const unitEur = computed(() => Number(props.group?.eventTeamUnitEur) || FUTURE_T
 /** True when enrollment left invoice_adr empty (e.g. voucher) — collect RA before event fee. */
 const needsInvoiceAddress = computed(() => {
   const id = Number(props.group?.invoice_adr)
-  if (Number.isFinite(id) && id > 0) return false
-  const formatted = formatOverviewAddress(props.group?.overview?.billing_address, locale.value)
-  return !formatted
+  return !(Number.isFinite(id) && id > 0)
 })
 
 const invoiceAddressValid = computed(() => {
   if (!needsInvoiceAddress.value) return true
   const addr = invoiceAddress.value
-  if (addr?.useExisting && isDolibarrRowId(addr.addressId)) return true
+  if (addr?.useExisting !== false && isDolibarrRowId(addr?.addressId)) return true
+  if (addr?.useExisting !== false && !isDolibarrRowId(addr?.addressId)) return false
   return !!buildNewAddressPayload(addr, ADDRESS_MODE_INVOICE)
 })
 
 function buildInvoicePayload() {
   if (!needsInvoiceAddress.value) return null
   const addr = invoiceAddress.value
-  if (addr?.useExisting && isDolibarrRowId(addr.addressId)) {
+  if (addr?.useExisting !== false && isDolibarrRowId(addr?.addressId)) {
     return { addressId: String(Number(String(addr.addressId).trim())) }
   }
   return buildNewAddressPayload(addr, ADDRESS_MODE_INVOICE) || null
@@ -136,13 +139,14 @@ async function loadInvoiceAddresses() {
         invoiceAddresses.value,
       )
     } else {
-      invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
+      invoiceAddress.value = { ...invoiceAddress.value, useExisting: false, addressId: '' }
     }
   } catch {
     invoiceAddresses.value = []
-    invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
+    invoiceAddress.value = { ...invoiceAddress.value, useExisting: false, addressId: '' }
   } finally {
     addressesLoading.value = false
+    addressesLoadAttempted.value = true
   }
 }
 
@@ -162,14 +166,6 @@ function teamEventLabel(team) {
 
 /** Initial registration (no teams yet). */
 const isInitialRegistration = computed(() => !hasEventRegistration.value)
-
-/** Erstanmeldung aktiv; Nachmeldung nur wenn global freigeschaltet. */
-const registrationActionsEnabled = computed(
-  () => isInitialRegistration.value || DETAIL_EVENT_ACTIONS_ENABLED,
-)
-const addMoreTeamsDisabled = computed(
-  () => !isInitialRegistration.value && !DETAIL_EVENT_ACTIONS_ENABLED,
-)
 
 const maxAdditionalTeams = computed(() =>
   Math.max(0, maxTeamsSelectable.value - currentEventTeamCount.value),
@@ -224,7 +220,7 @@ const showRegistrationForm = computed(
 )
 
 const canSubmit = computed(() => {
-  if (submitting.value) return false
+  if (props.disabled || submitting.value) return false
   if (isInitialRegistration.value && registrationChoice.value !== 'yes') return false
   if (!selectedTeamCount.value || selectedTeamCount.value < 1) return false
   if (!invoiceAddressValid.value) return false
@@ -235,6 +231,17 @@ const canSubmit = computed(() => {
   if (maxAdditionalTeams.value <= 0) return false
   if (selectedTeamCount.value > maxAdditionalTeams.value) return false
   return allTeamEventsSelected.value
+})
+
+/** Why the primary action stays disabled — shown under the button. */
+const submitBlockedHintKey = computed(() => {
+  if (canSubmit.value || submitting.value) return ''
+  if (props.disabled) return 'detail.cancelledBanner'
+  if (!showRegistrationForm.value) return ''
+  if (!isInitialRegistration.value && maxAdditionalTeams.value <= 0) return 'groupDetail.eventTeamsAtCapacity'
+  if (!allTeamEventsSelected.value) return 'groupDetail.submitNeedsTeamAndEvent'
+  if (needsInvoiceAddress.value && !invoiceAddressValid.value) return 'groupDetail.submitNeedsInvoiceAddress'
+  return ''
 })
 
 function futureProgramId() {
@@ -323,6 +330,7 @@ function selectTeamEvent(teamIndex, eventId) {
 }
 
 function chooseRegistration(mode) {
+  if (props.disabled) return
   registrationChoice.value = mode
   if (mode === 'yes') {
     panelOpen.value = true
@@ -361,7 +369,7 @@ function buildEventTeamsPayload() {
 }
 
 async function submit() {
-  if (!registrationActionsEnabled.value) return
+  if (props.disabled) return
   const eventTeamsPayload = buildEventTeamsPayload()
   const eventId = primaryEventIdForSubmit()
   if (!props.groupId || !eventId || eventTeamsPayload.length === 0) return
@@ -379,31 +387,71 @@ async function submit() {
       eventId,
       eventTeamCount: totalTeams,
       eventTeams: eventTeamsPayload,
-      registeredPupils: neededPupils > currentPupils ? neededPupils : undefined,
+      // Bump capacity when more teams need a higher pupil tier (never shrink).
+      registeredPupils: Math.max(currentPupils, neededPupils) || undefined,
     }
     if (invoicePayload) payload.invoiceAddress = invoicePayload
     const res = await registerGroupForEvent(props.groupId, payload)
-    emit('updated', res.data)
-    submitSuccess.value = true
+    let card = unwrapNodeCard(res) || res?.data
+    // Always re-fetch: GET heals fk_gruppe from meta and returns eventTeams reliably.
+    try {
+      const fresh = await getGroup(props.groupId)
+      const freshCard = unwrapNodeCard(fresh)
+      if (freshCard) {
+        const feeErr = card?.eventFeeOrderError
+        card = feeErr ? { ...freshCard, eventFeeOrderError: feeErr } : freshCard
+      }
+    } catch {
+      /* keep PUT response */
+    }
+    emit('updated', card)
+    requestSidebarRefresh()
+    if (card?.eventFeeOrderError) {
+      submitError.value = String(card.eventFeeOrderError)
+      submitSuccess.value = false
+    } else if (card?.eventRegistrationSkipped === 'already_registered') {
+      // 200 without new teams — surface that teams already exist (stale UI / retry).
+      submitSuccess.value = true
+      setTimeout(() => {
+        submitSuccess.value = false
+      }, 4000)
+    } else {
+      submitSuccess.value = true
+      setTimeout(() => {
+        submitSuccess.value = false
+      }, 4000)
+    }
     selectedTeamCount.value = 1
     teamAutoUpgrade.value = null
     registrationChoice.value = null
     panelOpen.value = false
-    invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
+    invoiceAddress.value = { ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false }
     syncTeamEventsArray()
-    setTimeout(() => {
-      submitSuccess.value = false
-    }, 4000)
   } catch (e) {
-    submitError.value =
-      e.response?.data?.message || e.response?.data?.error?.message || e.message || t('groupDetail.registerEventFailed')
+    const errData = e.response?.data
+    const msg =
+      errData?.message || errData?.error?.message || e.message || t('groupDetail.registerEventFailed')
+    // Capacity / retry races: reload group so already-created teams show up in the UI.
+    if (props.groupId) {
+      try {
+        const fresh = await getGroup(props.groupId)
+        const freshCard = unwrapNodeCard(fresh)
+        if (freshCard) {
+          emit('updated', freshCard)
+          requestSidebarRefresh()
+        }
+      } catch {
+        /* ignore reload failure */
+      }
+    }
+    submitError.value = msg
   } finally {
     submitting.value = false
   }
 }
 
 function togglePanel() {
-  if (!registrationActionsEnabled.value) return
+  if (props.disabled) return
   panelOpen.value = !panelOpen.value
   if (panelOpen.value && events.value.length === 0) {
     loadEvents()
@@ -419,10 +467,15 @@ watch(
     selectedTeamCount.value = 1
     teamAutoUpgrade.value = null
     registrationChoice.value = null
-    panelOpen.value = false
-    invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
+    panelOpen.value = enrolledTeams.value.length > 0
+    invoiceAddress.value = { ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false }
     invoiceAddresses.value = []
+    addressesLoadAttempted.value = false
     syncTeamEventsArray()
+    if (panelOpen.value) {
+      loadEvents()
+      if (needsInvoiceAddress.value) void loadInvoiceAddresses()
+    }
   },
 )
 
@@ -441,6 +494,11 @@ onMounted(() => {
   syncTeamEventsArray()
   if (isInitialRegistration.value) {
     loadEvents()
+  } else {
+    // Nachmeldung: Panel offen, damit der Flow sofort bedienbar ist.
+    panelOpen.value = true
+    loadEvents()
+    if (needsInvoiceAddress.value) void loadInvoiceAddresses()
   }
 })
 </script>
@@ -469,15 +527,7 @@ onMounted(() => {
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
 
-    <div
-      class="future-event-registration"
-      :class="{ 'future-event-registration--disabled': addMoreTeamsDisabled }"
-      :inert="addMoreTeamsDisabled || undefined"
-    >
-    <p v-if="addMoreTeamsDisabled" class="detail-section-disabled-hint">
-      <I18nText k="detail.eventSectionComingSoon" />
-    </p>
-
+    <div class="future-event-registration" :class="{ 'future-event-registration--readonly': disabled }">
     <template v-if="isInitialRegistration">
       <p class="onsite-event-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
       <p class="future-event-hint onsite-event-hint"><I18nText k="wizard.onSiteEventHint" /></p>
@@ -486,7 +536,7 @@ onMounted(() => {
           type="button"
           class="onsite-event-option"
           :class="{ active: registrationChoice === 'yes' }"
-          :disabled="addMoreTeamsDisabled"
+          :disabled="disabled"
           @click="chooseRegistration('yes')"
         >
           <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventYes" /></span>
@@ -497,7 +547,7 @@ onMounted(() => {
           type="button"
           class="onsite-event-option"
           :class="{ active: registrationChoice === 'later' }"
-          :disabled="addMoreTeamsDisabled"
+          :disabled="disabled"
           @click="chooseRegistration('later')"
         >
           <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventSkip" /></span>
@@ -511,7 +561,7 @@ onMounted(() => {
       type="button"
       class="future-event-panel-toggle"
       :aria-expanded="panelOpen"
-      :disabled="addMoreTeamsDisabled"
+      :disabled="disabled"
       @click="togglePanel"
     >
       <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
@@ -548,7 +598,6 @@ onMounted(() => {
               active: selectedTeamCount === count,
               'needs-pupils-upgrade': teamPillNeedsMorePupils(count),
             }"
-            :disabled="addMoreTeamsDisabled"
             @click="selectTeamCount(count)"
           >
             <span class="future-event-team-count-pill-main">
@@ -624,7 +673,6 @@ onMounted(() => {
                       :model-value="entry.eventId"
                       :placeholder="t('wizard.onSiteEventPlaceholder')"
                       :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
-                      :disabled="addMoreTeamsDisabled"
                       @update:model-value="selectTeamEvent(idx, $event)"
                     />
                   </div>
@@ -638,12 +686,11 @@ onMounted(() => {
             <i class="bi bi-receipt" aria-hidden="true" />
             <I18nText k="groupDetail.invoiceAddressRequiredHint" />
           </p>
-          <p v-if="addressesLoading" class="future-event-hint">
+          <p v-if="addressesLoading && !addressesLoadAttempted" class="future-event-hint">
             <i class="bi bi-arrow-repeat spin" aria-hidden="true" />
             <I18nText k="dashboard.loading" />
           </p>
           <AddressSelector
-            v-else
             v-model="invoiceAddress"
             mode="invoice"
             :addresses="invoiceAddresses"
@@ -656,13 +703,17 @@ onMounted(() => {
           <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
         </p>
 
-        <button type="button" class="detail-btn detail-btn-primary" :disabled="addMoreTeamsDisabled || !canSubmit" @click="submit">
+        <button type="button" class="detail-btn detail-btn-primary" :disabled="!canSubmit" @click="submit">
           <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true" />
           <i v-else class="bi bi-plus-circle" aria-hidden="true" />
           <I18nText v-if="submitting" k="groupDetail.registering" />
           <I18nText v-else-if="isInitialRegistration" k="groupDetail.registerForEventButton" />
           <I18nText v-else k="groupDetail.eventTeamsAddMoreSubmit" />
         </button>
+        <p v-if="submitBlockedHintKey" class="future-event-hint future-event-submit-hint">
+          <i class="bi bi-info-circle" aria-hidden="true" />
+          <I18nText :k="submitBlockedHintKey" />
+        </p>
       </template>
 
       <p v-if="submitError" class="detail-message detail-message-error">
@@ -769,22 +820,23 @@ onMounted(() => {
 .future-event-registration {
   margin-top: 0.25rem;
 }
-.future-event-registration--disabled {
-  opacity: 0.5;
+.future-event-registration--readonly {
+  opacity: 0.55;
   filter: grayscale(0.35);
-  pointer-events: none;
-  user-select: none;
 }
-.detail-section-disabled-hint {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.65rem;
-  border-radius: var(--radius);
-  border: 1px dashed var(--color-border);
-  background: color-mix(in srgb, var(--color-bg) 92%, var(--color-text-muted));
+.future-event-submit-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  color: #b45309;
 }
-.future-event-panel-toggle:disabled {
+.future-event-submit-hint .bi {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+.future-event-panel-toggle:disabled,
+.onsite-event-option:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
