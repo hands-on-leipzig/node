@@ -368,6 +368,7 @@ export default {
         "selectEvent": "Select event…",
         "eventTeamsLabel": "Number of event teams (8 participants each)",
         "eventCostHint": "Estimated event fee: {cost} EUR (100 EUR per event team).",
+        "invoiceAddressRequiredHint": "An invoice address is required for the event fee. None was stored at enrollment (e.g. voucher) — please add one here.",
         "registerForEventButton": "Register group for event",
         "registering": "Registering…",
         "registerEventSuccess": "Group has been registered for the event.",

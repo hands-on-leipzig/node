@@ -3,7 +3,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
-import { getEventsNearest, registerGroupForEvent } from '@/services/draht'
+import AddressSelector from '@/components/AddressSelector.vue'
+import {
+  getEventsNearest,
+  registerGroupForEvent,
+  listAddressBookGrouped,
+  isDolibarrRowId,
+} from '@/services/draht'
 import {
   FUTURE_TEAM_EVENT_UNIT_EUR,
   FUTURE_EVENT_TEAM_SIZE,
@@ -14,6 +20,13 @@ import {
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
 import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity } from '@/utils/events'
 import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
+import {
+  emptyAddressState,
+  buildNewAddressPayload,
+  ADDRESS_MODE_INVOICE,
+  syncExistingAddressSelection,
+} from '@/utils/addressForm'
+import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 
 const props = defineProps({
   groupId: { type: [String, Number], required: true },
@@ -22,7 +35,7 @@ const props = defineProps({
 
 const emit = defineEmits(['updated'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 /** null | 'yes' | 'later' — wie Wizard Schritt Event */
 const registrationChoice = ref(null)
@@ -39,6 +52,10 @@ const teamAutoUpgrade = ref(null)
 const submitting = ref(false)
 const submitError = ref(null)
 const submitSuccess = ref(false)
+
+const invoiceAddress = ref(emptyAddressState(ADDRESS_MODE_INVOICE))
+const invoiceAddresses = ref([])
+const addressesLoading = ref(false)
 
 const registeredPupils = computed(() => {
   const n = Number(props.group?.registeredPupils || 0)
@@ -80,6 +97,54 @@ const currentEventLabel = computed(() => {
 })
 
 const unitEur = computed(() => Number(props.group?.eventTeamUnitEur) || FUTURE_TEAM_EVENT_UNIT_EUR)
+
+/** True when enrollment left invoice_adr empty (e.g. voucher) — collect RA before event fee. */
+const needsInvoiceAddress = computed(() => {
+  const id = Number(props.group?.invoice_adr)
+  if (Number.isFinite(id) && id > 0) return false
+  const formatted = formatOverviewAddress(props.group?.overview?.billing_address, locale.value)
+  return !formatted
+})
+
+const invoiceAddressValid = computed(() => {
+  if (!needsInvoiceAddress.value) return true
+  const addr = invoiceAddress.value
+  if (addr?.useExisting && isDolibarrRowId(addr.addressId)) return true
+  return !!buildNewAddressPayload(addr, ADDRESS_MODE_INVOICE)
+})
+
+function buildInvoicePayload() {
+  if (!needsInvoiceAddress.value) return null
+  const addr = invoiceAddress.value
+  if (addr?.useExisting && isDolibarrRowId(addr.addressId)) {
+    return { addressId: String(Number(String(addr.addressId).trim())) }
+  }
+  return buildNewAddressPayload(addr, ADDRESS_MODE_INVOICE) || null
+}
+
+async function loadInvoiceAddresses() {
+  if (!needsInvoiceAddress.value || addressesLoading.value) return
+  addressesLoading.value = true
+  try {
+    const grouped = await listAddressBookGrouped()
+    invoiceAddresses.value = Array.isArray(grouped?.invoice)
+      ? grouped.invoice
+      : (Array.isArray(grouped?.combined) ? grouped.combined : [])
+    if (invoiceAddresses.value.length > 0) {
+      invoiceAddress.value = syncExistingAddressSelection(
+        { ...invoiceAddress.value, useExisting: true },
+        invoiceAddresses.value,
+      )
+    } else {
+      invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
+    }
+  } catch {
+    invoiceAddresses.value = []
+    invoiceAddress.value = { ...invoiceAddress.value, useExisting: false }
+  } finally {
+    addressesLoading.value = false
+  }
+}
 
 function teamDisplayName(team) {
   const label = String(team?.label || '').trim()
@@ -162,6 +227,7 @@ const canSubmit = computed(() => {
   if (submitting.value) return false
   if (isInitialRegistration.value && registrationChoice.value !== 'yes') return false
   if (!selectedTeamCount.value || selectedTeamCount.value < 1) return false
+  if (!invoiceAddressValid.value) return false
   if (isInitialRegistration.value) {
     if (selectedTeamCount.value > maxTeamsByPupils.value && !teamAutoUpgrade.value) return false
     return allTeamEventsSelected.value
@@ -261,6 +327,7 @@ function chooseRegistration(mode) {
   if (mode === 'yes') {
     panelOpen.value = true
     if (events.value.length === 0) loadEvents()
+    if (needsInvoiceAddress.value) void loadInvoiceAddresses()
     if (!Number.isFinite(Number(selectedTeamCount.value)) || selectedTeamCount.value < 1) {
       selectedTeamCount.value = 1
     }
@@ -298,6 +365,8 @@ async function submit() {
   const eventTeamsPayload = buildEventTeamsPayload()
   const eventId = primaryEventIdForSubmit()
   if (!props.groupId || !eventId || eventTeamsPayload.length === 0) return
+  const invoicePayload = buildInvoicePayload()
+  if (needsInvoiceAddress.value && !invoicePayload) return
 
   submitting.value = true
   submitError.value = null
@@ -312,6 +381,7 @@ async function submit() {
       eventTeams: eventTeamsPayload,
       registeredPupils: neededPupils > currentPupils ? neededPupils : undefined,
     }
+    if (invoicePayload) payload.invoiceAddress = invoicePayload
     const res = await registerGroupForEvent(props.groupId, payload)
     emit('updated', res.data)
     submitSuccess.value = true
@@ -319,6 +389,7 @@ async function submit() {
     teamAutoUpgrade.value = null
     registrationChoice.value = null
     panelOpen.value = false
+    invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
     syncTeamEventsArray()
     setTimeout(() => {
       submitSuccess.value = false
@@ -337,6 +408,9 @@ function togglePanel() {
   if (panelOpen.value && events.value.length === 0) {
     loadEvents()
   }
+  if (panelOpen.value && needsInvoiceAddress.value) {
+    void loadInvoiceAddresses()
+  }
 }
 
 watch(
@@ -346,6 +420,8 @@ watch(
     teamAutoUpgrade.value = null
     registrationChoice.value = null
     panelOpen.value = false
+    invoiceAddress.value = emptyAddressState(ADDRESS_MODE_INVOICE)
+    invoiceAddresses.value = []
     syncTeamEventsArray()
   },
 )
@@ -353,6 +429,13 @@ watch(
 watch(selectedTeamCount, () => {
   syncTeamEventsArray()
 })
+
+watch(
+  () => [showRegistrationForm.value, needsInvoiceAddress.value],
+  ([show, needs]) => {
+    if (show && needs) void loadInvoiceAddresses()
+  },
+)
 
 onMounted(() => {
   syncTeamEventsArray()
@@ -549,6 +632,25 @@ onMounted(() => {
               </div>
             </div>
           </div>
+
+        <div v-if="needsInvoiceAddress" class="future-event-invoice">
+          <p class="future-event-hint future-event-invoice-hint">
+            <i class="bi bi-receipt" aria-hidden="true" />
+            <I18nText k="groupDetail.invoiceAddressRequiredHint" />
+          </p>
+          <p v-if="addressesLoading" class="future-event-hint">
+            <i class="bi bi-arrow-repeat spin" aria-hidden="true" />
+            <I18nText k="dashboard.loading" />
+          </p>
+          <AddressSelector
+            v-else
+            v-model="invoiceAddress"
+            mode="invoice"
+            :addresses="invoiceAddresses"
+            :label="t('enroll.invoiceAddress')"
+            id-prefix="future-event-invoice"
+          />
+        </div>
 
         <p class="future-event-hint">
           <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
@@ -801,6 +903,25 @@ onMounted(() => {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   line-height: 1.45;
+}
+.future-event-invoice {
+  margin: 0.85rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-muted, var(--liquid-tile-bg-inner));
+}
+.future-event-invoice-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+  font-weight: 500;
+}
+.future-event-invoice-hint .bi {
+  margin-top: 0.15rem;
+  color: var(--color-accent);
 }
 .future-event-hint-warn {
   color: #b45309;
