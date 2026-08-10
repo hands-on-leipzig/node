@@ -731,7 +731,9 @@ export function updateClassVersandaufschub(classId, payload) {
 }
 
 /**
- * Register group for event(s). Payload: { eventId, eventTeamCount, registeredPupils?, eventTeams?: [{ eventId, name }] }.
+ * Register group for event(s).
+ * Payload: { eventId, eventTeamCount, registeredPupils?, eventTeams?: [{ eventId, name }],
+ * invoiceAddress? (required by API when group has no invoice_adr, e.g. voucher enrollment) }.
  */
 export function registerGroupForEvent(groupId, payload) {
   return api.put('/groups/' + encodeURIComponent(groupId) + '/event', payload)
