@@ -21,6 +21,7 @@ import {
   pushOverlayHistory,
   pushRootBackTrap,
 } from '@/utils/spaBrowserBack'
+import { requestCloseEnrollWizard } from '@/utils/enrollWizardClose'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import CoachImpersonationBanner from '@/components/CoachImpersonationBanner.vue'
 import AdminViewAsCoachPanel from '@/components/AdminViewAsCoachPanel.vue'
@@ -289,6 +290,12 @@ function closeSidebar() {
   sidebarOpen.value = false
   if (hadOverlay) window.history.back()
 }
+
+/** JOIN logo: leave enroll wizard (if open) and land on the coach dashboard. */
+function onBrandClick() {
+  closeSidebar()
+  requestCloseEnrollWizard()
+}
 function toggleSidebar() {
   const willOpen = !sidebarOpen.value
   sidebarOpen.value = willOpen
@@ -478,7 +485,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     @update:open="onShellOpen"
   >
     <template #brand>
-      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="closeSidebar">
+      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="onBrandClick">
         <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
     </template>
