@@ -2308,21 +2308,47 @@ watch(deliveryAddressDifferent, (different) => {
       <div class="wizard-panel">
         <div class="wizard-sticky-top">
           <div class="wizard-header">
-            <!--<button type="button" class="wizard-close" aria-label="Close" @click="close">
-              <i class="bi bi-x-lg"></i>
-            </button>-->
-            <button type="button" class="btn btn-ghost" :disabled="step === 0 && introSubStep === 'fll'" @click="goWizardBack">
-              <i class="bi bi-arrow-left"></i> <I18nText k="wizard.back" />
-            </button>
-            <button v-if="step < lastStep" type="button" class="btn btn-primary" :disabled="step !== institutionStepIndex && step !== foundersTeamNameStepIndex && step !== participantsStepIndex && !canNext()" @click="next">
-              <I18nText k="wizard.next" /> <i class="bi bi-arrow-right"></i>
-            </button>
-            <button v-else type="button" class="btn btn-primary" :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid() || !consentDataProcessing || !consentTerms" @click="submit">
-              <i v-if="submitting" class="bi bi-arrow-repeat spin"></i>
-              <i v-else class="bi bi-check-lg"></i>
-              <I18nText v-if="submitting" k="wizard.submitting" />
-              <I18nText v-else k="wizard.submit" />
-            </button>
+            <div class="wizard-header-cluster">
+              <button
+                type="button"
+                class="wizard-header-btn wizard-header-btn--close"
+                :aria-label="t('common.closeDialog')"
+                @click="close"
+              >
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="wizard-header-btn wizard-header-btn--back"
+                :disabled="step === 0 && introSubStep === 'fll'"
+                @click="goWizardBack"
+              >
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                <I18nText k="wizard.back" />
+              </button>
+              <button
+                v-if="step < lastStep"
+                type="button"
+                class="wizard-header-btn wizard-header-btn--primary"
+                :disabled="step !== institutionStepIndex && step !== foundersTeamNameStepIndex && step !== participantsStepIndex && !canNext()"
+                @click="next"
+              >
+                <I18nText k="wizard.next" />
+                <i class="bi bi-arrow-right" aria-hidden="true"></i>
+              </button>
+              <button
+                v-else
+                type="button"
+                class="wizard-header-btn wizard-header-btn--primary"
+                :disabled="submitting || !hasRequiredSchoolFields() || !areAddressesValid() || !consentDataProcessing || !consentTerms"
+                @click="submit"
+              >
+                <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true"></i>
+                <i v-else class="bi bi-check-lg" aria-hidden="true"></i>
+                <I18nText v-if="submitting" k="wizard.submitting" />
+                <I18nText v-else k="wizard.submit" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3252,9 +3278,6 @@ html[data-theme='dark'] .wizard-sticky-top {
   margin: 0;
 }
 
-.wizard-close i {
-  font-size: 1.35rem;
-}
 /* Panel: sticky nav on top + scrollable step content below */
 .wizard-body {
   flex: 0 1 auto;
@@ -4386,36 +4409,74 @@ html[data-theme='dark'] .wizard-sticky-top {
   border-top: none;
   border-bottom: none;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 0.75rem;
   background: transparent;
 }
-.wizard-header .btn {
-  padding: 0.9rem 1.4rem;
-  font-size: 1.05rem;
-  font-weight: 500;
-  border-radius: var(--radius);
+.wizard-header-cluster {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid var(--liquid-border, var(--color-border));
+  border-radius: 999px;
+  background: var(--liquid-tile-bg-inner, color-mix(in srgb, var(--wizard-shell-fill) 70%, #fff));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 8px 22px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.wizard-header-btn {
+  margin: 0;
   border: none;
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: pointer;
   font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: transform 0.2s, box-shadow 0.2s;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.85rem;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
-.wizard-header .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.wizard-header .btn-primary {
+.wizard-header-btn:hover:not(:disabled):not(.wizard-header-btn--primary) {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: var(--color-text);
+}
+.wizard-header-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.wizard-header-btn--close {
+  width: 2.85rem;
+  flex: 0 0 2.85rem;
+  border-right: 1px solid var(--liquid-border, var(--color-border));
+}
+.wizard-header-btn--close i {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.wizard-header-btn--back {
+  padding: 0 1.1rem 0 0.95rem;
+  border-right: 1px solid var(--liquid-border, var(--color-border));
+}
+.wizard-header-btn--primary {
+  padding: 0 1.35rem;
   background: var(--color-accent);
-  color: white;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
-.wizard-header .btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
+.wizard-header-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 88%, #000);
+  color: #fff;
 }
-.wizard-header .btn-ghost { background: transparent; color: var(--color-text-muted); }
-.wizard-header .btn-ghost:hover:not(:disabled) { color: var(--color-text); }
+.wizard-header-btn--primary:disabled {
+  opacity: 0.55;
+}
 
 .wizard-hero {
   padding: 3rem 2.5rem;
@@ -4659,12 +4720,19 @@ html[data-theme='dark'] .wizard-sticky-top {
   .wizard-header {
     padding: 0.45rem 1rem 0.65rem;
   }
-  .wizard-close {
-    width: 2.4rem;
-    height: 2.4rem;
-  }
-  .wizard-header .btn {
+  .wizard-header-btn {
     min-height: 2.75rem;
+    font-size: 1rem;
+  }
+  .wizard-header-btn--close {
+    width: 2.75rem;
+    flex-basis: 2.75rem;
+  }
+  .wizard-header-btn--back {
+    padding: 0 0.9rem;
+  }
+  .wizard-header-btn--primary {
+    padding: 0 1.1rem;
   }
 }
 
@@ -4680,9 +4748,6 @@ html[data-theme='dark'] .wizard-sticky-top {
   .wizard-header {
     padding-left: 1.25rem;
     padding-right: 1.25rem;
-  }
-  .wizard-sticky-top {
-    padding-top: max(0.45rem, env(safe-area-inset-top, 0px));
   }
   .wizard-message {
     margin-left: 1.25rem;
@@ -4785,17 +4850,13 @@ html[data-theme='dark'] .wizard-sticky-top {
     flex-wrap: wrap;
     gap: 0.2rem 0.75rem;
   }
-  .wizard-header {
-    gap: 0.5rem;
+  .wizard-header-cluster {
+    width: 100%;
   }
-  .wizard-header .btn {
+  .wizard-header-btn--back,
+  .wizard-header-btn--primary {
     flex: 1 1 0;
-    justify-content: center;
-    padding: 0.8rem 0.9rem;
-    font-size: 0.95rem;
-  }
-  .wizard-header .btn .bi {
-    font-size: 0.95rem;
+    min-width: 0;
   }
 }
 
@@ -4805,15 +4866,13 @@ html[data-theme='dark'] .wizard-sticky-top {
     padding-left: 0.85rem;
     padding-right: 0.85rem;
   }
-  .wizard-header {
-    flex-wrap: nowrap;
+  .wizard-header-btn {
+    font-size: 0.92rem;
   }
-  .wizard-header .btn {
-    flex: 1 1 0;
-    min-width: 0;
-    justify-content: center;
-    padding: 0.75rem 0.5rem;
-    font-size: 0.9rem;
+  .wizard-header-btn--back,
+  .wizard-header-btn--primary {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
   }
   .wizard-options-vertical {
     max-width: 100%;

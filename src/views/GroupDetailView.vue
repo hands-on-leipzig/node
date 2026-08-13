@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getGroup, updateGroupVersandaufschub } from '@/services/draht'
+import { getGroup, updateGroupVersandaufschub, unwrapNodeCard } from '@/services/draht'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
@@ -48,7 +48,7 @@ async function fetchGroup() {
   group.value = null
   try {
     const res = await getGroup(id.value)
-    group.value = res.data
+    group.value = unwrapNodeCard(res)
   } catch (e) {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
@@ -58,14 +58,18 @@ async function fetchGroup() {
 }
 
 function onGroupUpdated(card) {
-  group.value = card
+  const unwrapped = card && typeof card === 'object' && card.data && typeof card.data === 'object' && !Array.isArray(card.data)
+    && (card.data.id != null || card.data.rowid != null)
+    ? card.data
+    : card
+  group.value = unwrapped
 }
 
 async function saveVersandaufschub(dateStrOrNull) {
   if (!id.value) return
   try {
     const res = await updateGroupVersandaufschub(id.value, { versandaufschub: dateStrOrNull })
-    group.value = res.data
+    group.value = unwrapNodeCard(res)
   } catch (e) {
     console.error('[GroupDetail] versandaufschub save failed', e)
   }
@@ -143,11 +147,11 @@ watch(
         <section
           class="detail-section detail-section--wide"
           :class="{ 'detail-section--disabled': cancelled }"
-          :inert="cancelled"
         >
           <FutureGroupEventTeamsPanel
             :group-id="group.id"
             :group="group"
+            :disabled="cancelled"
             @updated="onGroupUpdated"
           />
         </section>

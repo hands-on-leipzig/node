@@ -18,9 +18,11 @@ import {
   dispatchBrowserBackRequest,
   isSpaRootRoute,
   isSpaShellRoute,
+  popOverlayHistory,
   pushOverlayHistory,
   pushRootBackTrap,
 } from '@/utils/spaBrowserBack'
+import { requestCloseEnrollWizard } from '@/utils/enrollWizardClose'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import CoachImpersonationBanner from '@/components/CoachImpersonationBanner.vue'
 import AdminViewAsCoachPanel from '@/components/AdminViewAsCoachPanel.vue'
@@ -45,6 +47,8 @@ const isCoachApp = computed(() => isAuthenticated() && hasCoachRole())
 /** Logged-out (or non-coach) on public venues: minimal sidebar + login */
 const isGuestShell = computed(() => route.name === 'venues' && !isCoachApp.value)
 const sidebarOpen = ref(false)
+/** Ignore backdrop closes briefly after open (mobile ghost-click closes the drawer instantly). */
+let sidebarBackdropArmedAt = 0
 const teams = ref([])
 const classes = ref([])
 const groups = ref([])
@@ -285,21 +289,42 @@ function isActive(item) {
 
 function closeSidebar() {
   if (!sidebarOpen.value) return
-  const hadOverlay = typeof window !== 'undefined' && window.history.state?.hotOverlay === 'sidebar'
+  sidebarBackdropArmedAt = 0
+  // If an overlay history entry exists, let popstate close the drawer (avoids double-handling).
+  if (popOverlayHistory('sidebar')) return
   sidebarOpen.value = false
-  if (hadOverlay) window.history.back()
+}
+
+/** JOIN logo: leave enroll wizard (if open) and land on the coach dashboard. */
+function onBrandClick() {
+  closeSidebar()
+  requestCloseEnrollWizard()
 }
 function toggleSidebar() {
-  const willOpen = !sidebarOpen.value
-  sidebarOpen.value = willOpen
-  if (willOpen && typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
+  if (sidebarOpen.value) {
+    closeSidebar()
+    return
+  }
+  sidebarOpen.value = true
+  // Arm backdrop after the opening gesture finishes (avoids instant close on iOS/Android).
+  sidebarBackdropArmedAt = Date.now() + 400
+  if (typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches) {
     pushOverlayHistory('sidebar')
   }
 }
 
 function onShellOpen(open) {
-  if (open) sidebarOpen.value = true
-  else closeSidebar()
+  if (open) {
+    sidebarOpen.value = true
+    sidebarBackdropArmedAt = Date.now() + 400
+    return
+  }
+  // AppShell backdrop emits update:open=false — ignore the opening ghost-click.
+  if (Date.now() < sidebarBackdropArmedAt) {
+    sidebarOpen.value = true
+    return
+  }
+  closeSidebar()
 }
 
 const sidebarFooterRef = ref(null)
@@ -320,6 +345,7 @@ function handleBrowserBack(event) {
 
   if (sidebarOpen.value) {
     sidebarOpen.value = false
+    sidebarBackdropArmedAt = 0
     return
   }
 
@@ -478,7 +504,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     @update:open="onShellOpen"
   >
     <template #brand>
-      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="closeSidebar">
+      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="onBrandClick">
         <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
     </template>
