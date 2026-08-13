@@ -15,10 +15,10 @@ import { listTeams, listClasses, listGroups, getGroup, parseNodeListPayload, unw
 import { resolveSidebarAccentTone, resolveSidebarGroupLabelKey, isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { SIDEBAR_REFRESH_EVENT } from '@/utils/sidebarRefresh'
 import {
+  dismissOverlayHistory,
   dispatchBrowserBackRequest,
   isSpaRootRoute,
   isSpaShellRoute,
-  popOverlayHistory,
   pushOverlayHistory,
   pushRootBackTrap,
 } from '@/utils/spaBrowserBack'
@@ -289,10 +289,11 @@ function isActive(item) {
 
 function closeSidebar() {
   if (!sidebarOpen.value) return
-  sidebarBackdropArmedAt = 0
-  // If an overlay history entry exists, let popstate close the drawer (avoids double-handling).
-  if (popOverlayHistory('sidebar')) return
   sidebarOpen.value = false
+  sidebarBackdropArmedAt = 0
+  // Never history.back() here — that races with RouterLink / router.push and cancels navigation.
+  // Browser-back still closes the drawer via the overlay history entry + popstate handler.
+  dismissOverlayHistory('sidebar')
 }
 
 /** JOIN logo: leave enroll wizard (if open) and land on the coach dashboard. */

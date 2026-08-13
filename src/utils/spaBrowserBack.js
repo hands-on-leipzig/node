@@ -30,6 +30,8 @@ export function pushOverlayHistory(overlayId) {
 
 /**
  * Close an overlay via UI: pop the matching history entry when present.
+ * Prefer {@link dismissOverlayHistory} when a router navigation follows —
+ * history.back() races with router.push / RouterLink and can cancel the nav.
  * @param {string} overlayId
  * @returns {boolean} true when history.back() was triggered
  */
@@ -40,6 +42,23 @@ export function popOverlayHistory(overlayId) {
     return true
   }
   return false
+}
+
+/**
+ * Clear an overlay marker with replaceState (no history.back()).
+ * Safe to call before router.push / from RouterLink @click handlers.
+ * @param {string} overlayId
+ * @returns {boolean}
+ */
+export function dismissOverlayHistory(overlayId) {
+  if (typeof window === 'undefined') return false
+  if (window.history.state?.hotOverlay !== overlayId) return false
+  window.history.replaceState(
+    { ...cloneRouterHistoryState() },
+    '',
+    window.location.href,
+  )
+  return true
 }
 
 /**
