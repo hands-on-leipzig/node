@@ -311,10 +311,16 @@ function closeSidebar() {
   dismissOverlayHistory('sidebar')
 }
 
-/** JOIN logo: leave enroll wizard (if open) and land on the coach dashboard. */
-function onBrandClick() {
+/**
+ * JOIN logo / Start tab: if the enroll wizard is open, confirm abort first
+ * (wizard prevents default navigation until the user confirms).
+ */
+function onGoHomeClick(event) {
   closeSidebar()
-  requestCloseEnrollWizard()
+  const wizardHandled = requestCloseEnrollWizard({ navigateHome: true })
+  if (wizardHandled) {
+    event?.preventDefault?.()
+  }
 }
 function toggleSidebar() {
   if (sidebarOpen.value) {
@@ -520,7 +526,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     @update:open="onShellOpen"
   >
     <template #brand>
-      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="onBrandClick">
+      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="onGoHomeClick">
         <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
     </template>
@@ -529,7 +535,7 @@ const { canInstall, promptInstall } = usePwaInstall()
       <RouterLink
         :to="isCoachApp ? '/dashboard' : '/'"
         class="glass-sidebar__brand"
-        @click="onBrandClick"
+        @click="onGoHomeClick"
       >
         <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
@@ -554,7 +560,7 @@ const { canInstall, promptInstall } = usePwaInstall()
         to="/dashboard"
         class="glass-app__mobile-tab"
         :class="{ 'glass-app__mobile-tab--active': route.name === 'dashboard' }"
-        @click="closeSidebar"
+        @click="onGoHomeClick"
       >
         <i class="bi bi-grid-1x2-fill" aria-hidden="true" />
         <span class="glass-app__mobile-tab-label"><I18nText k="nav.tabHome" /></span>

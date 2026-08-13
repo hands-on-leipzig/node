@@ -26,7 +26,6 @@ import { buildDocumentsFolderTree } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
 import { useModalDismiss } from '@/composables/useModalDismiss'
 import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory, pushWizardHistorySnapshot } from '@/utils/spaBrowserBack'
-import { CLOSE_ENROLL_WIZARD_EVENT } from '@/utils/enrollWizardClose'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -263,9 +262,6 @@ function onWizardClose(fromBrowserBack = false) {
   wizardOpen.value = false
   clearWizardQuery()
   resetWizardHistory(fromBrowserBack)
-}
-function onCloseEnrollWizardRequest() {
-  if (wizardOpen.value) onWizardClose()
 }
 function onWizardSuccess(fromBrowserBack = false) {
   loadLists()
@@ -527,7 +523,6 @@ onMounted(async () => {
   }
   if (typeof window !== 'undefined') {
     window.addEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
-    window.addEventListener(CLOSE_ENROLL_WIZARD_EVENT, onCloseEnrollWizardRequest)
   }
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
     mobileMediaQuery = window.matchMedia('(max-width: 768px)')
@@ -551,7 +546,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
-    window.removeEventListener(CLOSE_ENROLL_WIZARD_EVENT, onCloseEnrollWizardRequest)
   }
   if (detachMobileListener) detachMobileListener()
   if (pdfModalBlobUrl.value) {

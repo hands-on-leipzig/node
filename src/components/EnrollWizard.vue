@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { CLOSE_ENROLL_WIZARD_EVENT } from '@/utils/enrollWizardClose'
 import {
   enrollTeam,
   enrollClass,
@@ -1184,6 +1185,52 @@ function close() {
   emit('close')
 }
 
+const abortConfirmOpen = ref(false)
+const abortNavigateHome = ref(false)
+
+function requestAbort({ navigateHome = true } = {}) {
+  if (!props.open) return
+  abortNavigateHome.value = !!navigateHome
+  abortConfirmOpen.value = true
+}
+
+function cancelAbort() {
+  abortConfirmOpen.value = false
+  abortNavigateHome.value = false
+}
+
+function confirmAbort() {
+  const goHome = abortNavigateHome.value
+  abortConfirmOpen.value = false
+  abortNavigateHome.value = false
+  emit('close')
+  if (goHome) {
+    const home = '/dashboard'
+    if (router.currentRoute.value.path !== home) {
+      void router.push(home)
+    }
+  }
+}
+
+function onExternalCloseRequest(event) {
+  if (!props.open) return
+  event?.preventDefault?.()
+  const navigateHome = event?.detail?.navigateHome !== false
+  requestAbort({ navigateHome })
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) cancelAbort()
+  },
+)
+
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  window.addEventListener(CLOSE_ENROLL_WIZARD_EVENT, onExternalCloseRequest)
+})
+
 function isFilled(value) {
   return value !== null && value !== undefined && String(value).trim() !== ''
 }
@@ -2160,6 +2207,9 @@ watch(() => props.open, (isOpen) => {
 
 onBeforeUnmount(() => {
   if (voucherValidateTimer) clearTimeout(voucherValidateTimer)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener(CLOSE_ENROLL_WIZARD_EVENT, onExternalCloseRequest)
+  }
   if (typeof document !== 'undefined') {
     document.body.style.overflow = previousBodyOverflow.value
     document.documentElement.style.overflow = previousHtmlOverflow.value
@@ -2262,7 +2312,7 @@ watch(deliveryAddressDifferent, (different) => {
 </script>
 
 <template>
-  <div v-if="open" class="wizard-backdrop" @click.self="close">
+  <div v-if="open" class="wizard-backdrop" @click.self="requestAbort({ navigateHome: true })">
     <div class="wizard-modal liquid-surface-scope" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div class="wizard-hero">
         <div class="wizard-hero-content">
@@ -2313,7 +2363,7 @@ watch(deliveryAddressDifferent, (different) => {
                 type="button"
                 class="wizard-header-btn wizard-header-btn--close"
                 :aria-label="t('common.closeDialog')"
-                @click="close"
+                @click="requestAbort({ navigateHome: true })"
               >
                 <i class="bi bi-x-lg" aria-hidden="true"></i>
               </button>
@@ -3216,6 +3266,36 @@ watch(deliveryAddressDifferent, (different) => {
               <I18nText v-else k="wizard.success" />
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="abortConfirmOpen"
+      class="wizard-abort-scrim"
+      role="presentation"
+      @click.self="cancelAbort"
+    >
+      <div
+        class="wizard-abort-dialog liquid-surface"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="wizard-abort-title"
+        aria-describedby="wizard-abort-text"
+      >
+        <h3 id="wizard-abort-title" class="wizard-abort-title">
+          <I18nText k="wizard.abortTitle" />
+        </h3>
+        <p id="wizard-abort-text" class="wizard-abort-text">
+          <I18nText k="wizard.abortMessage" />
+        </p>
+        <div class="wizard-abort-actions">
+          <button type="button" class="wizard-header-btn wizard-header-btn--back" @click="cancelAbort">
+            <I18nText k="common.cancel" />
+          </button>
+          <button type="button" class="wizard-header-btn wizard-header-btn--primary" @click="confirmAbort">
+            <I18nText k="wizard.abortConfirm" />
+          </button>
         </div>
       </div>
     </div>
@@ -4696,6 +4776,45 @@ html[data-theme='dark'] .wizard-sticky-top {
   }
 }
 
+.wizard-abort-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(6, 6, 8, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.wizard-abort-dialog {
+  width: min(22rem, 100%);
+  padding: 1.25rem 1.35rem 1.15rem;
+  border-radius: var(--radius-lg, 1rem);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--liquid-shadow, 0 16px 40px rgba(0, 0, 0, 0.28));
+  background: var(--wizard-shell-fill, var(--liquid-tile-bg-strong, #fff));
+}
+.wizard-abort-title {
+  margin: 0 0 0.45rem;
+  font-size: 1.1rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+.wizard-abort-text {
+  margin: 0 0 1.15rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+.wizard-abort-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+}
+
 @media (max-width: 960px) {
   .wizard-modal {
     height: 100dvh;
@@ -4715,6 +4834,14 @@ html[data-theme='dark'] .wizard-sticky-top {
   }
   .wizard-panel-main {
     min-height: 0;
+  }
+
+  /* Sit control cluster below JOIN mobile top bar (chrome stacks above wizard). */
+  .wizard-sticky-top {
+    padding-top: var(
+      --glass-mobile-chrome-top,
+      calc(env(safe-area-inset-top, 0px) + 3.15rem)
+    );
   }
 
   .wizard-header {
