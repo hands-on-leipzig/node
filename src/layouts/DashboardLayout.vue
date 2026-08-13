@@ -287,6 +287,21 @@ function isActive(item) {
   return route.path.startsWith(item.path)
 }
 
+/** Bottom-tab "More" looks selected when the drawer is open or we're on a nested page. */
+const moreTabActive = computed(() => {
+  if (sidebarOpen.value) return true
+  const name = String(route.name || '')
+  return [
+    'team-detail',
+    'class-detail',
+    'group-detail',
+    'settings',
+    'admin-documents',
+    'admin-calendar',
+    'admin-translations',
+  ].includes(name)
+})
+
 function closeSidebar() {
   if (!sidebarOpen.value) return
   sidebarOpen.value = false
@@ -509,6 +524,63 @@ const { canInstall, promptInstall } = usePwaInstall()
         <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
       </RouterLink>
     </template>
+
+    <template #mobile-top>
+      <RouterLink
+        :to="isCoachApp ? '/dashboard' : '/'"
+        class="glass-sidebar__brand"
+        @click="onBrandClick"
+      >
+        <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
+      </RouterLink>
+    </template>
+
+    <template #mobile-top-actions>
+      <button
+        v-if="canInstall"
+        type="button"
+        class="header-install-btn header-install-btn--mobile-top"
+        @click="promptInstall"
+        title="Install app"
+        aria-label="Install app"
+      >
+        <i class="bi bi-phone" aria-hidden="true" />
+      </button>
+    </template>
+
+    <template #mobile-tabs="{ open, toggle }">
+      <RouterLink
+        v-if="isCoachApp"
+        to="/dashboard"
+        class="glass-app__mobile-tab"
+        :class="{ 'glass-app__mobile-tab--active': route.name === 'dashboard' }"
+        @click="closeSidebar"
+      >
+        <i class="bi bi-grid-1x2-fill" aria-hidden="true" />
+        <span class="glass-app__mobile-tab-label"><I18nText k="nav.tabHome" /></span>
+      </RouterLink>
+      <RouterLink
+        to="/"
+        class="glass-app__mobile-tab"
+        :class="{ 'glass-app__mobile-tab--active': route.name === 'venues' }"
+        @click="closeSidebar"
+      >
+        <i class="bi bi-geo-alt-fill" aria-hidden="true" />
+        <span class="glass-app__mobile-tab-label"><I18nText k="nav.tabVenues" /></span>
+      </RouterLink>
+      <button
+        type="button"
+        class="glass-app__mobile-tab glass-app__mobile-tab--more"
+        :class="{ 'glass-app__mobile-tab--active': moreTabActive || open }"
+        :aria-pressed="open"
+        :aria-label="t('common.menu')"
+        @click="toggle"
+      >
+        <i class="bi" :class="open ? 'bi-x-lg' : 'bi-list'" aria-hidden="true" />
+        <span class="glass-app__mobile-tab-label"><I18nText k="nav.tabMore" /></span>
+      </button>
+    </template>
+
     <template #nav>
         <RouterLink
           v-for="item in navItems"
@@ -824,7 +896,7 @@ const { canInstall, promptInstall } = usePwaInstall()
     </template>
 
     <div class="glass-app__panel" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
-      <div class="content-actions">
+      <div class="content-actions content-actions--desktop">
         <button
           v-if="canInstall"
           type="button"
@@ -1233,7 +1305,19 @@ const { canInstall, promptInstall } = usePwaInstall()
   background: var(--color-bg-hover);
 }
 
+.header-install-btn--mobile-top {
+  width: var(--touch);
+  height: var(--touch);
+  min-height: var(--touch);
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--radius);
+}
+
 @media (max-width: 768px) {
+  .content-actions--desktop {
+    display: none;
+  }
   .header-install-btn {
     padding: 0.45rem 0.65rem;
   }

@@ -106,6 +106,9 @@ export default {
     },
     "nav": {
         "dashboard": "Mein Dashboard",
+        "tabHome": "Start",
+        "tabVenues": "Orte",
+        "tabMore": "Mehr",
         "venues": "Austragungsorte",
         "login": "Anmelden",
         "enrollTeam": "Team anmelden",
