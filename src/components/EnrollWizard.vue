@@ -224,7 +224,7 @@ const deliveryAddressDifferent = ref(false)
 
 /** Voucher sets invoice (Thirdparty) — delivery must be a separate contact address, not “same as invoice”. */
 const voucherForcesInvoiceAddress = computed(
-  () => (voucherType.value === '1' && isDolibarrRowId(voucherInvoiceId.value))
+  () => voucherType.value === '1'
     || isDolibarrRowId(voucherPresetInvoiceId.value),
 )
 
@@ -1651,7 +1651,8 @@ function buildInvoicePayload() {
 }
 
 function buildDeliveryPayload() {
-  if (voucherForcesInvoiceAddress.value) {
+  // Voucher invoice party must never be used as ship-to.
+  if (voucherForcesInvoiceAddress.value || voucherType.value === '1') {
     return buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
   }
   if (!deliveryAddressDifferent.value) {
@@ -2078,7 +2079,9 @@ async function submit() {
         state: formData.value.state?.trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: buildDeliveryPayload(),
-        deliverySameAsInvoice: voucherForcesInvoiceAddress.value ? false : !deliveryAddressDifferent.value,
+        deliverySameAsInvoice: (voucherForcesInvoiceAddress.value || voucherType.value === '1')
+          ? false
+          : !deliveryAddressDifferent.value,
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
@@ -2138,7 +2141,9 @@ async function submit() {
         state: (formData.value.state || '').trim() || undefined,
         voucher: voucher.value?.trim() || undefined,
         deliveryAddress: deliveryPayload ?? undefined,
-        deliverySameAsInvoice: voucherForcesInvoiceAddress.value ? false : !deliveryAddressDifferent.value,
+        deliverySameAsInvoice: (voucherForcesInvoiceAddress.value || voucherType.value === '1')
+          ? false
+          : !deliveryAddressDifferent.value,
         consentDataProcessing: true,
         consentTerms: true,
         newsletterOptIn: !!consentNewsletter.value,
@@ -2982,7 +2987,7 @@ watch(deliveryAddressDifferent, (different) => {
           <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
-              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+              <template v-if="voucherForcesInvoiceAddress">
                 <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
                 <div class="field voucher-invoice-forced">
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
@@ -3121,7 +3126,7 @@ watch(deliveryAddressDifferent, (different) => {
           >
             <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
-              <template v-if="voucherType === '1' || voucherPresetInvoiceId != null">
+              <template v-if="voucherForcesInvoiceAddress">
                 <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
                 <div class="field voucher-invoice-forced">
                   <p class="field-hint valid voucher-forced-msg"><i class="bi bi-info-circle-fill"></i> <I18nText k="enroll.voucherInvoiceForced" /> <span v-if="voucherInvoiceName || voucherPresetInvoiceName">({{ voucherInvoiceName || voucherPresetInvoiceName }})</span></p>
