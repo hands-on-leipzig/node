@@ -717,7 +717,7 @@ export default {
         "teamDescExplore": "Participation as a team with up to 6 participants. The program concludes with participation in a regional exhibition.",
         "teamDescChallenge": "Participation as a team with up to 6 participants. The program concludes with participation in a regional exhibition.",
         "classDescExplore": "Participation as a class or larger group with up to 24 participants. The project concludes with an internal school presentation or showcase.",
-        "classDescChallenge": "Participation as a class or larger group with up to 24 participants. The project concludes with an internal school presentation or showcase.",
+        "classDescChallenge": "Participation as a class or larger group with up to 30 participants. The project concludes with an internal school presentation or showcase.",
         "futureGroup5Desc": "The Future Edition program, in which Computer Science & AI 5+ is used.<br>\n\nPlease note: Registration opens in October 2026.",
         "futureGroup8Desc": "The Future Edition program using Computer Science [&] AI 8+ or Computer Science [&] AI 11+.",
         "optionExplore": "Explore",
