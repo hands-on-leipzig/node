@@ -717,7 +717,7 @@ export default {
         "teamDescExplore": "Teilnahme als Team mit bis zu 6 Teilnehmenden. Der Projektabschluss ist die Teilnahme an einer regionalen Ausstellung.",
         "teamDescChallenge": "Teilnahme als Team mit bis zu 10 Teilnehmenden. Der Projektabschluss ist die Teilnahme an einer regionalen Veranstaltung.",
         "classDescExplore": "Teilnahme als Klasse bzw. große Gruppe mit bis zu 24 Teilnehmenden. Der Projektabschluss findet schulintern statt.",
-        "classDescChallenge": "Teilnahme als Klasse bzw. große Gruppe mit bis zu 24 Teilnehmenden. Der Projektabschluss findet schulintern statt.",
+        "classDescChallenge": "Teilnahme als Klasse bzw. große Gruppe mit bis zu 30 Teilnehmenden. Der Projektabschluss findet schulintern statt.",
         "futureGroup5Desc": "Das Future Edition Angebot bei dem Informatik & KI 5+ eingesetzt wird.\n\nACHTUNG: Die Anmeldung ist erst ab Oktober 2026 möglich.",
         "futureGroup8Desc": "Das Future Edition Angebot bei dem Informatik & KI 8+ oder Informatik & KI 11+ verwendet wird.",
         "optionExplore": "Explore",
