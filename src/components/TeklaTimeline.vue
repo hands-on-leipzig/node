@@ -236,6 +236,8 @@ const schedule = computed(() => {
     isCustom: s.isCustom === true || !!(standard && stored && stored !== standard),
     preparationStartDate: s.preparationStartDate || null,
     locked: s.locked === true,
+    standardMissingReason: s.standardMissingReason || null,
+    hasDeliveryAddress: s.hasDeliveryAddress !== false,
   }
 })
 
@@ -253,6 +255,23 @@ const coachMinYmd = computed(() => schedule.value?.coachMinDate || '')
 const isCustomShipment = computed(() => !!schedule.value?.isCustom)
 
 const hasShipmentDate = computed(() => !!plannedYmd.value)
+
+const hasDeliveryAddress = computed(() => schedule.value?.hasDeliveryAddress !== false)
+
+const needsDeliveryAddress = computed(
+  () => isShipmentPickerEnabled.value && !hasDeliveryAddress.value,
+)
+
+const shipmentMissingKey = computed(() =>
+  schedule.value?.standardMissingReason === 'no_holiday_config'
+    ? 'detail.shipmentStandardUnconfigured'
+    : 'detail.shipmentStandardMissing',
+)
+
+function scrollToDeliveryForm(event) {
+  event?.preventDefault?.()
+  document.getElementById('detail-addresses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 const wednesdayOptions = computed(() => {
   const anchor = standardYmd.value || plannedYmd.value
@@ -390,27 +409,37 @@ function resetToStandardShipment() {
                   v-if="isShipmentStep(step) && isShipmentPickerEnabled"
                   class="tekla-versandaufschub"
                 >
-                  <p v-if="hasShipmentDate" class="tekla-shipment-main">
+                  <p v-if="needsDeliveryAddress" class="tekla-shipment-hint">
+                    <I18nText k="detail.shipmentNeedsDeliveryAddress" />
+                    <a
+                      href="#detail-addresses"
+                      class="tekla-shipment-address-link"
+                      @click="scrollToDeliveryForm"
+                    >
+                      <I18nText k="detail.shipmentAddDeliveryAddressLink" />
+                    </a>
+                  </p>
+                  <p v-else-if="hasShipmentDate" class="tekla-shipment-main">
                     <I18nText k="detail.shipmentDateLabel" />&nbsp;
                     <strong>{{ formatShipmentDate(plannedYmd, locale) }}</strong>
                   </p>
                   <p v-else class="tekla-shipment-hint">
-                    <I18nText k="detail.shipmentStandardMissing" />
+                    <I18nText :k="shipmentMissingKey" />
                   </p>
-                  <p v-if="isCustomShipment && standardYmd" class="tekla-shipment-current">
+                  <p v-if="!needsDeliveryAddress && isCustomShipment && standardYmd" class="tekla-shipment-current">
                     <I18nText k="detail.shipmentDiffersFromStandard" />
                     <strong>{{ formatShipmentDate(standardYmd, locale) }}</strong>
                   </p>
-                  <p v-else-if="hasShipmentDate && standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
+                  <p v-else-if="!needsDeliveryAddress && hasShipmentDate && standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
                     <I18nText k="detail.shipmentEarliestIsStandard" />
                   </p>
-                  <p v-if="shipmentLocked && hasShipmentDate" class="tekla-shipment-preparing">
+                  <p v-if="!needsDeliveryAddress && shipmentLocked && hasShipmentDate" class="tekla-shipment-preparing">
                     <i class="bi bi-truck"></i>&nbsp;<I18nText k="detail.shipmentPreparing" />
                   </p>
-                  <p v-if="!shipmentLocked && hasShipmentDate" class="tekla-shipment-hint">
+                  <p v-if="!needsDeliveryAddress && !shipmentLocked && hasShipmentDate" class="tekla-shipment-hint">
                     <I18nText k="detail.shipmentWednesdayHint" />
                   </p>
-                  <div v-if="!readOnly && !shipmentLocked && hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
+                  <div v-if="!needsDeliveryAddress && !readOnly && !shipmentLocked && hasShipmentDate && wednesdayOptions.length" class="tekla-versandaufschub-form tekla-shipment-picker">
                     <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
                         <I18nText k="detail.shipmentPickWednesday" />
                       </label>
@@ -766,6 +795,18 @@ function resetToStandardShipment() {
 .tekla-shipment-hint {
   color: var(--color-fg-muted);
   font-size: var(--text-xs);
+}
+
+.tekla-shipment-address-link {
+  display: inline;
+  margin-left: 0.35em;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tekla-shipment-address-link:hover {
+  color: var(--color-accent-hover, var(--color-accent));
 }
 
 .tekla-shipment-current--standard {

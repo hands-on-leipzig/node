@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getGroup, updateGroupVersandaufschub, unwrapNodeCard } from '@/services/draht'
+import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
@@ -34,6 +35,25 @@ function formatAddress(addr) {
   return formatOverviewAddress(addr, locale.value)
 }
 
+function cardHasDeliveryAddress(card) {
+  if (!card) return false
+  if (card.shipmentSchedule?.hasDeliveryAddress === false) return false
+  if (Number(card.delivery_adr) > 0) return true
+  const addr = card.overview?.delivery_address
+  return !!(addr && formatAddress(addr))
+}
+
+function onDeliveryAddressSaved(card) {
+  if (card && typeof card === 'object') group.value = card
+}
+
+function scrollToDeliveryForm() {
+  if (typeof window === 'undefined' || window.location.hash !== '#detail-addresses') return
+  nextTick(() => {
+    document.getElementById('detail-addresses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 function scrollToCoCoachesSection() {
   if (route.query.focus !== 'coCoaches' || loading.value || !group.value) return
   nextTick(() => {
@@ -53,7 +73,10 @@ async function fetchGroup() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
-    if (group.value) scrollToCoCoachesSection()
+    if (group.value) {
+      scrollToCoCoachesSection()
+      scrollToDeliveryForm()
+    }
   }
 }
 
@@ -81,6 +104,12 @@ watch(
   () => route.query.focus,
   () => {
     if (group.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
+watch(
+  () => route.hash,
+  () => {
+    if (group.value) scrollToDeliveryForm()
   }
 )
 </script>
@@ -156,7 +185,7 @@ watch(
           />
         </section>
 
-        <section class="detail-section">
+        <section id="detail-addresses" class="detail-section detail-section-addresses">
           <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
           <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
           <p class="detail-address">
@@ -168,14 +197,16 @@ watch(
             <I18nText v-else k="detail.noData" />
           </p>
           <p class="detail-address-label"><I18nText k="detail.deliveryAddress" /></p>
-          <p class="detail-address">
-            <template
-              v-if="group.overview && group.overview.delivery_address && formatAddress(group.overview.delivery_address)"
-            >
-              {{ formatAddress(group.overview.delivery_address) }}
-            </template>
-            <I18nText v-else k="detail.noData" />
+          <p v-if="cardHasDeliveryAddress(group)" class="detail-address">
+            {{ formatAddress(group.overview.delivery_address) }}
           </p>
+          <DetailDeliveryAddressForm
+            v-else-if="!cancelled"
+            tekla-type="groups"
+            :tekla-id="group.id"
+            @saved="onDeliveryAddressSaved"
+          />
+          <p v-else class="detail-address"><I18nText k="detail.noData" /></p>
         </section>
 
         <section id="group-co-coaches-anchor" class="detail-section detail-co-coaches-wrap">
@@ -228,7 +259,8 @@ watch(
 .detail-address { font-size: var(--text-base); color: var(--color-text); margin: 0 0 0.75rem; white-space: pre-line; }
 .detail-address:last-child { margin-bottom: 0; }
 .detail-empty-hint { font-size: var(--text-base); color: var(--color-text-muted); margin: 0; }
-.detail-co-coaches-wrap { margin-top: 0.25rem; }
+.detail-section-addresses,
+.detail-co-coaches-wrap { margin-top: 0.25rem; scroll-margin-top: 5rem; }
 .detail-coaches { margin: 0; font-size: var(--text-base); color: var(--color-text); }
 .detail-coaches span + span::before { content: ', '; }
 @media (min-width: 960px) {

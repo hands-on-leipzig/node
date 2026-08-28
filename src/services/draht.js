@@ -675,6 +675,14 @@ export function updateTeamVersandaufschub(teamId, payload) {
 }
 
 /**
+ * Set team delivery address. Payload: { deliveryAddress: { addressId } | new address fields }.
+ * Returns updated team card.
+ */
+export function updateTeamDeliveryAddress(teamId, payload) {
+  return api.put('/teams/' + encodeURIComponent(teamId) + '/delivery-address', payload)
+}
+
+/**
  * Register team for an event (nachmelden). Payload: { eventId }. Returns updated team card.
  */
 export function registerTeamForEvent(teamId, eventId) {
@@ -724,10 +732,26 @@ export function updateGroupVersandaufschub(groupId, payload) {
 }
 
 /**
+ * Set group delivery address. Payload: { deliveryAddress: { addressId } | new address fields }.
+ * Returns updated group card.
+ */
+export function updateGroupDeliveryAddress(groupId, payload) {
+  return api.put('/groups/' + encodeURIComponent(groupId) + '/delivery-address', payload)
+}
+
+/**
  * Update class versandaufschub. Payload: { versandaufschub: "Y-m-d" | null }. Returns updated class card.
  */
 export function updateClassVersandaufschub(classId, payload) {
   return api.put('/classes/' + encodeURIComponent(classId) + '/versandaufschub', payload)
+}
+
+/**
+ * Set class delivery address. Payload: { deliveryAddress: { addressId } | new address fields }.
+ * Returns updated class card.
+ */
+export function updateClassDeliveryAddress(classId, payload) {
+  return api.put('/classes/' + encodeURIComponent(classId) + '/delivery-address', payload)
 }
 
 /**

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getTeam, updateTeamPlayers, updateTeamVersandaufschub, updateTeamLabel } from '@/services/draht'
+import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
@@ -62,6 +63,25 @@ function statusLabel(obj) {
 
 function formatAddress(addr) {
   return formatOverviewAddress(addr, locale.value)
+}
+
+function cardHasDeliveryAddress(card) {
+  if (!card) return false
+  if (card.shipmentSchedule?.hasDeliveryAddress === false) return false
+  if (Number(card.delivery_adr) > 0) return true
+  const addr = card.overview?.delivery_address
+  return !!(addr && formatAddress(addr))
+}
+
+function onDeliveryAddressSaved(card) {
+  if (card && typeof card === 'object') team.value = card
+}
+
+function scrollToDeliveryForm() {
+  if (typeof window === 'undefined' || window.location.hash !== '#detail-addresses') return
+  nextTick(() => {
+    document.getElementById('detail-addresses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function formatDate(timestamp) {
@@ -235,7 +255,10 @@ async function fetchTeam() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
-    if (team.value) scrollToCoCoachesSection()
+    if (team.value) {
+      scrollToCoCoachesSection()
+      scrollToDeliveryForm()
+    }
   }
 }
 
@@ -252,6 +275,12 @@ watch(
   () => route.query.focus,
   () => {
     if (team.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
+watch(
+  () => route.hash,
+  () => {
+    if (team.value) scrollToDeliveryForm()
   }
 )
 </script>
@@ -336,7 +365,7 @@ watch(
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
-      <section class="detail-section">
+      <section id="detail-addresses" class="detail-section detail-section-addresses">
         <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
         <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
         <p class="detail-address">
@@ -348,14 +377,16 @@ watch(
           <I18nText v-else k="detail.noData" />
         </p>
         <p class="detail-address-label"><I18nText k="detail.deliveryAddress" /></p>
-        <p class="detail-address">
-          <template
-            v-if="team.overview && team.overview.delivery_address && formatAddress(team.overview.delivery_address)"
-          >
-            {{ formatAddress(team.overview.delivery_address) }}
-          </template>
-          <I18nText v-else k="detail.noData" />
+        <p v-if="cardHasDeliveryAddress(team)" class="detail-address">
+          {{ formatAddress(team.overview.delivery_address) }}
         </p>
+        <DetailDeliveryAddressForm
+          v-else-if="!cancelled"
+          tekla-type="teams"
+          :tekla-id="team.id"
+          @saved="onDeliveryAddressSaved"
+        />
+        <p v-else class="detail-address"><I18nText k="detail.noData" /></p>
       </section>
 
       <!-- Players + co-coaches (team only) -->
@@ -525,6 +556,7 @@ watch(
 .detail-address:last-child {
   margin-bottom: 0;
 }
+.detail-section-addresses,
 .detail-co-coaches-wrap {
   scroll-margin-top: 5rem;
 }

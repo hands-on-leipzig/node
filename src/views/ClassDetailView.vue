@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getClass, updateClassVersandaufschub } from '@/services/draht'
+import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { timelineHasShipmentStep } from '@/utils/timeline'
@@ -50,6 +51,25 @@ function formatAddress(addr) {
   return formatOverviewAddress(addr, locale.value)
 }
 
+function cardHasDeliveryAddress(card) {
+  if (!card) return false
+  if (card.shipmentSchedule?.hasDeliveryAddress === false) return false
+  if (Number(card.delivery_adr) > 0) return true
+  const addr = card.overview?.delivery_address
+  return !!(addr && formatAddress(addr))
+}
+
+function onDeliveryAddressSaved(card) {
+  if (card && typeof card === 'object') cls.value = card
+}
+
+function scrollToDeliveryForm() {
+  if (typeof window === 'undefined' || window.location.hash !== '#detail-addresses') return
+  nextTick(() => {
+    document.getElementById('detail-addresses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 function formatDate(timestamp) {
   if (!timestamp) return ''
   const d = new Date(typeof timestamp === 'number' ? timestamp * 1000 : timestamp)
@@ -75,7 +95,10 @@ async function fetchClass() {
     error.value = e.response?.status === 404 ? t('detail.notFound') : (e.message || t('errors.loadFailed'))
   } finally {
     loading.value = false
-    if (cls.value) scrollToCoCoachesSection()
+    if (cls.value) {
+      scrollToCoCoachesSection()
+      scrollToDeliveryForm()
+    }
   }
 }
 
@@ -85,6 +108,12 @@ watch(
   () => route.query.focus,
   () => {
     if (cls.value && route.query.focus === 'coCoaches') scrollToCoCoachesSection()
+  }
+)
+watch(
+  () => route.hash,
+  () => {
+    if (cls.value) scrollToDeliveryForm()
   }
 )
 </script>
@@ -167,7 +196,7 @@ watch(
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
-      <section class="detail-section">
+      <section id="detail-addresses" class="detail-section detail-section-addresses">
         <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
         <p class="detail-address-label"><I18nText k="detail.billingAddress" /></p>
         <p class="detail-address">
@@ -179,14 +208,16 @@ watch(
           <I18nText v-else k="detail.noData" />
         </p>
         <p class="detail-address-label"><I18nText k="detail.deliveryAddress" /></p>
-        <p class="detail-address">
-          <template
-            v-if="cls.overview && cls.overview.delivery_address && formatAddress(cls.overview.delivery_address)"
-          >
-            {{ formatAddress(cls.overview.delivery_address) }}
-          </template>
-          <I18nText v-else k="detail.noData" />
+        <p v-if="cardHasDeliveryAddress(cls)" class="detail-address">
+          {{ formatAddress(cls.overview.delivery_address) }}
         </p>
+        <DetailDeliveryAddressForm
+          v-else-if="!cancelled"
+          tekla-type="classes"
+          :tekla-id="cls.id"
+          @saved="onDeliveryAddressSaved"
+        />
+        <p v-else class="detail-address"><I18nText k="detail.noData" /></p>
       </section>
 
       <!-- 5) Note (always shown, placeholder when missing) -->
@@ -328,8 +359,10 @@ watch(
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
 }
+.detail-section-addresses,
 .detail-co-coaches-wrap {
   margin-top: 0.25rem;
+  scroll-margin-top: 5rem;
 }
 .detail-coaches {
   margin: 0;
