@@ -42,6 +42,20 @@ export function futureMaxEventTeams(pupilCount) {
 /** Pro Event-Team vorgesehene Teilnehmendenzahl (CRM-Logik). */
 export const FUTURE_EVENT_TEAM_SIZE = 8
 
+/** Named roster cap for Future event teams (program 6/7). */
+export const FUTURE_TEAM_MAX_PLAYERS = FUTURE_EVENT_TEAM_SIZE
+
+/**
+ * Max named team members for a Future event team.
+ * @param {unknown} program program id 6|7
+ * @returns {number|null}
+ */
+export function futureTeamMaxPlayers(program) {
+  const p = Number(program)
+  if (p === 6 || p === 7) return FUTURE_TEAM_MAX_PLAYERS
+  return null
+}
+
 /**
  * Kleinste erlaubte Gruppengröße aus {@link FUTURE_PUPIL_COUNTS}, für die `teamCount` 8er-Teams möglich sind.
  */

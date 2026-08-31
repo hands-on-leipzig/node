@@ -7,6 +7,7 @@ import {
   defaultShipmentPickerRange,
   fallbackShipmentWednesdays,
   formatShipmentDate,
+  todayYmd,
 } from '@/utils/shipmentSchedule'
 import {
   buildShipmentConditions,
@@ -234,6 +235,13 @@ const coachMinYmd = computed(() => schedule.value?.coachMinDate || '')
 const isCustomShipment = computed(() => !!schedule.value?.isCustom)
 
 const hasShipmentDate = computed(() => !!plannedYmd.value)
+
+/** White box only while the planned date is still today or later; hide once it has passed. */
+const isShipmentDateUpcoming = computed(() => {
+  const ymd = plannedYmd.value
+  if (!ymd) return true
+  return ymd >= todayYmd()
+})
 
 const hasDeliveryAddress = computed(() => schedule.value?.hasDeliveryAddress !== false)
 
@@ -546,7 +554,7 @@ function onConditionAction(condition) {
         </div>
 
         <div
-          v-if="lane.realShipment && isShipmentPickerEnabled && !needsDeliveryAddress"
+          v-if="lane.realShipment && isShipmentPickerEnabled && !needsDeliveryAddress && isShipmentDateUpcoming"
           class="tekla-versandaufschub"
         >
           <p v-if="hasShipmentDate" class="tekla-shipment-main">
