@@ -1,27 +1,28 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import TeklaTimeline from '@/components/TeklaTimeline.vue'
+import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 
 const { locale } = useI18n()
-const scenario = ref('addressMissing')
+const scenario = ref('crcMissing')
 
 const scenarios = [
-  { id: 'addressMissing', label: 'Versand zuerst, Adresse fehlt' },
-  { id: 'invoiceOpen', label: 'Rechnung zuerst, Rechnung offen' },
-  { id: 'ready', label: 'Alles bereit, wartet auf Termin' },
-  { id: 'noShipment', label: 'Kein Versand' },
+  { id: 'crcMissing', label: 'Führungszeugnis fehlt' },
+  { id: 'addressMissing', label: 'Lieferadresse fehlt' },
+  { id: 'invoiceOpen', label: 'Rechnung offen' },
+  { id: 'teamData', label: 'Teamdaten unvollständig, kein Versand' },
+  { id: 'ready', label: 'Alles erfüllt, wartet auf Termin' },
+  { id: 'noShipment', label: 'Kein Versand, keine Rechnung' },
   { id: 'delivered', label: 'Zugestellt' },
 ]
 
 const fixtures = {
-  addressMissing: {
+  crcMissing: {
+    alert: { de: 'Führungszeugnis fehlt', en: 'CRC missing', status: 'warn' },
     steps: [
       {
         de: 'Versand',
         en: 'Shipment',
-        de_sub: 'Saisonmaterialien',
-        en_sub: 'Season materials',
         status: 'progress',
         picto: 'truck',
         items: [
@@ -29,20 +30,30 @@ const fixtures = {
           { type: 'invoice', label: 'RE2026-88', status: 'paid' },
         ],
       },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Rechnung', en: 'Invoice', status: 'closed', picto: 'receipt' },
+    ],
+    shipmentSchedule: {
+      hasDeliveryAddress: true,
+      earliestDate: '2026-09-02',
+      standardDate: '2026-09-02',
+    },
+  },
+  addressMissing: {
+    alert: null,
+    steps: [
       {
-        de: 'Anmeldung',
-        en: 'Registration',
-        status: 'closed',
-        picto: 'user',
-      },
-      {
-        de: 'Event',
-        en: 'Event',
-        de_sub: 'Noch keine Veranstaltung gewählt',
-        en_sub: 'No event selected yet',
+        de: 'Versand',
+        en: 'Shipment',
         status: 'progress',
-        picto: 'flag',
+        picto: 'truck',
+        items: [
+          { type: 'order', label: 'SO2026-104', status: 'validated' },
+          { type: 'invoice', label: 'RE2026-88', status: 'paid' },
+        ],
       },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Rechnung', en: 'Invoice', status: 'closed', picto: 'receipt' },
     ],
     shipmentSchedule: {
       hasDeliveryAddress: false,
@@ -51,13 +62,9 @@ const fixtures = {
     },
   },
   invoiceOpen: {
+    alert: null,
     steps: [
-      {
-        de: 'Anmeldung',
-        en: 'Registration',
-        status: 'closed',
-        picto: 'user',
-      },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
       {
         de: 'Rechnung',
         en: 'Invoice',
@@ -79,16 +86,26 @@ const fixtures = {
       standardDate: '2026-09-02',
     },
   },
-  ready: {
+  teamData: {
+    alert: null,
     steps: [
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Kein Versand', en: 'No shipment', status: 'closed', picto: 'truck' },
       {
-        de: 'Event',
-        en: 'Event',
+        de: 'Rechnung',
+        en: 'Invoice',
         status: 'closed',
-        picto: 'flag',
-        de_sub: 'Regionalentscheid Leipzig',
-        en_sub: 'Regional qualifier Leipzig',
+        picto: 'receipt',
+        de_sub: 'nicht benötigt',
+        items: [{ type: 'invoice', status: 'not_needed' }],
       },
+      { de: 'Teamdaten', en: 'Team data', status: 'open', de_sub: 'unvollständig' },
+    ],
+    shipmentSchedule: null,
+  },
+  ready: {
+    alert: null,
+    steps: [
       {
         de: 'Versand',
         en: 'Shipment',
@@ -99,12 +116,8 @@ const fixtures = {
           { type: 'invoice', label: 'RE2026-99', status: 'paid' },
         ],
       },
-      {
-        de: 'Anmeldung',
-        en: 'Registration',
-        status: 'closed',
-        picto: 'user',
-      },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Rechnung', en: 'Invoice', status: 'closed', picto: 'receipt' },
     ],
     shipmentSchedule: {
       hasDeliveryAddress: true,
@@ -113,48 +126,38 @@ const fixtures = {
     },
   },
   noShipment: {
+    alert: null,
     steps: [
-      {
-        de: 'Anmeldung',
-        en: 'Registration',
-        status: 'closed',
-        picto: 'user',
-      },
-      {
-        de: 'Kein Versand',
-        en: 'No shipment',
-        status: 'closed',
-        picto: 'truck',
-      },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Kein Versand', en: 'No shipment', status: 'closed', picto: 'truck' },
       {
         de: 'Rechnung',
         en: 'Invoice',
         status: 'closed',
         picto: 'receipt',
+        de_sub: 'nicht benötigt',
         items: [{ type: 'invoice', label: 'RE2026-12', status: 'not_needed' }],
       },
+      { de: 'Teamdaten', en: 'Team data', status: 'closed', de_sub: 'vollständig' },
     ],
     shipmentSchedule: null,
   },
   delivered: {
+    alert: null,
     steps: [
       {
-        de: 'Versand',
-        en: 'Shipment',
+        de: 'Material',
+        en: 'Material',
         status: 'closed',
         picto: 'truck',
         items: [
           { type: 'order', label: 'SO2026-44', status: 'closed' },
           { type: 'invoice', label: 'RE2026-44', status: 'paid' },
-          { type: 'shipment', label: 'SH2026-44', status: 'delivered' },
+          { type: 'shipment', label: 'SH2026-44', status: 'delivered', link: 'https://example.com', link_text: '00340434' },
         ],
       },
-      {
-        de: 'Anmeldung',
-        en: 'Registration',
-        status: 'closed',
-        picto: 'user',
-      },
+      { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+      { de: 'Rechnung', en: 'Invoice', status: 'closed', picto: 'receipt' },
     ],
     shipmentSchedule: {
       hasDeliveryAddress: true,
@@ -172,10 +175,10 @@ const current = computed(() => fixtures[scenario.value])
   <main class="preview">
     <header class="preview-head">
       <p class="preview-kicker">Coach-Vorschlag</p>
-      <h1>Status statt Zeitstrahl</h1>
+      <h1>Stand der Anmeldung</h1>
       <p class="preview-lead">
-        Dieselbe Karte, unterschiedliche API-Reihenfolge. Die Darstellung bleibt für Coaches gleich:
-        nächster Schritt oben, Versand als Checkliste.
+        Fester Prozess: Anmeldung, Rechnung, Versand, Teamdaten. Die Punkte darunter
+        gelten nur, wenn sie für diese Anmeldung zutreffen — etwa ein fehlendes Führungszeugnis.
       </p>
       <div class="preview-controls">
         <label>
@@ -194,8 +197,9 @@ const current = computed(() => fixtures[scenario.value])
       </div>
     </header>
     <section id="detail-addresses" class="preview-card">
-      <TeklaTimeline
+      <TeklaStatusBoard
         :steps="current.steps"
+        :alert="current.alert"
         :locale="locale"
         :shipment-schedule="current.shipmentSchedule"
         tekla-type="teams"
