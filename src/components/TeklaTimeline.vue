@@ -546,41 +546,28 @@ function onConditionAction(condition) {
         </div>
 
         <div
-          v-if="lane.realShipment && isShipmentPickerEnabled"
+          v-if="lane.realShipment && isShipmentPickerEnabled && !needsDeliveryAddress"
           class="tekla-versandaufschub"
         >
-          <p v-if="needsDeliveryAddress" class="tekla-shipment-hint">
-            <I18nText k="detail.shipmentNeedsDeliveryAddress" />
-            <a
-              href="#detail-addresses"
-              class="tekla-shipment-address-link"
-              @click="scrollToDeliveryForm"
-            >
-              <I18nText k="detail.shipmentAddDeliveryAddressLink" />
-            </a>
-          </p>
-          <p v-else-if="hasShipmentDate" class="tekla-shipment-main">
+          <p v-if="hasShipmentDate" class="tekla-shipment-main">
             <I18nText k="detail.shipmentDateLabel" />&nbsp;
             <strong>{{ formatShipmentDate(plannedYmd, locale) }}</strong>
           </p>
           <p v-else class="tekla-shipment-hint">
             <I18nText :k="shipmentMissingKey" />
           </p>
-          <p v-if="!needsDeliveryAddress && isCustomShipment && standardYmd" class="tekla-shipment-current">
+          <p v-if="isCustomShipment && standardYmd" class="tekla-shipment-current">
             <I18nText k="detail.shipmentDiffersFromStandard" />
             <strong>{{ formatShipmentDate(standardYmd, locale) }}</strong>
           </p>
-          <p v-else-if="!needsDeliveryAddress && hasShipmentDate && standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
+          <p v-else-if="hasShipmentDate && standardYmd" class="tekla-shipment-current tekla-shipment-current--standard">
             <I18nText k="detail.shipmentEarliestIsStandard" />
           </p>
-          <p v-if="!needsDeliveryAddress && shipmentLocked && hasShipmentDate" class="tekla-shipment-preparing">
+          <p v-if="shipmentLocked && hasShipmentDate" class="tekla-shipment-preparing">
             <i class="bi bi-truck"></i>&nbsp;<I18nText k="detail.shipmentPreparing" />
           </p>
-          <p v-if="!needsDeliveryAddress && !shipmentLocked && hasShipmentDate" class="tekla-shipment-hint">
-            <I18nText k="detail.shipmentWednesdayHint" />
-          </p>
           <div
-            v-if="!needsDeliveryAddress && !readOnly && !shipmentLocked && hasShipmentDate && wednesdayOptions.length"
+            v-if="!readOnly && !shipmentLocked && hasShipmentDate && wednesdayOptions.length"
             class="tekla-versandaufschub-form tekla-shipment-picker"
           >
             <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
