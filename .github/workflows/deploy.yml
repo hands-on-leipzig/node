@@ -16,7 +16,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, cursor/tekla-timeline-status-board-de8a]
   release:
     types: [published]
   workflow_dispatch:
