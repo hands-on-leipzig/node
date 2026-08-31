@@ -35,6 +35,12 @@ const routes = [
       ]
     : []),
   {
+    path: '/dev/timeline-preview',
+    name: 'timeline-preview',
+    component: () => import('@/views/TimelinePreviewView.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/dashboard',
     component: () => import('@/layouts/DashboardLayout.vue'),
     meta: { requiresAuth: true },
