@@ -7,6 +7,7 @@ import {
   defaultShipmentPickerRange,
   fallbackShipmentWednesdays,
   formatShipmentDate,
+  todayYmd,
 } from '@/utils/shipmentSchedule'
 
 const props = defineProps({
@@ -256,6 +257,13 @@ const isCustomShipment = computed(() => !!schedule.value?.isCustom)
 
 const hasShipmentDate = computed(() => !!plannedYmd.value)
 
+/** White box only while the planned date is still today or later; hide once it has passed. */
+const isShipmentDateUpcoming = computed(() => {
+  const ymd = plannedYmd.value
+  if (!ymd) return true
+  return ymd >= todayYmd()
+})
+
 const hasDeliveryAddress = computed(() => schedule.value?.hasDeliveryAddress !== false)
 
 const needsDeliveryAddress = computed(
@@ -406,7 +414,7 @@ function resetToStandardShipment() {
                 </ul>
                 <!-- Frühestes Versanddatum (Mittwoch) am Versand-Schritt -->
                 <div
-                  v-if="isShipmentStep(step) && isShipmentPickerEnabled"
+                  v-if="isShipmentStep(step) && isShipmentPickerEnabled && isShipmentDateUpcoming"
                   class="tekla-versandaufschub"
                 >
                   <p v-if="needsDeliveryAddress" class="tekla-shipment-hint">

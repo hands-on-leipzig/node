@@ -13,6 +13,7 @@ import CustomSelect from '@/components/CustomSelect.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextBanner.vue'
 import { foundersTeamMaxPlayers } from '@/config/foundersEditionConfig'
+import { futureTeamMaxPlayers } from '@/config/futureEditionConfig'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,7 +51,9 @@ const timelineSteps = computed(() => {
 const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
 const shipmentScheduleProp = useTeklaShipmentSchedule(team, showShipmentSchedule)
 
-const teamMaxPlayers = computed(() => foundersTeamMaxPlayers(team.value?.program))
+const teamMaxPlayers = computed(() =>
+  foundersTeamMaxPlayers(team.value?.program) ?? futureTeamMaxPlayers(team.value?.program),
+)
 const teamAtMaxPlayers = computed(() => {
   const max = teamMaxPlayers.value
   if (max == null) return false
@@ -228,7 +231,12 @@ function buildPlayersPayload(list) {
 
 async function persistPlayers() {
   if (!id.value) return
-  const list = displayedPlayers.value
+  let list = displayedPlayers.value
+  const max = teamMaxPlayers.value
+  if (max != null && list.length > max) {
+    list = list.slice(0, max)
+    editingPlayers.value = list
+  }
   savingPlayers.value = true
   try {
     const payload = buildPlayersPayload(list)
