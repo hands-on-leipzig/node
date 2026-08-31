@@ -34,7 +34,7 @@ jobs:
   deploy-test:
     name: Deploy to Test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'test')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'test') || (github.event_name == 'push' && github.ref == 'refs/heads/cursor/tekla-timeline-status-board-de8a')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
