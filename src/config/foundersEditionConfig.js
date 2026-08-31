@@ -16,6 +16,25 @@ export const FOUNDERS_REGISTRATION_PRODUCT_REFS = {
   5: 'FOUNDERS_CLASS_CHALLENGE',
 }
 
+/** Named roster cap for Founders teams (program 1 Explore / 2 Challenge). */
+export const FOUNDERS_TEAM_MAX_PLAYERS_EXPLORE = 6
+export const FOUNDERS_TEAM_MAX_PLAYERS_CHALLENGE = 10
+
+/**
+ * Max named team members for a Founders team.
+ * @param {unknown} programOrVariant program id 1|2 or 'explore'|'challenge'
+ * @returns {number|null}
+ */
+export function foundersTeamMaxPlayers(programOrVariant) {
+  if (programOrVariant === 'explore' || Number(programOrVariant) === 1) {
+    return FOUNDERS_TEAM_MAX_PLAYERS_EXPLORE
+  }
+  if (programOrVariant === 'challenge' || Number(programOrVariant) === 2) {
+    return FOUNDERS_TEAM_MAX_PLAYERS_CHALLENGE
+  }
+  return null
+}
+
 /** EUR placeholders by program id (1/2 = team, 4/5 = class). */
 export const FOUNDERS_REGISTRATION_PRICE_EUR = {
   1: 275,

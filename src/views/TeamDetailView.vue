@@ -12,6 +12,7 @@ import TeklaTimeline from '@/components/TeklaTimeline.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextBanner.vue'
+import { foundersTeamMaxPlayers } from '@/config/foundersEditionConfig'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,6 +49,13 @@ const timelineSteps = computed(() => {
 
 const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
 const shipmentScheduleProp = useTeklaShipmentSchedule(team, showShipmentSchedule)
+
+const teamMaxPlayers = computed(() => foundersTeamMaxPlayers(team.value?.program))
+const teamAtMaxPlayers = computed(() => {
+  const max = teamMaxPlayers.value
+  if (max == null) return false
+  return displayedPlayers.value.length >= max
+})
 
 const genderOptions = computed(() => [
   { value: '', label: t('detail.gender') },
@@ -155,13 +163,16 @@ function removePlayer(idx) {
 }
 
 function startAddPlayer() {
+  if (teamAtMaxPlayers.value) return
   isAddingPlayer.value = true
   newPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
 }
 
 function addPlayer() {
+  if (teamAtMaxPlayers.value) return
   const e = newPlayer.value
   let copy = editingPlayers.value.length ? [...editingPlayers.value] : [...(team.value?.players || [])]
+  if (teamMaxPlayers.value != null && copy.length >= teamMaxPlayers.value) return
   const birthday = e.birthdayStr ? Math.floor(new Date(e.birthdayStr).getTime() / 1000) : null
   copy.push({ firstname: e.firstname, name: e.name, gender: e.gender, birthday })
   editingPlayers.value = copy
@@ -423,7 +434,10 @@ watch(
           </ul>
           <p v-else class="detail-empty-hint"><I18nText k="detail.noData" /></p>
           <div v-if="!cancelled" class="detail-players-toolbar">
-            <button v-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer"><I18nText k="detail.addPlayer" /></button>
+            <p v-if="teamMaxPlayers != null && teamAtMaxPlayers && !isAddingPlayer" class="detail-empty-hint">
+              <I18nText k="detail.playersMaxReached" :values="{ max: teamMaxPlayers }" />
+            </p>
+            <button v-else-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer"><I18nText k="detail.addPlayer" /></button>
             <template v-else>
               <input v-model="newPlayer.firstname" class="detail-player-input" :placeholder="t('detail.firstname')" />
               <input v-model="newPlayer.name" class="detail-player-input" :placeholder="t('detail.lastname')" />

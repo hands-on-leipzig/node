@@ -37,6 +37,7 @@ import { buildCountryOptions } from '@/utils/countryOptions'
 import {
   formatEventOptionLabel,
 } from '@/utils/events'
+import { foundersTeamMaxPlayers as maxPlayersForFoundersTeam } from '@/config/foundersEditionConfig'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
 import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
@@ -241,6 +242,14 @@ const step4ValidationAttempted = ref(false)
 
 const foundersTeamHasParticipantsStep = computed(
   () => edition.value === 'founders' && foundersType.value === 'team'
+)
+
+const founderTeamMaxPlayers = computed(() =>
+  maxPlayersForFoundersTeam(foundersVariant.value) ?? 6,
+)
+
+const founderTeamAtMaxPlayers = computed(
+  () => founderTeamPlayers.value.length >= founderTeamMaxPlayers.value,
 )
 
 const foundersClassEnrollment = computed(
@@ -1127,6 +1136,10 @@ function selectFoundersVariant(val) {
     wizardSeasonSetCount.value = 0
     if (presetSeasonSetCount.value != null) presetSeasonSetCount.value = 0
   }
+  const max = maxPlayersForFoundersTeam(val)
+  if (max != null && founderTeamPlayers.value.length > max) {
+    founderTeamPlayers.value = founderTeamPlayers.value.slice(0, max)
+  }
   scheduleAdvanceIfReady(2)
 }
 
@@ -1300,6 +1313,7 @@ function isStep4RequiredFieldMissing(field) {
 }
 
 function addFounderParticipant() {
+  if (founderTeamPlayers.value.length >= founderTeamMaxPlayers.value) return
   founderTeamPlayers.value = [...founderTeamPlayers.value, { firstname: '', name: '', gender: '', birthdayStr: '' }]
 }
 
@@ -2163,7 +2177,9 @@ async function submit() {
       const createdId = getCreatedId(res)
       if (createdId && isTeam && founderTeamPlayers.value.length > 0) {
         const allPlayers = buildWizardPlayersPayload()
-        const nonEmpty = allPlayers.filter((p) => p.firstname || p.name || p.gender || p.birthday)
+        const nonEmpty = allPlayers
+          .filter((p) => p.firstname || p.name || p.gender || p.birthday)
+          .slice(0, founderTeamMaxPlayers.value)
         if (nonEmpty.length > 0) {
           await updateTeamPlayers(createdId, { players: nonEmpty })
         }
@@ -2770,7 +2786,9 @@ watch(deliveryAddressDifferent, (different) => {
             v-show="step === participantsStepIndex && foundersTeamHasParticipantsStep"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
-            <p class="wizard-hint"><I18nText k="wizard.participantsHint" /></p>
+            <p class="wizard-hint">
+              <I18nText k="wizard.participantsHint" :values="{ max: founderTeamMaxPlayers }" />
+            </p>
             <div class="wizard-participants">
               <div class="wizard-participant-row wizard-participant-header">
                 <span class="wizard-participant-label"><I18nText k="detail.firstname" /></span>
@@ -2798,9 +2816,15 @@ watch(deliveryAddressDifferent, (different) => {
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
-              <button type="button" class="wizard-btn-add-participant" @click="addFounderParticipant">
+              <button
+                v-if="!founderTeamAtMaxPlayers"
+                type="button"
+                class="wizard-btn-add-participant"
+                @click="addFounderParticipant"
+              >
                 <i class="bi bi-plus-lg"></i> <I18nText k="detail.addPlayer" />
               </button>
+              <p v-else class="wizard-hint"><I18nText k="wizard.participantsMaxReached" :values="{ max: founderTeamMaxPlayers }" /></p>
             </div>
           </div>
 
