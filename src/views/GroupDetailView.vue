@@ -6,9 +6,9 @@ import { getGroup, updateGroupVersandaufschub, unwrapNodeCard } from '@/services
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
-import { timelineHasShipmentStep } from '@/utils/timeline'
+import { timelineHasShipmentStep, unwrapTimelinePayload } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
-import TeklaTimeline from '@/components/TeklaTimeline.vue'
+import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 
@@ -22,11 +22,9 @@ const id = computed(() => route.params.id)
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(group.value))
 
-const timelineSteps = computed(() => {
-  const tl = group.value?.timeline
-  if (!tl) return []
-  return Array.isArray(tl.timeline) ? tl.timeline : (Array.isArray(tl) ? tl : [])
-})
+const timelinePayload = computed(() => unwrapTimelinePayload(group.value?.timeline))
+const timelineSteps = computed(() => timelinePayload.value.steps)
+const timelineAlert = computed(() => timelinePayload.value.alert)
 
 const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
 const shipmentScheduleProp = useTeklaShipmentSchedule(group, showShipmentSchedule)
@@ -131,9 +129,10 @@ watch(
         <span><I18nText k="detail.cancelledBanner" /></span>
       </p>
 
-      <TeklaTimeline
-        v-if="timelineSteps.length"
+      <TeklaStatusBoard
+        v-if="timelineSteps.length || timelineAlert"
         :steps="timelineSteps"
+        :alert="timelineAlert"
         :locale="locale"
         tekla-type="groups"
         :tekla-id="group.id"

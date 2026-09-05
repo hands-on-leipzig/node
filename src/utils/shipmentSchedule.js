@@ -81,24 +81,21 @@ export function fallbackShipmentWednesdays(coachMinYmd, weekCount = 24) {
   return listWednesdaysBetween(from, to)
 }
 
-export function defaultShipmentPickerRange(anchorYmd, coachMinYmd, extraWeeks = 12, weeksBefore = 8) {
-  if (!anchorYmd) {
+export function defaultShipmentPickerRange(anchorYmd, pickerMinYmd, extraWeeks = 16) {
+  const today = todayYmd()
+  let min = pickerMinYmd || nextWednesdayOnOrAfter(today)
+  if (!min) {
     return { min: '', max: '', options: [] }
   }
-  const anchor = new Date(`${anchorYmd}T12:00:00`)
-  const minDate = new Date(anchor)
-  minDate.setDate(minDate.getDate() - weeksBefore * 7)
-  let rangeMin = minDate.toISOString().slice(0, 10)
-  if (coachMinYmd && coachMinYmd > rangeMin) {
-    rangeMin = coachMinYmd
+  const maxAnchor = anchorYmd && anchorYmd > min ? anchorYmd : min
+  let max = addWeeksToYmd(maxAnchor, extraWeeks)
+  if (anchorYmd && anchorYmd > max) {
+    max = anchorYmd
   }
-  const maxDate = new Date(anchor)
-  maxDate.setDate(maxDate.getDate() + extraWeeks * 7)
-  const max = maxDate.toISOString().slice(0, 10)
   return {
-    min: rangeMin,
+    min,
     max,
-    options: listWednesdaysBetween(rangeMin, max),
+    options: listWednesdaysBetween(min, max),
   }
 }
 

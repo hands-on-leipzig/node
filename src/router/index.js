@@ -24,22 +24,6 @@ const routes = [
     component: () => import('@/views/HomeView.vue'),
     meta: { public: true },
   },
-  ...(import.meta.env.DEV
-    ? [
-        {
-          path: '/dev/timeline-preview',
-          name: 'timeline-preview',
-          component: () => import('@/views/TimelinePreviewView.vue'),
-          meta: { public: true },
-        },
-      ]
-    : []),
-  {
-    path: '/dev/timeline-preview',
-    name: 'timeline-preview',
-    component: () => import('@/views/TimelinePreviewView.vue'),
-    meta: { public: true },
-  },
   {
     path: '/dashboard',
     component: () => import('@/layouts/DashboardLayout.vue'),

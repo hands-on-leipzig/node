@@ -7,6 +7,8 @@ import {
   defaultShipmentPickerRange,
   fallbackShipmentWednesdays,
   formatShipmentDate,
+  isWednesdayYmd,
+  nextWednesdayOnOrAfter,
   todayYmd,
 } from '@/utils/shipmentSchedule'
 import { buildStatusLanes } from '@/utils/timeline'
@@ -194,6 +196,9 @@ const schedule = computed(() => {
     locked: s.locked === true,
     standardMissingReason: s.standardMissingReason || null,
     hasDeliveryAddress: s.hasDeliveryAddress !== false,
+    allowEarlier: s.allowEarlier !== false,
+    pickerMinDate: s.pickerMinDate || null,
+    holidayEndDate: s.holidayEndDate || null,
   }
 })
 
@@ -206,8 +211,6 @@ const plannedYmd = computed(() => schedule.value?.earliestDate || schedule.value
 const standardYmd = computed(() => schedule.value?.standardDate || '')
 const coachMinYmd = computed(() => schedule.value?.coachMinDate || '')
 
-const isCustomShipment = computed(() => !!schedule.value?.isCustom)
-
 const hasShipmentDate = computed(() => !!plannedYmd.value)
 
 /** White box only while the planned date is still today or later; hide once it has passed. */
@@ -217,15 +220,35 @@ const isShipmentDateUpcoming = computed(() => {
   return ymd >= todayYmd()
 })
 
+const pickerMinYmd = computed(() => {
+  const s = schedule.value
+  if (!s) return coachMinYmd.value
+  if (s.pickerMinDate) return s.pickerMinDate
+  if (s.allowEarlier === false) return nextWednesdayOnOrAfter(todayYmd())
+  return coachMinYmd.value
+})
+
 const wednesdayOptions = computed(() => {
   const anchor = standardYmd.value || plannedYmd.value
+  const min = pickerMinYmd.value
   const ymds = anchor
-    ? defaultShipmentPickerRange(anchor, coachMinYmd.value, 16).options
-    : fallbackShipmentWednesdays(coachMinYmd.value, 24)
+    ? defaultShipmentPickerRange(anchor, min, 16).options
+    : fallbackShipmentWednesdays(min, 24)
+  if (plannedYmd.value && isWednesdayYmd(plannedYmd.value) && !ymds.includes(plannedYmd.value)) {
+    ymds.unshift(plannedYmd.value)
+    ymds.sort()
+  }
   return ymds.map((ymd) => ({
     value: ymd,
     label: formatShipmentDate(ymd, props.locale),
   }))
+})
+
+/** Once shipping has started the date stays visible as a read-only single option. */
+const dateOptions = computed(() => {
+  if (!shipmentLocked.value) return wednesdayOptions.value
+  if (!plannedYmd.value) return []
+  return [{ value: plannedYmd.value, label: formatShipmentDate(plannedYmd.value, props.locale) }]
 })
 
 const shipmentSelectionDirty = computed(() => {
@@ -235,13 +258,13 @@ const shipmentSelectionDirty = computed(() => {
 })
 
 watch(
-  [plannedYmd, wednesdayOptions],
+  [plannedYmd, dateOptions],
   () => {
     const planned = plannedYmd.value
-    if (planned && wednesdayOptions.value.some((o) => o.value === planned)) {
+    if (planned && dateOptions.value.some((o) => o.value === planned)) {
       selectedShipmentYmd.value = planned
-    } else if (wednesdayOptions.value.length) {
-      selectedShipmentYmd.value = wednesdayOptions.value[0].value
+    } else if (dateOptions.value.length) {
+      selectedShipmentYmd.value = dateOptions.value[0].value
     } else {
       selectedShipmentYmd.value = planned || ''
     }
@@ -254,11 +277,6 @@ function submitShipmentDate() {
   if (!val) return
   emit('shipment-date-save', val)
   emit('versandaufschub-save', val)
-}
-
-function resetToStandardShipment() {
-  emit('shipment-date-save', null)
-  emit('versandaufschub-save', null)
 }
 
 const lanes = computed(() =>
@@ -292,7 +310,7 @@ function factorLabel(factor) {
 }
 
 function factorDetail(factor) {
-  if (factor.id === 'date' && plannedYmd.value) {
+  if (factor.id === 'date' && plannedYmd.value && !datePickerOpen(factor)) {
     return formatShipmentDate(plannedYmd.value, props.locale)
   }
   return ''
@@ -305,6 +323,10 @@ function showDatePicker(factor) {
     isShipmentDateUpcoming.value &&
     hasShipmentDate.value
   )
+}
+
+function datePickerOpen(factor) {
+  return showDatePicker(factor) && !props.readOnly && dateOptions.value.length > 0
 }
 
 function onFactorAction(factor) {
@@ -359,13 +381,31 @@ function onFactorAction(factor) {
                   waiting: factor.waiting && !factor.done,
                   warn: factor.warn && !factor.done,
                   action: factor.coachAction && !factor.done,
+                  plain: factor.hideIcon,
                 }"
               >
-                <i class="bi tekla-point-icon" :class="factorIcon(factor)" aria-hidden="true"></i>
+                <i
+                  v-if="!factor.hideIcon"
+                  class="bi tekla-point-icon"
+                  :class="factorIcon(factor)"
+                  aria-hidden="true"
+                ></i>
                 <div class="tekla-point-body">
-                  <div class="tekla-point-main">
+                  <div class="tekla-point-main" :class="{ 'tekla-point-main--inline': factor.id === 'date' }">
                     <span class="tekla-point-label">{{ factorLabel(factor) }}</span>
-                    <span v-if="factorDetail(factor)" class="tekla-point-detail">{{ factorDetail(factor) }}</span>
+                    <select
+                      v-if="datePickerOpen(factor)"
+                      :id="`shipment-date-${teklaId}`"
+                      v-model="selectedShipmentYmd"
+                      class="tekla-versandaufschub-input tekla-shipment-select"
+                      :disabled="shipmentLocked"
+                      :aria-label="factorLabel(factor)"
+                    >
+                      <option v-for="opt in dateOptions" :key="opt.value" :value="opt.value">
+                        {{ opt.label }}
+                      </option>
+                    </select>
+                    <span v-else-if="factorDetail(factor)" class="tekla-point-detail">{{ factorDetail(factor) }}</span>
                     <button
                       v-if="factor.coachAction && factor.action && !readOnly"
                       type="button"
@@ -378,6 +418,18 @@ function onFactorAction(factor) {
                     </button>
                   </div>
                   <p v-if="factor.hintKey" class="tekla-point-hint"><I18nText :k="factor.hintKey" /></p>
+                  <div
+                    v-if="datePickerOpen(factor) && !shipmentLocked && shipmentSelectionDirty"
+                    class="tekla-shipment-form-actions"
+                  >
+                    <button
+                      type="button"
+                      class="tekla-btn tekla-btn-primary"
+                      @click="submitShipmentDate"
+                    >
+                      <I18nText k="common.save" />
+                    </button>
+                  </div>
 
                   <ul v-if="factor.items && factor.items.length" class="tekla-stage-docs">
                     <li v-for="(item, i) in factor.items" :key="i" class="tekla-doc">
@@ -434,42 +486,6 @@ function onFactorAction(factor) {
                       </span>
                     </li>
                   </ul>
-
-                  <div
-                    v-if="showDatePicker(factor) && !readOnly && !shipmentLocked && wednesdayOptions.length"
-                    class="tekla-shipment-picker"
-                  >
-                    <label class="tekla-shipment-select-label" :for="`shipment-date-${teklaId}`">
-                      <I18nText k="detail.shipmentPickWednesday" />
-                    </label>
-                    <select
-                      :id="`shipment-date-${teklaId}`"
-                      v-model="selectedShipmentYmd"
-                      class="tekla-versandaufschub-input tekla-shipment-select"
-                    >
-                      <option v-for="opt in wednesdayOptions" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </option>
-                    </select>
-                    <div class="tekla-shipment-form-actions">
-                      <button
-                        type="button"
-                        class="tekla-btn tekla-btn-primary"
-                        :disabled="!shipmentSelectionDirty"
-                        @click="submitShipmentDate"
-                      >
-                        <I18nText k="common.save" />
-                      </button>
-                      <button
-                        v-if="isCustomShipment && standardYmd"
-                        type="button"
-                        class="tekla-btn"
-                        @click="resetToStandardShipment"
-                      >
-                        <I18nText k="detail.shipmentResetStandard" />
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </li>
             </ul>
@@ -689,8 +705,8 @@ function onFactorAction(factor) {
 }
 
 .tekla-point-icon {
-  margin-top: 0.12rem;
   flex-shrink: 0;
+  line-height: 1.35;
   color: var(--color-text-muted);
 }
 
@@ -708,6 +724,10 @@ function onFactorAction(factor) {
   color: var(--color-warn, #ca8a04);
 }
 
+.tekla-point.plain {
+  color: var(--color-text);
+}
+
 .tekla-point-body {
   min-width: 0;
   flex: 1;
@@ -716,13 +736,17 @@ function onFactorAction(factor) {
 .tekla-point-main {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.3rem 0.6rem;
 }
 
 .tekla-point-label {
   font-weight: 500;
   line-height: 1.35;
+}
+
+.tekla-point-main--inline .tekla-point-label {
+  font-weight: 700;
 }
 
 .tekla-point-detail {
@@ -734,6 +758,29 @@ function onFactorAction(factor) {
 .tekla-point.done .tekla-point-detail {
   font-weight: 500;
   color: var(--color-text-muted);
+}
+
+.tekla-point-main .tekla-shipment-select {
+  margin-left: auto;
+  width: auto;
+  min-width: 14rem;
+  max-width: 100%;
+  padding: 0.1rem 0.5rem;
+  font-size: inherit;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.tekla-point-main--inline .tekla-shipment-select {
+  margin-left: 0;
+  min-width: 12rem;
+}
+
+.tekla-shipment-select:disabled {
+  cursor: default;
+  opacity: 1;
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
 }
 
 .tekla-point-hint {
@@ -842,32 +889,11 @@ function onFactorAction(factor) {
   font-style: italic;
 }
 
-.tekla-shipment-picker {
-  width: 100%;
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.4rem;
-}
-
-.tekla-shipment-select-label {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
-
-.tekla-shipment-select {
-  min-width: 16rem;
-  max-width: 100%;
-  appearance: auto;
-  cursor: pointer;
-}
-
 .tekla-shipment-form-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .tekla-versandaufschub-input {
@@ -877,8 +903,8 @@ function onFactorAction(factor) {
   border-radius: var(--radius);
   background: var(--color-bg);
   color: var(--color-text);
-  width: 100%;
-  max-width: 22rem;
+  appearance: auto;
+  cursor: pointer;
 }
 
 .tekla-btn {
@@ -910,12 +936,10 @@ function onFactorAction(factor) {
 }
 
 @media (max-width: 640px) {
-  .tekla-point-detail {
+  .tekla-point-detail,
+  .tekla-point-main:not(.tekla-point-main--inline) .tekla-shipment-select {
     margin-left: 0;
     width: 100%;
-  }
-
-  .tekla-shipment-select {
     min-width: 0;
   }
 }

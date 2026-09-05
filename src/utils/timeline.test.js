@@ -127,6 +127,7 @@ describe('buildStatusLanes', () => {
     })
     assert.equal(lanes.find((l) => l.id === 'billing').status, 'warn')
     assert.equal(lanes.find((l) => l.id === 'billing').factors[0].action, 'open-invoice')
+    assert.equal(lanes.find((l) => l.id === 'billing').factors[0].hintKey, 'detail.factorInvoiceHint')
     assert.equal(lanes.find((l) => l.id === 'participants').factors[0].id, 'teamdata')
     assert.equal(lanes.find((l) => l.id === 'shipment').factors.find((f) => f.id === 'address'), undefined)
     assert.notEqual(lanes.find((l) => l.id === 'shipment').status, 'closed')
@@ -152,7 +153,7 @@ describe('buildStatusLanes', () => {
     assert.notEqual(shipment.status, 'closed')
     assert.equal(shipment.blockedKey, 'detail.laneShipmentBlocked')
     assert.equal(shipment.factors.find((f) => f.id === 'address').done, true)
-    assert.equal(shipment.factors.find((f) => f.id === 'date').done, true)
+    assert.equal(shipment.factors.find((f) => f.id === 'date').done, false)
   })
 
   it('does not mark shipment done while the Führungszeugnis is missing', () => {
@@ -193,7 +194,7 @@ describe('buildStatusLanes', () => {
 })
 
 describe('buildStatusFactors', () => {
-  it('marks the shipment date as waiting when preparation is locked', () => {
+  it('keeps the date row visible but explains the lock once shipping has started', () => {
     const factors = buildStatusFactors({
       steps: [
         { de: 'Versand', en: 'Shipment', status: 'progress' },
@@ -205,11 +206,13 @@ describe('buildStatusFactors', () => {
     assert.equal(date.lane, 'shipment')
     assert.equal(date.waiting, true)
     assert.equal(date.done, false)
-    assert.equal(date.showShipmentPicker, false)
-    assert.equal(date.hintKey, null)
+    assert.equal(date.showShipmentPicker, true)
+    assert.equal(date.hintKey, 'detail.shipmentPreparing')
+    assert.equal(date.hideIcon, false)
+    assert.equal(date.labelKey, 'detail.factorDate')
   })
 
-  it('labels the date as earliest-possible while other gates can still delay it', () => {
+  it('heads the date row without a done marker and keeps the no-guarantee hint below', () => {
     const factors = buildStatusFactors({
       steps: [
         { de: 'Versand', en: 'Shipment', status: 'progress', items: [{ type: 'order', status: 'validated' }] },
@@ -227,5 +230,22 @@ describe('buildStatusFactors', () => {
     const date = factors.find((f) => f.id === 'date')
     assert.equal(date.labelKey, 'detail.factorDate')
     assert.equal(date.hintKey, 'detail.factorDateHint')
+    assert.equal(date.done, false)
+    assert.equal(date.hideIcon, true)
+  })
+
+  it('keeps the no-guarantee hint after the summer holidays have ended', () => {
+    const factors = buildStatusFactors({
+      steps: [{ de: 'Versand', en: 'Shipment', status: 'progress' }],
+      schedule: {
+        hasDeliveryAddress: true,
+        earliestDate: '2026-08-26',
+        allowEarlier: false,
+      },
+    })
+    const date = factors.find((f) => f.id === 'date')
+    assert.equal(date.labelKey, 'detail.factorDate')
+    assert.equal(date.hintKey, 'detail.factorDateHint')
+    assert.equal(date.hideIcon, true)
   })
 })

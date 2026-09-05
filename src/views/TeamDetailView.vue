@@ -6,12 +6,13 @@ import { getTeam, updateTeamPlayers, updateTeamVersandaufschub, updateTeamLabel 
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
-import { timelineHasShipmentStep } from '@/utils/timeline'
+import { timelineHasShipmentStep, unwrapTimelinePayload } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
-import TeklaTimeline from '@/components/TeklaTimeline.vue'
+import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextBanner.vue'
+import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import { foundersTeamMaxPlayers } from '@/config/foundersEditionConfig'
 import { futureTeamMaxPlayers } from '@/config/futureEditionConfig'
 
@@ -42,11 +43,9 @@ const displayedPlayers = computed(() => {
   return list
 })
 
-const timelineSteps = computed(() => {
-  const t = team.value?.timeline
-  if (!t) return []
-  return Array.isArray(t.timeline) ? t.timeline : (Array.isArray(t) ? t : [])
-})
+const timelinePayload = computed(() => unwrapTimelinePayload(team.value?.timeline))
+const timelineSteps = computed(() => timelinePayload.value.steps)
+const timelineAlert = computed(() => timelinePayload.value.alert)
 
 const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
 const shipmentScheduleProp = useTeklaShipmentSchedule(team, showShipmentSchedule)
@@ -332,10 +331,11 @@ watch(
       </p>
       <FutureEnrollmentContextBanner v-if="!cancelled" kind="team" :card="team" />
 
-      <!-- 2) Timeline -->
-      <TeklaTimeline
-        v-if="timelineSteps.length"
+      <!-- 2) Status -->
+      <TeklaStatusBoard
+        v-if="timelineSteps.length || timelineAlert"
         :steps="timelineSteps"
+        :alert="timelineAlert"
         :locale="locale"
         tekla-type="teams"
         :tekla-id="team.id"
@@ -380,7 +380,10 @@ watch(
       <section class="detail-section detail-section-event">
         <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
         <p v-if="registeredEventLabel" class="detail-event-current">{{ registeredEventLabel }}</p>
-        <p v-else class="detail-hint"><I18nText k="teamDetail.noEventRegistered" /></p>
+        <EventScheduleLink v-if="registeredEventLabel" :event="team.event" />
+        <p v-if="!registeredEventLabel" class="detail-hint">
+          <I18nText k="teamDetail.noEventRegistered" />
+        </p>
       </section>
 
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->

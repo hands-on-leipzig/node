@@ -12,7 +12,7 @@ function inferHasDeliveryAddress(card, schedule) {
 }
 
 /**
- * Build shipmentSchedule prop for TeklaTimeline when Versand step is shown.
+ * Build shipmentSchedule prop for TeklaStatusBoard when Versand step is shown.
  * Shipment date is derived from the delivery address only.
  * @param {import('vue').Ref<object|null>} cardRef team/group/class card from API
  * @param {import('vue').ComputedRef<boolean>} showRef timelineHasShipmentStep

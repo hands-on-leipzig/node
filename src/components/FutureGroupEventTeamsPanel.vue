@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
 import {
@@ -99,6 +100,9 @@ const currentEventLabel = computed(() => {
   if (!ev) return ''
   return ev.label || ev.ref || (ev.id != null ? `Event ${ev.id}` : '')
 })
+
+/** All event teams of a group share one event, so one schedule link covers the list. */
+const enrolledEvent = computed(() => firstEnrolledTeamEvent())
 
 const unitEur = computed(() => Number(props.group?.eventTeamUnitEur) || FUTURE_TEAM_EVENT_UNIT_EUR)
 
@@ -526,6 +530,7 @@ onMounted(() => {
       <i class="bi bi-calendar-x" aria-hidden="true" />
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
+    <EventScheduleLink v-if="enrolledTeams.length" :event="enrolledEvent" />
 
     <div class="future-event-registration" :class="{ 'future-event-registration--readonly': disabled }">
     <template v-if="isInitialRegistration">

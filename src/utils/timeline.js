@@ -149,8 +149,9 @@ function isCancelledStep(step) {
  *     hasDeliveryAddress?: boolean,
  *     earliestDate?: string|null,
  *     standardDate?: string|null,
- *     locked?: boolean,
- *   }|null,
+     *     locked?: boolean,
+     *     allowEarlier?: boolean,
+     *   }|null,
  * }} opts
  * @returns {Array<{
  *   id: string,
@@ -165,6 +166,7 @@ function isCancelledStep(step) {
  *   items: object[],
    *   showShipmentPicker?: boolean,
    *   hintKey?: string|null,
+   *   hideIcon?: boolean,
    * }>}
  */
 export function buildStatusFactors({ steps = [], alert = null, schedule = null } = {}) {
@@ -293,6 +295,7 @@ export function buildStatusFactors({ steps = [], alert = null, schedule = null }
       coachAction: !done && !!invoice,
       action: !done && invoice ? 'open-invoice' : null,
       labelKey: 'detail.factorInvoice',
+      hintKey: done ? null : 'detail.factorInvoiceHint',
       items: invoices,
     })
   }
@@ -325,19 +328,19 @@ export function buildStatusFactors({ steps = [], alert = null, schedule = null }
         items: [],
       })
       if (hasAddr) {
-        const hasDate = !!(schedule.earliestDate || schedule.standardDate)
         const locked = schedule.locked === true
         factors.push({
           id: 'date',
           lane: 'shipment',
-          done: hasDate && !locked,
+          done: false,
           waiting: locked,
+          hideIcon: !locked,
           coachAction: false,
           action: null,
           labelKey: 'detail.factorDate',
-          hintKey: locked ? null : 'detail.factorDateHint',
+          hintKey: locked ? 'detail.shipmentPreparing' : 'detail.factorDateHint',
           items: [],
-          showShipmentPicker: !locked,
+          showShipmentPicker: true,
         })
       }
     }

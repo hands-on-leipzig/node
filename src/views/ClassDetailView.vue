@@ -6,11 +6,12 @@ import { getClass, updateClassVersandaufschub } from '@/services/draht'
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
-import { timelineHasShipmentStep } from '@/utils/timeline'
+import { timelineHasShipmentStep, unwrapTimelinePayload } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
-import TeklaTimeline from '@/components/TeklaTimeline.vue'
+import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
+import EventScheduleLink from '@/components/EventScheduleLink.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -23,11 +24,9 @@ const id = computed(() => route.params.id)
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(cls.value))
 
-const timelineSteps = computed(() => {
-  const t = cls.value?.timeline
-  if (!t) return []
-  return Array.isArray(t.timeline) ? t.timeline : (Array.isArray(t) ? t : [])
-})
+const timelinePayload = computed(() => unwrapTimelinePayload(cls.value?.timeline))
+const timelineSteps = computed(() => timelinePayload.value.steps)
+const timelineAlert = computed(() => timelinePayload.value.alert)
 
 const showShipmentSchedule = computed(() => timelineHasShipmentStep(timelineSteps.value))
 const shipmentScheduleProp = useTeklaShipmentSchedule(cls, showShipmentSchedule)
@@ -136,10 +135,11 @@ watch(
         <span><I18nText k="detail.cancelledBanner" /></span>
       </p>
 
-      <!-- 2) Timeline -->
-      <TeklaTimeline
-        v-if="timelineSteps.length"
+      <!-- 2) Status -->
+      <TeklaStatusBoard
+        v-if="timelineSteps.length || timelineAlert"
         :steps="timelineSteps"
+        :alert="timelineAlert"
         :locale="locale"
         tekla-type="classes"
         :tekla-id="cls.id"
@@ -178,6 +178,9 @@ watch(
               }}</template>
               <I18nText v-else k="detail.noData" />
             </div>
+            <!-- Outside the inert wrapper: reading the schedule stays possible even
+                 while event actions are switched off. -->
+            <EventScheduleLink :event="cls.event" />
             <p v-if="!DETAIL_EVENT_ACTIONS_ENABLED" class="detail-section-disabled-hint">
               <I18nText k="detail.eventSectionComingSoon" />
             </p>
