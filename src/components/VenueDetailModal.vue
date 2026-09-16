@@ -2,6 +2,7 @@
 import {computed, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import VenueDetailMap from '@/components/VenueDetailMap.vue'
+import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import {useModalDismiss} from '@/composables/useModalDismiss'
 import {
   formatVenueDate,
@@ -133,16 +134,21 @@ useModalDismiss(() => props.show, {
                 <I18nText k="venues.detailNoContact"/>
               </p>
 
-              <a
-                  v-if="venue.frontendUrl"
-                  :href="venue.frontendUrl"
-                  class="venue-detail-link"
-                  rel="noopener noreferrer"
-                  target="_blank"
-              >
-                <I18nText k="venues.detailWebsite"/>
-                <i aria-hidden="true" class="bi bi-box-arrow-up-right"/>
-              </a>
+              <div class="venue-detail-links">
+                <a
+                    v-if="venue.frontendUrl"
+                    :href="venue.frontendUrl"
+                    class="venue-detail-link"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                >
+                  <I18nText k="venues.detailWebsite"/>
+                  <i aria-hidden="true" class="bi bi-box-arrow-up-right"/>
+                </a>
+
+                <!-- Renders itself only once FLOW has answered with a link. -->
+                <EventScheduleLink :event="venue"/>
+              </div>
             </aside>
           </div>
         </div>
@@ -335,6 +341,29 @@ useModalDismiss(() => props.show, {
 .venue-detail-link :deep(.i18n-text),
 .venue-detail-link :deep(.i18n-text-main) {
   color: inherit;
+}
+
+/* The container owns the distance to the block above and between the links. */
+.venue-detail-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+
+.venue-detail-links .venue-detail-link,
+.venue-detail-links :deep(.event-schedule-link) {
+  margin-top: 0;
+}
+
+/* The shared link component uses the accent colour; here both links match. */
+.venue-detail-links :deep(.event-schedule-link) {
+  color: var(--venue-detail-link);
+}
+
+.venue-detail-links :deep(.event-schedule-link:hover) {
+  color: var(--venue-detail-link-hover);
 }
 
 .venue-detail-modal-enter-active,

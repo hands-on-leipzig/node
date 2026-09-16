@@ -9,6 +9,7 @@ import {
   hasCoachRole,
 } from '@/auth/keycloak'
 import { fetchPublicVenues } from '@/services/publicVenues'
+import { fetchPublicEventLinks } from '@/services/publicEventLinks'
 import VenuesMap from '@/components/VenuesMap.vue'
 import VenueDetailModal from '@/components/VenueDetailModal.vue'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
@@ -37,6 +38,9 @@ const offers = ref({ exhibition: true, competition: true, future: true })
 
 const openAccordions = ref({})
 const selectedVenue = ref(null)
+/** DRAHT event id → schedule URL, fetched from FLOW when the first detail opens. */
+const planLinks = ref(new Map())
+let planLinksRequest = null
 
 const COUNTRY_KEYS = ['de', 'at', 'ch']
 const OFFER_KEYS = ['exhibition', 'competition', 'future']
@@ -120,8 +124,37 @@ function toggleAccordion(section, country) {
 function openVenueDetail(venue) {
   if (!venue?.id) return
   selectedVenue.value = venue
+  loadPlanLinks()
   pushOverlayHistory('venue')
 }
+
+/** Fetched once per visit; a venue list without schedule links is still complete. */
+function loadPlanLinks() {
+  if (planLinksRequest) return planLinksRequest
+
+  planLinksRequest = fetchPublicEventLinks()
+    .then((links) => {
+      planLinks.value = links
+    })
+    .catch(() => {
+      planLinksRequest = null
+    })
+
+  return planLinksRequest
+}
+
+/**
+ * The schedule link belongs to the event, so the detail view gets it on the venue and
+ * an own copy of it is not kept in the list.
+ */
+const selectedVenueWithPlan = computed(() => {
+  const venue = selectedVenue.value
+  if (!venue) return null
+
+  const url = planLinks.value.get(Number(venue.id))
+
+  return url ? { ...venue, planlink: url } : venue
+})
 
 function closeVenueDetail(fromBrowserBack = false) {
   if (!fromBrowserBack && popOverlayHistory('venue')) return
@@ -326,7 +359,7 @@ onBeforeUnmount(() => {
 
     <VenueDetailModal
       :show="!!selectedVenue"
-      :venue="selectedVenue"
+      :venue="selectedVenueWithPlan"
       @close="() => closeVenueDetail()"
     />
   </div>
