@@ -95,3 +95,44 @@ export function countFilesInDocumentTree(node) {
   }
   return n
 }
+
+/**
+ * Current folder as FLOW-style list items (folders first, then files).
+ * @param {{ files?: DocFile[], folders?: Array<{ name: string, node: object }> }} node
+ * @param {string} [pathPrefix]
+ */
+export function documentNodeToListItems(node, pathPrefix = '') {
+  const folders = (node?.folders || []).map((fd) => ({
+    id: `${pathPrefix}folder:${fd.name}`,
+    name: fd.name,
+    type: 'folder',
+    count: countFilesInDocumentTree(fd.node),
+    node: fd.node,
+  }))
+  const files = (node?.files || []).map((file, index) => ({
+    id: String(file.itemId || file.url || `${pathPrefix}file-${index}`),
+    name: file.name,
+    type: 'file',
+    url: file.url,
+    web_url: file.url,
+    drive_id: file.driveId || file.drive_id || '',
+    driveId: file.driveId || file.drive_id || '',
+    itemId: file.itemId || file.item_id || '',
+    graphItem: !!file.graphItem,
+  }))
+  return [...folders, ...files]
+}
+
+/**
+ * @param {string[]} path folder names from the root
+ * @param {{ files?: DocFile[], folders?: Array<{ name: string, node: object }> }} root
+ */
+export function documentNodeAtPath(root, path) {
+  let node = root
+  for (const name of path || []) {
+    const next = (node?.folders || []).find((fd) => fd.name === name)
+    if (!next) return node
+    node = next.node
+  }
+  return node
+}

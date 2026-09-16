@@ -19,10 +19,10 @@ import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
 import { hasAdminRole } from '@/auth/keycloak'
 import EnrollWizard from '@/components/EnrollWizard.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
-import DocumentsFolderTree from '@/components/DocumentsFolderTree.vue'
 import DocumentsFileOpeningOverlay from '@/components/DocumentsFileOpeningOverlay.vue'
 import PdfViewerModal from '@/components/PdfViewerModal.vue'
-import { buildDocumentsFolderTree } from '@/utils/documentsTree'
+import { DocumentsFolderList } from '@hands-on/glass/documents'
+import { buildDocumentsFolderTree, documentNodeAtPath, documentNodeToListItems } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
 import { useModalDismiss } from '@/composables/useModalDismiss'
 import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory, pushWizardHistorySnapshot } from '@/utils/spaBrowserBack'
@@ -361,6 +361,7 @@ const documentsConfig = ref({
 })
 const documentsLoading = ref(false)
 const documentsLoadedOnce = ref(false)
+const documentsPath = ref([])
 const documentsFileOpening = ref(false)
 const documentsFileOpeningName = ref('')
 const documentsModalOpen = ref(false)
@@ -639,11 +640,6 @@ async function handleOpenDocumentFile(file) {
   }
 }
 
-/** @param {{ url?: string, name?: string, driveId?: string, itemId?: string, graphItem?: boolean }} payload */
-async function openDocumentsPdf(payload) {
-  await handleOpenDocumentFile(payload || {})
-}
-
 function closeDocumentsPdf(fromBrowserBack = false) {
   if (!fromBrowserBack && popOverlayHistory('pdf')) return
   pdfModalOpen.value = false
@@ -664,10 +660,60 @@ const documentsFolderRoot = computed(() => {
   return buildDocumentsFolderTree(files, folderPaths)
 })
 
+const documentsBrowseNode = computed(() =>
+  documentNodeAtPath(documentsFolderRoot.value, documentsPath.value),
+)
+
+const documentsListItems = computed(() =>
+  documentNodeToListItems(documentsBrowseNode.value, documentsPath.value.join('/') + '/'),
+)
+
+const documentsBreadcrumbs = computed(() => {
+  const rootName = documentsConfig.value.title || t('dashboard.documentsForDownload')
+  const crumbs = [{ id: '', name: rootName }]
+  documentsPath.value.forEach((name, index) => {
+    crumbs.push({
+      id: documentsPath.value.slice(0, index + 1).join('/'),
+      name,
+    })
+  })
+  return crumbs
+})
+
+const documentsConfigured = computed(() =>
+  !!(documentsConfig.value.files?.length || documentsConfig.value.folderUrl),
+)
+
 const hasDocumentTreeContent = computed(() => {
   const r = documentsFolderRoot.value
   return (r.files?.length || 0) + (r.folders?.length || 0) > 0
 })
+
+function enterDocumentsFolder(item) {
+  if (!item?.name) return
+  documentsPath.value = [...documentsPath.value, item.name]
+}
+
+function navigateDocumentsCrumb(crumb) {
+  const id = String(crumb?.id || '')
+  documentsPath.value = id ? id.split('/').filter(Boolean) : []
+}
+
+function goDocumentsUp() {
+  if (!documentsPath.value.length) return
+  documentsPath.value = documentsPath.value.slice(0, -1)
+}
+
+function goDocumentsRoot() {
+  documentsPath.value = []
+}
+
+watch(
+  () => documentsConfig.value.files,
+  () => {
+    documentsPath.value = []
+  },
+)
 
 </script>
 
@@ -797,11 +843,21 @@ const hasDocumentTreeContent = computed(() => {
                 :open="documentsFileOpening"
                 :file-name="documentsFileOpeningName"
               />
-              <DocumentsFolderTree
-                :node="documentsFolderRoot"
-                :depth="0"
-                @open-pdf="openDocumentsPdf"
+              <DocumentsFolderList
+                :configured="documentsConfigured"
+                :opening-file="documentsFileOpening"
+                :items="documentsListItems"
+                :breadcrumbs="documentsBreadcrumbs"
+                :locale="locale"
+                :not-configured-text="t('dashboard.documentsNotConfigured')"
+                :empty-folder-text="t('dashboard.documentsEmptyFolder')"
+                :root-label="t('dashboard.documentsRoot')"
+                :go-up-label="t('dashboard.documentsGoUp')"
+                @open-folder="enterDocumentsFolder"
                 @open-file="handleOpenDocumentFile"
+                @navigate="navigateDocumentsCrumb"
+                @go-up="goDocumentsUp"
+                @go-root="goDocumentsRoot"
               />
             </div>
             <a
@@ -918,11 +974,21 @@ const hasDocumentTreeContent = computed(() => {
                   :open="documentsFileOpening"
                   :file-name="documentsFileOpeningName"
                 />
-                <DocumentsFolderTree
-                  :node="documentsFolderRoot"
-                  :depth="0"
-                  @open-pdf="openDocumentsPdf"
+                <DocumentsFolderList
+                  :configured="documentsConfigured"
+                  :opening-file="documentsFileOpening"
+                  :items="documentsListItems"
+                  :breadcrumbs="documentsBreadcrumbs"
+                  :locale="locale"
+                  :not-configured-text="t('dashboard.documentsNotConfigured')"
+                  :empty-folder-text="t('dashboard.documentsEmptyFolder')"
+                  :root-label="t('dashboard.documentsRoot')"
+                  :go-up-label="t('dashboard.documentsGoUp')"
+                  @open-folder="enterDocumentsFolder"
                   @open-file="handleOpenDocumentFile"
+                  @navigate="navigateDocumentsCrumb"
+                  @go-up="goDocumentsUp"
+                  @go-root="goDocumentsRoot"
                 />
               </div>
               <a
@@ -1178,7 +1244,7 @@ const hasDocumentTreeContent = computed(() => {
   min-height: 2.5rem;
   border-radius: var(--radius);
 }
-.dashboard-documents-panel--busy :deep(.doc-folder-tree) {
+.dashboard-documents-panel--busy :deep(.docs-folder) {
   pointer-events: none;
   opacity: 0.55;
   transition: opacity 0.15s ease;
