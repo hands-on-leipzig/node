@@ -45,7 +45,7 @@ const showAdminFeatures = computed(() => hasAdminRole() && !impersonatingCoach.v
 const impersonatedDisplayName = ref('')
 const isCoachApp = computed(() => isAuthenticated() && hasCoachRole())
 /** Logged-out (or non-coach) on public venues: minimal sidebar + login */
-const isGuestShell = computed(() => route.name === 'venues' && !isCoachApp.value)
+const isGuestShell = computed(() => (route.name === 'venues' || route.name === 'venues-event') && !isCoachApp.value)
 const sidebarOpen = ref(false)
 /** Ignore backdrop closes briefly after open (mobile ghost-click closes the drawer instantly). */
 let sidebarBackdropArmedAt = 0
@@ -283,6 +283,9 @@ function isGroupActive(id) {
 }
 
 function isActive(item) {
+  if (item.path === '/') {
+    return route.name === 'venues' || route.name === 'venues-event'
+  }
   if (item.exact) return route.path === item.path
   return route.path.startsWith(item.path)
 }
@@ -568,7 +571,7 @@ const { canInstall, promptInstall } = usePwaInstall()
       <RouterLink
         to="/"
         class="glass-app__mobile-tab"
-        :class="{ 'glass-app__mobile-tab--active': route.name === 'venues' }"
+        :class="{ 'glass-app__mobile-tab--active': route.name === 'venues' || route.name === 'venues-event' }"
         @click="closeSidebar"
       >
         <i class="bi bi-geo-alt-fill" aria-hidden="true" />
@@ -901,8 +904,12 @@ const { canInstall, promptInstall } = usePwaInstall()
       </SidebarFooter>
     </template>
 
-    <div class="glass-app__panel" :key="'content-' + showTranslationKeys + '-' + translationEditMode">
-      <div class="content-actions content-actions--desktop">
+    <div
+      class="glass-app__panel"
+      :class="{ 'glass-app__panel--embed': route.name === 'venues-event' }"
+      :key="'content-' + showTranslationKeys + '-' + translationEditMode"
+    >
+      <div v-if="route.name !== 'venues-event'" class="content-actions content-actions--desktop">
         <button
           v-if="canInstall"
           type="button"

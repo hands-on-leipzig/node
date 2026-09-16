@@ -47,6 +47,10 @@ export default {
         "loadError": "Could not load venues.",
         "retry": "Try again",
         "filters": "Filters",
+        "sortBy": "Grouping",
+        "sortName": "Place",
+        "sortDate": "Date",
+        "sortProgram": "Program",
         "filterCountries": "Countries",
         "filterOffers": "Offers",
         "country": {
@@ -102,7 +106,10 @@ export default {
         "filterStatusOff": "off",
         "allFiltersActive": "All filters active",
         "noActiveSeason": "No active season in the calendar (Explore/Challenge/Future). In Dolibarr, check Seasons: today must be between season start and end.",
-        "emptyListHint": "No events match the filters. In Dolibarr, for each event check: season (current), program (1/2/6/7), type (regional competition), and ensure “Hide on venues page” and “Not public” are off."
+        "emptyListHint": "No events match the filters. In Dolibarr, for each event check: season (current), program (1/2/6/7), type (regional competition), and ensure “Hide on venues page” and “Not public” are off.",
+        "backToOverview": "Back to overview",
+        "publicFrameLabel": "Public event page",
+        "noPublicPage": "No public page is available for this event yet."
     },
     "nav": {
         "dashboard": "My dashboard",

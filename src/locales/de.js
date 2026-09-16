@@ -47,6 +47,10 @@ export default {
         "loadError": "Austragungsorte konnten nicht geladen werden.",
         "retry": "Erneut versuchen",
         "filters": "Filter",
+        "sortBy": "Gruppierung",
+        "sortName": "Ort",
+        "sortDate": "Datum",
+        "sortProgram": "Programm",
         "filterCountries": "Länder",
         "filterOffers": "Angebote",
         "country": {
@@ -102,7 +106,10 @@ export default {
         "filterStatusOff": "aus",
         "allFiltersActive": "Alle Filter aktiv",
         "noActiveSeason": "Keine aktive Saison im Kalender (Explore/Challenge/Future). In Dolibarr unter Saisons prüfen, ob heute zwischen Saisonstart und -ende liegt.",
-        "emptyListHint": "Keine Veranstaltungen passen zu den Filtern. In Dolibarr bei jeder Veranstaltung prüfen: Saison (aktuell), Programm (1/2/6/7), Art (Regionalwettbewerb), Haken „Auf Standortseite verstecken“ und „Nicht öffentlich“ müssen aus sein."
+        "emptyListHint": "Keine Veranstaltungen passen zu den Filtern. In Dolibarr bei jeder Veranstaltung prüfen: Saison (aktuell), Programm (1/2/6/7), Art (Regionalwettbewerb), Haken „Auf Standortseite verstecken“ und „Nicht öffentlich“ müssen aus sein.",
+        "backToOverview": "Zur Übersicht",
+        "publicFrameLabel": "Öffentliche Eventseite",
+        "noPublicPage": "Für diese Veranstaltung ist noch keine öffentliche Seite hinterlegt."
     },
     "nav": {
         "dashboard": "Mein Dashboard",

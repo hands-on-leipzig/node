@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
+    dedupe: ['vue', 'vue-i18n', 'leaflet'],
   },
   // Keep glass Vue SFCs out of the dep optimizer (exports resolve via Vite + vue plugin).
   optimizeDeps: {

@@ -111,5 +111,5 @@ export function isSpaRootRoute(route) {
  * @param {import('vue-router').RouteLocationNormalizedLoaded} route
  */
 export function isSpaShellRoute(route) {
-  return route.path === '/' || route.path.startsWith('/dashboard')
+  return route.path === '/' || route.path.startsWith('/e/') || route.path.startsWith('/dashboard')
 }
