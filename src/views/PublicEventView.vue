@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PublicEventFrame, publicEventPathFromUrl } from '@hands-on/glass/venues'
 import { publicPlanBase } from '@/utils/publicPlan'
+import { getToken, isAuthenticated } from '@/auth/keycloak'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,5 +28,11 @@ function goBack() {
 </script>
 
 <template>
-  <PublicEventFrame :src="src" :title="title" @back="goBack" />
+  <PublicEventFrame
+    :src="src"
+    :title="title"
+    :sso-token="getToken"
+    :sso-ready="isAuthenticated()"
+    @back="goBack"
+  />
 </template>
