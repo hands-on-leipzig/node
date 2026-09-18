@@ -1070,10 +1070,10 @@ const { canInstall, promptInstall } = usePwaInstall()
   text-decoration: line-through;
   color: var(--color-text-muted);
 }
-.sidebar-tekla-tile--challenge { border-left-color: #c62828; }
-.sidebar-tekla-tile--explore { border-left-color: #2e7d32; }
-.sidebar-tekla-tile--future8 { border-left-color: #1565c0; }
-.sidebar-tekla-tile--future5 { border-left-color: #e6a800; }
+.sidebar-tekla-tile--challenge { border-left-color: var(--program-challenge); }
+.sidebar-tekla-tile--explore { border-left-color: var(--program-explore); }
+.sidebar-tekla-tile--future8 { border-left-color: var(--program-future8); }
+.sidebar-tekla-tile--future5 { border-left-color: var(--program-future5); }
 .sidebar-tekla-tile:hover {
   background: color-mix(in srgb, var(--liquid-tile-bg-inner) 88%, var(--color-bg-hover));
 }

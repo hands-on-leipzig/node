@@ -152,16 +152,16 @@ watch(
 }
 
 .detail-header--challenge {
-  --detail-accent-bar: #c62828;
+  --detail-accent-bar: var(--program-challenge);
 }
 .detail-header--explore {
-  --detail-accent-bar: #2e7d32;
+  --detail-accent-bar: var(--program-explore);
 }
 .detail-header--future8 {
-  --detail-accent-bar: #1565c0;
+  --detail-accent-bar: var(--program-future8);
 }
 .detail-header--future5 {
-  --detail-accent-bar: #e6a800;
+  --detail-accent-bar: var(--program-future5);
 }
 
 .detail-header-top {
