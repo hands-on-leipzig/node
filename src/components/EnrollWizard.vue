@@ -54,6 +54,7 @@ const previousHtmlOverflow = ref('')
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const FUTURE_GROUP_5_ENABLED = false
 
 // Step 0a: FLL experience (before voucher)
 const introSubStep = ref('fll') // 'fll' | 'voucher'
@@ -157,20 +158,14 @@ const shouldSkipSeasonSetsWizardStep = computed(() => {
   return foundersNeedsSeasonSets.value
 })
 
-/** Future 5+ ist reines Bildungsprogramm — Teams am Event gibt es nur bei 8+. */
-const futureGroupHasEvents = computed(
-  () => edition.value === 'future' && futureGroup.value !== '5',
-)
-
 /** Future on-site event step. */
 function isOnSiteEventWizardStep(s) {
   return edition.value === 'future' && s === 6
 }
 
-/** Skip the Future on-site event step for 5+ (no events) and for Quicklaunch preset "kein Event". */
+/** Quicklaunch preset "kein Event" → skip the Future on-site event step entirely. */
 const shouldSkipOnSiteEventWizardStep = computed(
-  () => edition.value === 'future'
-    && (!futureGroupHasEvents.value || presetEventMode.value === 'none'),
+  () => edition.value === 'future' && presetEventMode.value === 'none',
 )
 
 /** True when step `n` is a preset-locked step that should be skipped (pupils, season-sets, on-site event). */
@@ -403,7 +398,7 @@ const wizardProgressSteps = computed(() => {
   }
 
   if (edition.value === 'future') {
-    const items = [
+    return withIndex([
       { key: 'wizard.progressChoose', active: s <= 2, done: s > 2 },
       { key: 'wizard.progressDetails', active: s === 3, done: s > 3 },
       {
@@ -416,19 +411,14 @@ const wizardProgressSteps = computed(() => {
         active: s === 5 && !shouldSkipSeasonSetsWizardStep.value,
         done: s > 5 || shouldSkipSeasonSetsWizardStep.value,
       },
-    ]
-    if (futureGroupHasEvents.value) {
-      items.push({
+      {
         key: 'wizard.progressOnSite',
         active: s === 6 && !shouldSkipOnSiteEventWizardStep.value,
         done: s > 6 || shouldSkipOnSiteEventWizardStep.value,
-      })
-    }
-    items.push(
+      },
       { key: 'wizard.progressAddresses', active: s === 7, done: s > 7 },
       { key: 'wizard.progressReview', active: s === 8, done: success.value },
-    )
-    return withIndex(items)
+    ])
   }
 
   if (foundersTeamHasParticipantsStep.value) {
@@ -1134,22 +1124,9 @@ function selectEdition(val) {
   scheduleAdvanceIfReady(1)
 }
 
-/** Drop any event selection and voucher event lock (group without events, e.g. Future 5+). */
-function clearFutureEventSelection() {
-  futureOnSiteEvent.value = null
-  futureEventId.value = null
-  futureEventsNearest.value = []
-  futureEventTeamCount.value = 1
-  futureTeamAutoUpgrade.value = null
-  futureTeamEvents.value = []
-  presetRegisterEventTeams.value = false
-  presetEventTeamCount.value = null
-  presetLockedEventId.value = null
-}
-
 function selectFutureGroup(val) {
+  if (val === '5' && !FUTURE_GROUP_5_ENABLED) return
   futureGroup.value = val
-  if (!futureGroupHasEvents.value) clearFutureEventSelection()
   scheduleAdvanceIfReady(2)
 }
 
@@ -1421,7 +1398,6 @@ function canNext() {
   }
   if (s === 6) {
     if (edition.value === 'future') {
-      if (shouldSkipOnSiteEventWizardStep.value) return true
       if (!futureOnSiteEvent.value) return false
       if (futureOnSiteEvent.value === 'yes') {
         const n = Number(futureEventTeamCount.value)
@@ -1595,10 +1571,6 @@ defineExpose({
 })
 
 async function loadFutureEventsNearest() {
-  if (!futureGroupHasEvents.value) {
-    futureEventsNearest.value = []
-    return
-  }
   futureEventsNearestLoading.value = true
   futureEventsNearest.value = []
   try {
@@ -1787,12 +1759,13 @@ function applyVoucherPreset(raw) {
   if (editionVal === 'future') {
     edition.value = 'future'
     const g = data.group != null ? String(data.group) : ''
-    if (g === '8' || g === '5') futureGroup.value = g
+    if (g === '8') futureGroup.value = '8'
+    if (g === '5' && FUTURE_GROUP_5_ENABLED) futureGroup.value = '5'
     applyVoucherPupilsLock(data)
     presetBranch = 'edition_future'
   } else if (program === 6 || program === 7) {
     edition.value = 'future'
-    futureGroup.value = program === 7 ? '8' : '5'
+    futureGroup.value = program === 7 ? '8' : (FUTURE_GROUP_5_ENABLED ? '5' : null)
     applyVoucherPupilsLock(data)
     presetBranch = 'program_6_or_7_future'
   } else if (program === 1 || program === 2 || program === 4 || program === 5) {
@@ -1828,10 +1801,7 @@ function applyVoucherPreset(raw) {
 
   presetEventMode.value = extractEventMode(raw)
 
-  if (edition.value === 'future' && !futureGroupHasEvents.value) {
-    // Group without events (5+): ignore any event preset from the voucher.
-    clearFutureEventSelection()
-  } else if (presetEventMode.value === 'none') {
+  if (presetEventMode.value === 'none') {
     // "Kein Event": no team event at all — skip the on-site event step and clear any event lock.
     futureOnSiteEvent.value = 'later'
     presetRegisterEventTeams.value = false
@@ -2136,10 +2106,7 @@ async function submit() {
       const sc = effectiveSeasonSetCount.value
       payload.seasonSetCount = sc
       payload.num_boards = sc
-      if (!futureGroupHasEvents.value) {
-        payload.registerEventTeams = false
-        payload.eventTeamCount = 0
-      } else if (futureOnSiteEvent.value === 'yes') {
+      if (futureOnSiteEvent.value === 'yes') {
         payload.registerEventTeams = true
         const n = Number(futureEventTeamCount.value)
         payload.eventTeamCount = Number.isFinite(n) && n >= 1 ? n : 1
@@ -2563,14 +2530,15 @@ watch(deliveryAddressDifferent, (different) => {
             </div>
           </div>
 
-          <!-- Step 2: Future = group 5+/8+, Founders = Explore/Challenge -->
+          <!-- Step 2: Future = group 5+/8+ (5+ currently disabled), Founders = Explore/Challenge -->
           <div v-show="step === 2" class="wizard-step wizard-step-animate">
             <template v-if="edition === 'future'">
               <div class="wizard-options wizard-options-two">
                 <button
                   type="button"
                   class="wizard-option wizard-option-card"
-                  :class="{ active: futureGroup === '5' }"
+                  :class="{ active: futureGroup === '5', 'is-disabled': !FUTURE_GROUP_5_ENABLED }"
+                  :disabled="!FUTURE_GROUP_5_ENABLED"
                   @click="selectFutureGroup('5')"
                 >
                   <div class="wizard-option-main"><I18nText k="dashboard.optionFutureGroup5" /></div>
@@ -2930,8 +2898,8 @@ watch(deliveryAddressDifferent, (different) => {
             </p>
           </div>
 
-          <!-- Step 6: On-site event (Future 8+ only — 5+ has no events) -->
-          <div v-show="step === 6 && futureGroupHasEvents" class="wizard-step wizard-step-animate">
+          <!-- Step 6: On-site event (Future only) -->
+          <div v-show="step === 6 && edition === 'future'" class="wizard-step wizard-step-animate">
             <div class="wizard-step-voucher-inner wizard-step-onsite-event">
               <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
               <p class="wizard-hint"><I18nText k="wizard.onSiteEventHint" /></p>
@@ -3147,7 +3115,7 @@ watch(deliveryAddressDifferent, (different) => {
                   <span><I18nText k="wizard.shippingPending" /></span>
                   <span class="wizard-cart-muted"><I18nText k="wizard.shippingPendingNote" /></span>
                 </div>
-                <div v-if="futureGroupHasEvents && futureOnSiteEvent !== 'yes'" class="wizard-cart-row wizard-cart-row--price">
+                <div v-if="futureOnSiteEvent !== 'yes'" class="wizard-cart-row wizard-cart-row--price">
                   <span><I18nText k="wizard.orderPriceEventLater" /></span>
                   <strong>{{ formatWizardEur(0) }}</strong>
                 </div>

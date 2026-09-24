@@ -6,7 +6,6 @@ import { getGroup, updateGroupVersandaufschub, unwrapNodeCard } from '@/services
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
-import { futureProgramHasEvents } from '@/config/futureEditionConfig'
 import { timelineHasShipmentStep, unwrapTimelinePayload } from '@/utils/timeline'
 import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule'
 import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
@@ -22,9 +21,6 @@ const id = computed(() => route.params.id)
 
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(group.value))
-
-/** Future 5+ groups are education program only — no event teams to register. */
-const hasEventTeams = computed(() => futureProgramHasEvents(group.value?.program))
 
 const timelinePayload = computed(() => unwrapTimelinePayload(group.value?.timeline))
 const timelineSteps = computed(() => timelinePayload.value.steps)
@@ -177,7 +173,6 @@ watch(
         </section>
 
         <section
-          v-if="hasEventTeams"
           class="detail-section detail-section--wide"
           :class="{ 'detail-section--disabled': cancelled }"
         >
