@@ -1,12 +1,13 @@
 /**
  * Enrollment options shown on the dashboard.
  * Founders: type 'team'|'class', program (backend id).
- * Future: type 'future', group '5'|'8' (group 5+ currently disabled in UI); user then chooses 8, 16 or 24 participants per group.
+ * Future: type 'future', group '5'|'8'; user then chooses 8, 16 or 24 participants per group.
+ * Group 5+ is education program only — no events.
  * Program ids: 1 = Explore team, 2 = Challenge team, 4 = Explore class, 5 = Challenge class,
  * 6 = Future group 5-8, 7 = Future group 8-16.
  */
 export const ENROLLMENT_OPTIONS = [
-  // Future edition (group 5+ and 8+; 5+ currently disabled in Wizard UI)
+  // Future edition (group 5+ and 8+)
   { type: 'future', group: '5', edition: 'future', labelKey: 'dashboard.optionFutureGroup5' },
   { type: 'future', group: '8', edition: 'future', labelKey: 'dashboard.optionFutureGroup8' },
   // Founders edition
