@@ -38,17 +38,28 @@ function venuePublicUrl(venue) {
   return planLinks.value.get(Number(venue?.id)) || publicPlanUrl(venue) || ''
 }
 
+function venueEventRoute(venue) {
+  const url = venuePublicUrl(venue)
+  const publicPath = publicEventPathFromUrl(url)
+  if (!publicPath) return null
+  return {
+    name: 'venues-event',
+    params: { publicPath },
+    query: { src: url, title: venue.name || '' },
+  }
+}
+
+function venueEventHref(venue) {
+  const target = venueEventRoute(venue)
+  return target ? router.resolve(target).href : ''
+}
+
 async function openVenueDetail(venue) {
   if (!venue?.id) return
   await loadPlanLinks()
-  const url = venuePublicUrl(venue)
-  const publicPath = publicEventPathFromUrl(url)
-  if (publicPath) {
-    router.push({
-      name: 'venues-event',
-      params: { publicPath },
-      query: { src: url, title: venue.name || '' },
-    })
+  const target = venueEventRoute(venue)
+  if (target) {
+    router.push(target)
     return
   }
   selectedVenue.value = venue
@@ -187,6 +198,8 @@ onBeforeUnmount(() => {
         <VenuesCatalog
           :venues="venues"
           :selected-venue="selectedVenueWithPlan"
+          state-key="node.venues.catalog"
+          :event-href="venueEventHref"
           @select="openVenueDetail"
           @close="() => closeVenueDetail()"
         >
