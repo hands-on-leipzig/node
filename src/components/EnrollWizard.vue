@@ -152,6 +152,7 @@ function isSeasonSetsWizardStep(s) {
 }
 
 const shouldSkipSeasonSetsWizardStep = computed(() => {
+  if (seasonSetsRuleDefined.value) return edition.value === 'future' || foundersNeedsSeasonSets.value
   if (!seasonSetsPresetLocked.value) return false
   if (edition.value === 'future') return true
   return foundersNeedsSeasonSets.value
@@ -652,6 +653,9 @@ const { quote: pricingQuote, loading: pricingLoading, error: pricingError } = us
 
 const pricingLines = computed(() => (Array.isArray(pricingQuote.value?.lines) ? pricingQuote.value.lines : []))
 
+/** DRAHT order rule fixes season sets itself (e.g. Future 5+ by participant count) — coach must not choose. */
+const seasonSetsRuleDefined = computed(() => pricingQuote.value?.seasonSetsSelectable === false)
+
 /**
  * Mirrors the PHP helper handson_unified_rules_quote_line_is_season_set_shipping.
  * A line is "shipping" when its lineKind is 'service' or its label/productRef
@@ -866,7 +870,7 @@ watch(
 )
 
 watch(
-  [seasonSetsPresetLocked, pupilsPresetLocked, shouldSkipOnSiteEventWizardStep, () => step.value, edition, foundersNeedsSeasonSets],
+  [seasonSetsPresetLocked, seasonSetsRuleDefined, pupilsPresetLocked, shouldSkipOnSiteEventWizardStep, () => step.value, edition, foundersNeedsSeasonSets],
   () => {
     if (!props.open) return
     if (!isSkippablePresetStep(step.value)) return
@@ -901,7 +905,7 @@ const summaryItems = computed(() => {
   if (edition.value === 'future' && futurePupils.value != null) {
     items.push({ label: `${futurePupils.value} ${t('enrollFuture.pupils')}` })
   }
-  if (edition.value === 'future' || foundersNeedsSeasonSets.value) {
+  if ((edition.value === 'future' || foundersNeedsSeasonSets.value) && !seasonSetsRuleDefined.value) {
     const sc = effectiveSeasonSetCount.value
     const setLabel = sc === 0 ? t('enrollFuture.seasonNone') : sc === 1 ? t('enrollFuture.seasonOne') : t('enrollFuture.seasonTwo')
     items.push({ label: `${t('wizard.orderSeasonSets')}: ${setLabel}` })
@@ -2133,9 +2137,11 @@ async function submit() {
       }
       const invoicePayload = buildInvoicePayload()
       if (invoicePayload) payload.invoiceAddress = invoicePayload
-      const sc = effectiveSeasonSetCount.value
-      payload.seasonSetCount = sc
-      payload.num_boards = sc
+      if (!seasonSetsRuleDefined.value) {
+        const sc = effectiveSeasonSetCount.value
+        payload.seasonSetCount = sc
+        payload.num_boards = sc
+      }
       if (!futureGroupHasEvents.value) {
         payload.registerEventTeams = false
         payload.eventTeamCount = 0
@@ -2197,9 +2203,11 @@ async function submit() {
         ...buildParticipationPayload(),
       }
       if (invoicePayload) payload.invoiceAddress = invoicePayload
-      const sc = effectiveSeasonSetCount.value
-      payload.seasonSetCount = sc
-      payload.num_boards = sc
+      if (!seasonSetsRuleDefined.value) {
+        const sc = effectiveSeasonSetCount.value
+        payload.seasonSetCount = sc
+        payload.num_boards = sc
+      }
       if (isTeam && founderTeamEventId.value) {
         const evId = Number(founderTeamEventId.value)
         if (Number.isFinite(evId) && evId > 0) payload.eventId = evId
@@ -3102,7 +3110,7 @@ watch(deliveryAddressDifferent, (different) => {
                 <span><I18nText k="wizard.orderPupils" /></span>
                 <strong>{{ futurePupils }} <I18nText k="enrollFuture.pupils" /></strong>
               </div>
-              <div class="wizard-cart-row">
+              <div v-if="!seasonSetsRuleDefined" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderSeasonSets" /></span>
                 <strong>
                   <I18nText v-if="effectiveSeasonSetCount === 0" k="enrollFuture.seasonNone" tag="span" />
@@ -3241,7 +3249,7 @@ watch(deliveryAddressDifferent, (different) => {
                   <I18nText v-else k="wizard.optionChallenge" tag="span" />
                 </strong>
               </div>
-              <div v-if="foundersNeedsSeasonSets" class="wizard-cart-row">
+              <div v-if="foundersNeedsSeasonSets && !seasonSetsRuleDefined" class="wizard-cart-row">
                 <span><I18nText k="wizard.orderSeasonSets" /></span>
                 <strong>
                   <I18nText v-if="effectiveSeasonSetCount === 0" k="enrollFuture.seasonNone" tag="span" />
