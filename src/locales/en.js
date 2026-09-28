@@ -371,7 +371,8 @@ export default {
         "remove": "Remove",
         "coCoaches": "Co-coaches",
         "cancelledBadge": "Deregistered",
-        "cancelledBanner": "This registration has been deregistered. All functions are disabled."
+        "cancelledBanner": "This registration has been deregistered. All functions are disabled.",
+        "minorCoachAddressHint": "Underage coaches cannot create or change addresses. You can still edit team data such as participant names."
     },
     "teamDetail": {
         "event": "Event",
@@ -403,6 +404,7 @@ export default {
         "eventTeamsAdditionalLabel": "Register additional teams",
         "eventTeamsTotalAfterAdd": "Then {total} team(s) in total for “{event}”",
         "eventTeamsAtCapacity": "The maximum number of event teams (4) has been reached.",
+        "minorCoachEventHint": "Underage coaches cannot register teams here. Please add an adult from your team/school as a coach.",
         "eventTeamsAddMoreSubmit": "Register additional teams",
         "registerForEventHint": "You can register this Future group for an on-site event at any time.",
         "teamCountHint": "Registered participants: {pupils}. With the current size you can cover up to {maxCurrent} event team(s); you may select up to {maxSelectable} team(s) — if capacity is insufficient, we automatically raise the participant count to the next tier (8 / 16 / 24 / 32) when you save.",
@@ -431,6 +433,7 @@ export default {
         "registerNew": "New registration",
         "registrationOpensAt": "Registration opens on {date} at {hour}:00 a.m.",
         "registrationClosedHint": "The registration period has not started yet.",
+        "minorCoachEnrollHint": "Underage coaches cannot start a new registration here. Please add an adult from your team/school as a coach (e.g. via co-coach invite).",
         "addCoCoachButton": "Add co-coach",
         "addCoCoachModalTitle": "Co-coach",
         "addCoCoachModalLead": "Pick a registration and enter the co-coach’s email address. There is no autocomplete — you first check whether a coach account exists for that email.",
@@ -632,6 +635,7 @@ export default {
         "profileDrahtId": "DRAHT-ID",
         "profileDrahtIdUnavailable": "Your DRAHT ID could not be loaded from the app or the browser token.",
         "addressesIntro": "Manage your saved addresses here.",
+        "minorCoachAddressHint": "Underage coaches cannot create, change, or delete addresses here.",
         "savedAddressesTitle": "Saved addresses",
         "deliveryAddressesTitle": "Delivery addresses",
         "invoiceAddressesTitle": "Invoice addresses",

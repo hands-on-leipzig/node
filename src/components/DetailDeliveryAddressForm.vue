@@ -26,7 +26,12 @@ const props = defineProps({
   },
   teklaId: { type: [String, Number], required: true },
   disabled: { type: Boolean, default: false },
+  /** Underage coach (day-precise): may not create/change addresses. Shows a dedicated hint. */
+  minorLocked: { type: Boolean, default: false },
 })
+
+/** Effective lock: either the caller's generic `disabled` or the minor-coach restriction. */
+const locked = computed(() => props.disabled || props.minorLocked)
 
 const emit = defineEmits(['saved'])
 
@@ -76,7 +81,7 @@ async function loadAddresses() {
 }
 
 async function save() {
-  if (props.disabled || !canSave.value || !props.teklaId) return
+  if (locked.value || !canSave.value || !props.teklaId) return
   const payload = buildPayload()
   if (!payload) return
   saving.value = true
@@ -101,6 +106,10 @@ onMounted(loadAddresses)
 <template>
   <div class="detail-delivery-form">
     <p class="detail-delivery-form-lead"><I18nText k="detail.shipmentNeedsDeliveryAddress" /></p>
+    <p v-if="minorLocked" class="detail-delivery-form-hint">
+      <i class="bi bi-info-circle" />
+      <I18nText k="detail.minorCoachAddressHint" />
+    </p>
     <p v-if="loading" class="detail-delivery-form-muted">
       <i class="bi bi-arrow-repeat spin" />
     </p>
@@ -111,12 +120,13 @@ onMounted(loadAddresses)
       :addresses="deliveryAddresses"
       :label="t('detail.deliveryAddress')"
       id-prefix="detail-delivery"
+      :disabled="locked"
     />
     <p v-if="error" class="detail-delivery-form-error">{{ error }}</p>
     <button
       type="button"
       class="detail-btn detail-btn-primary"
-      :disabled="disabled || saving || !canSave"
+      :disabled="locked || saving || !canSave"
       @click="save"
     >
       <i v-if="saving" class="bi bi-arrow-repeat spin" />
@@ -137,9 +147,16 @@ onMounted(loadAddresses)
   color: var(--color-text-muted);
 }
 .detail-delivery-form-muted,
-.detail-delivery-form-error {
+.detail-delivery-form-error,
+.detail-delivery-form-hint {
   margin: 0;
   font-size: 0.88rem;
+}
+.detail-delivery-form-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  color: var(--color-text-muted);
 }
 .detail-delivery-form-error { color: var(--color-danger, #dc2626); }
 .detail-btn {

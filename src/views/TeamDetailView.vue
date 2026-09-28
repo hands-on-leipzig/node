@@ -15,6 +15,7 @@ import FutureEnrollmentContextBanner from '@/components/FutureEnrollmentContextB
 import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import { foundersTeamMaxPlayers } from '@/config/foundersEditionConfig'
 import { futureTeamMaxPlayers } from '@/config/futureEditionConfig'
+import { useCoachProfile } from '@/composables/useCoachProfile'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +38,10 @@ const id = computed(() => route.params.id)
 
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(team.value))
+
+/** Underage coach (day-precise): may view + edit team data (e.g. player names) but not addresses. */
+const { isMinorCoach, loadCoachProfile } = useCoachProfile()
+void loadCoachProfile()
 
 const displayedPlayers = computed(() => {
   const list = editingPlayers.value.length ? editingPlayers.value : (team.value?.players || [])
@@ -406,6 +411,7 @@ watch(
           v-else-if="!cancelled"
           tekla-type="teams"
           :tekla-id="team.id"
+          :minor-locked="isMinorCoach"
           @saved="onDeliveryAddressSaved"
         />
         <p v-else class="detail-address"><I18nText k="detail.noData" /></p>

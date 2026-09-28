@@ -134,7 +134,13 @@ export function getAddresses() {
 /**
  * Current coach identity from the API (Dolibarr contact id as set by Bearer middleware).
  * Prefer this over parsing the JWT in the browser — the claim name may differ or be omitted from tokenParsed.
- * @returns {Promise<{ data: { data: { coachContactId: number, defaultLang?: string } } }>}
+ *
+ * Planned (draht-dev, not shipped yet): `data.dateOfBirth` — `YYYY-MM-DD` mapped from
+ * `$contact->birthdate` (null when unset), and/or a precomputed `data.isMinor` boolean.
+ * Used by `useCoachProfile()` to gate underage-coach restrictions (no team/class/group
+ * enrollment, no address create/edit) day-precise. See `src/utils/coachAge.js`.
+ *
+ * @returns {Promise<{ data: { data: { coachContactId: number, defaultLang?: string, dateOfBirth?: string|null, isMinor?: boolean } } }>}
  */
 export function getNodeCoachMe() {
   return api.get('/me')

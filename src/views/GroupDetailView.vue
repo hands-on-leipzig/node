@@ -11,6 +11,7 @@ import { useTeklaShipmentSchedule } from '@/composables/useTeklaShipmentSchedule
 import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 import FutureGroupEventTeamsPanel from '@/components/FutureGroupEventTeamsPanel.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
+import { useCoachProfile } from '@/composables/useCoachProfile'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -21,6 +22,10 @@ const id = computed(() => route.params.id)
 
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(group.value))
+
+/** Underage coach (day-precise): may view + edit group/team data but not addresses or event team registration. */
+const { isMinorCoach, loadCoachProfile } = useCoachProfile()
+void loadCoachProfile()
 
 const timelinePayload = computed(() => unwrapTimelinePayload(group.value?.timeline))
 const timelineSteps = computed(() => timelinePayload.value.steps)
@@ -180,6 +185,7 @@ watch(
             :group-id="group.id"
             :group="group"
             :disabled="cancelled"
+            :minor-locked="isMinorCoach"
             @updated="onGroupUpdated"
           />
         </section>
@@ -203,6 +209,7 @@ watch(
             v-else-if="!cancelled"
             tekla-type="groups"
             :tekla-id="group.id"
+            :minor-locked="isMinorCoach"
             @saved="onDeliveryAddressSaved"
           />
           <p v-else class="detail-address"><I18nText k="detail.noData" /></p>

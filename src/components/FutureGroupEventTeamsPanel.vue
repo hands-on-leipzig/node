@@ -34,7 +34,12 @@ const props = defineProps({
   group: { type: Object, required: true },
   /** When true (e.g. abgemeldet), block registration actions without using HTML inert. */
   disabled: { type: Boolean, default: false },
+  /** Underage coach (day-precise): may not register/add teams to an event. Shows a dedicated hint. */
+  minorLocked: { type: Boolean, default: false },
 })
+
+/** Effective lock: either the caller's generic `disabled` (e.g. cancelled) or the minor-coach restriction. */
+const locked = computed(() => props.disabled || props.minorLocked)
 
 const emit = defineEmits(['updated'])
 
@@ -224,7 +229,7 @@ const showRegistrationForm = computed(
 )
 
 const canSubmit = computed(() => {
-  if (props.disabled || submitting.value) return false
+  if (locked.value || submitting.value) return false
   if (isInitialRegistration.value && registrationChoice.value !== 'yes') return false
   if (!selectedTeamCount.value || selectedTeamCount.value < 1) return false
   if (!invoiceAddressValid.value) return false
@@ -240,6 +245,7 @@ const canSubmit = computed(() => {
 /** Why the primary action stays disabled — shown under the button. */
 const submitBlockedHintKey = computed(() => {
   if (canSubmit.value || submitting.value) return ''
+  if (props.minorLocked) return 'groupDetail.minorCoachEventHint'
   if (props.disabled) return 'detail.cancelledBanner'
   if (!showRegistrationForm.value) return ''
   if (!isInitialRegistration.value && maxAdditionalTeams.value <= 0) return 'groupDetail.eventTeamsAtCapacity'
@@ -334,7 +340,7 @@ function selectTeamEvent(teamIndex, eventId) {
 }
 
 function chooseRegistration(mode) {
-  if (props.disabled) return
+  if (locked.value) return
   registrationChoice.value = mode
   if (mode === 'yes') {
     panelOpen.value = true
@@ -373,7 +379,7 @@ function buildEventTeamsPayload() {
 }
 
 async function submit() {
-  if (props.disabled) return
+  if (locked.value) return
   const eventTeamsPayload = buildEventTeamsPayload()
   const eventId = primaryEventIdForSubmit()
   if (!props.groupId || !eventId || eventTeamsPayload.length === 0) return
@@ -455,7 +461,7 @@ async function submit() {
 }
 
 function togglePanel() {
-  if (props.disabled) return
+  if (locked.value) return
   panelOpen.value = !panelOpen.value
   if (panelOpen.value && events.value.length === 0) {
     loadEvents()
@@ -532,7 +538,11 @@ onMounted(() => {
     </div>
     <EventScheduleLink v-if="enrolledTeams.length" :event="enrolledEvent" />
 
-    <div class="future-event-registration" :class="{ 'future-event-registration--readonly': disabled }">
+    <div class="future-event-registration" :class="{ 'future-event-registration--readonly': locked }">
+    <p v-if="minorLocked" class="future-event-hint future-event-hint-warn">
+      <i class="bi bi-info-circle" aria-hidden="true" />
+      <I18nText k="groupDetail.minorCoachEventHint" />
+    </p>
     <template v-if="isInitialRegistration">
       <p class="onsite-event-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
       <p class="future-event-hint onsite-event-hint"><I18nText k="wizard.onSiteEventHint" /></p>
@@ -541,7 +551,7 @@ onMounted(() => {
           type="button"
           class="onsite-event-option"
           :class="{ active: registrationChoice === 'yes' }"
-          :disabled="disabled"
+          :disabled="locked"
           @click="chooseRegistration('yes')"
         >
           <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventYes" /></span>
@@ -552,7 +562,7 @@ onMounted(() => {
           type="button"
           class="onsite-event-option"
           :class="{ active: registrationChoice === 'later' }"
-          :disabled="disabled"
+          :disabled="locked"
           @click="chooseRegistration('later')"
         >
           <span class="onsite-event-option-main"><I18nText k="wizard.onSiteEventSkip" /></span>
@@ -566,7 +576,7 @@ onMounted(() => {
       type="button"
       class="future-event-panel-toggle"
       :aria-expanded="panelOpen"
-      :disabled="disabled"
+      :disabled="locked"
       @click="togglePanel"
     >
       <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
@@ -701,6 +711,7 @@ onMounted(() => {
             :addresses="invoiceAddresses"
             :label="t('enroll.invoiceAddress')"
             id-prefix="future-event-invoice"
+            :disabled="locked"
           />
         </div>
 

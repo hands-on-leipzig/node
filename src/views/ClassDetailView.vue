@@ -12,6 +12,7 @@ import TeklaStatusBoard from '@/components/TeklaStatusBoard.vue'
 import DetailTeklaHeader from '@/components/DetailTeklaHeader.vue'
 import { DETAIL_EVENT_ACTIONS_ENABLED } from '@/config/detailEventActions'
 import EventScheduleLink from '@/components/EventScheduleLink.vue'
+import { useCoachProfile } from '@/composables/useCoachProfile'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -23,6 +24,10 @@ const id = computed(() => route.params.id)
 
 /** Deregistered ("abgemeldet"): all editing functions are disabled. */
 const cancelled = computed(() => isTeklaCancelled(cls.value))
+
+/** Underage coach (day-precise): may view + edit class data but not addresses. */
+const { isMinorCoach, loadCoachProfile } = useCoachProfile()
+void loadCoachProfile()
 
 const timelinePayload = computed(() => unwrapTimelinePayload(cls.value?.timeline))
 const timelineSteps = computed(() => timelinePayload.value.steps)
@@ -218,6 +223,7 @@ watch(
           v-else-if="!cancelled"
           tekla-type="classes"
           :tekla-id="cls.id"
+          :minor-locked="isMinorCoach"
           @saved="onDeliveryAddressSaved"
         />
         <p v-else class="detail-address"><I18nText k="detail.noData" /></p>

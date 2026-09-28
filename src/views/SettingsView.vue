@@ -5,6 +5,7 @@ import { getUserProfile, getCoachDolibarrContactId } from '@/auth/keycloak'
 import { listAddressBookGrouped, createAddress, updateAddress, deleteAddress, getNodeCoachMe } from '@/services/draht'
 import CountryNativeSelect from '@/components/CountryNativeSelect.vue'
 import { buildCountryOptions } from '@/utils/countryOptions'
+import { useCoachProfile } from '@/composables/useCoachProfile'
 
 const { t, locale } = useI18n()
 
@@ -19,6 +20,9 @@ const countryGroups = computed(() => {
 })
 
 const profile = computed(() => getUserProfile())
+
+/** Underage coach (day-precise): may not create, change, or delete addresses here. */
+const { isMinorCoach, loadCoachProfile } = useCoachProfile()
 const coachContactIdFromApi = ref(null)
 const coachIdLoading = ref(true)
 const coachIdError = ref('')
@@ -127,6 +131,7 @@ function buildPayload() {
 }
 
 async function saveAddress() {
+  if (isMinorCoach.value) return
   error.value = ''
   success.value = ''
   const payload = buildPayload()
@@ -149,6 +154,7 @@ async function saveAddress() {
 }
 
 async function removeAddress(addressId) {
+  if (isMinorCoach.value) return
   error.value = ''
   success.value = ''
   deletingId.value = String(addressId)
@@ -187,6 +193,7 @@ async function loadCoachIdentity() {
 onMounted(() => {
   loadAddresses()
   loadCoachIdentity()
+  void loadCoachProfile()
 })
 </script>
 
@@ -225,6 +232,9 @@ onMounted(() => {
 
       <h2 class="settings-section-title settings-addresses-heading"><I18nText k="settings.savedAddressesTitle" /></h2>
       <p class="settings-sub"><I18nText k="settings.addressesIntro" /></p>
+      <p v-if="isMinorCoach" class="settings-msg settings-msg-info">
+        <i class="bi bi-info-circle"></i><I18nText k="settings.minorCoachAddressHint" />
+      </p>
 
       <div v-if="error" class="settings-msg settings-msg-error">
         <i class="bi bi-exclamation-circle"></i>{{ error }}
@@ -255,10 +265,10 @@ onMounted(() => {
                     <span>{{ item.state }} {{ item.country?.toUpperCase() }}</span>
                   </div>
                   <div class="settings-actions">
-                    <button type="button" class="btn btn-ghost btn-sm" @click="applyAddressToForm(item)">
+                    <button type="button" class="btn btn-ghost btn-sm" :disabled="isMinorCoach" @click="applyAddressToForm(item)">
                       <i class="bi bi-pencil"></i>
                     </button>
-                    <button type="button" class="btn btn-ghost btn-sm" :disabled="deletingId === String(item.id)" @click="removeAddress(item.id)">
+                    <button type="button" class="btn btn-ghost btn-sm" :disabled="isMinorCoach || deletingId === String(item.id)" @click="removeAddress(item.id)">
                       <i class="bi bi-trash"></i>
                     </button>
                   </div>
@@ -270,6 +280,7 @@ onMounted(() => {
 
         <form class="settings-block" @submit.prevent="saveAddress">
           <h2>{{ isEditing ? t('settings.editAddressTitle') : t('settings.newAddressTitle') }}</h2>
+          <fieldset class="settings-address-fieldset" :disabled="isMinorCoach">
           <div class="field">
             <label for="addr-label"><I18nText k="settings.addressLabel" /></label>
             <input id="addr-label" v-model="form.label" type="text">
@@ -308,6 +319,7 @@ onMounted(() => {
               <I18nText v-else k="common.save" />
             </button>
           </div>
+          </fieldset>
         </form>
       </div>
     </section>
@@ -351,6 +363,9 @@ onMounted(() => {
 .settings-msg { margin-bottom: 0.7rem; padding: 0.55rem 0.7rem; border-radius: var(--radius); display: inline-flex; align-items: center; gap: 0.45rem; }
 .settings-msg-error { border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); color: var(--color-danger); }
 .settings-msg-success { border: 1px solid color-mix(in srgb, var(--color-success) 35%, var(--color-border)); color: var(--color-success); }
+.settings-msg-info { border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.settings-address-fieldset { border: 0; margin: 0; padding: 0; }
+.settings-address-fieldset:disabled { opacity: 0.6; }
 .field { margin-bottom: 0.7rem; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .field label { display: block; margin-bottom: 0.25rem; font-size: 0.82rem; color: var(--color-text-muted); }

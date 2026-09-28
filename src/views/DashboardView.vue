@@ -25,6 +25,7 @@ import { DocumentsFolderList } from '@hands-on/glass/documents'
 import { buildDocumentsFolderTree, documentNodeAtPath, documentNodeToListItems } from '@/utils/documentsTree'
 import { useDocumentFileOpen } from '@/composables/useDocumentFileOpen'
 import { useModalDismiss } from '@/composables/useModalDismiss'
+import { useCoachProfile } from '@/composables/useCoachProfile'
 import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory, pushWizardHistorySnapshot } from '@/utils/spaBrowserBack'
 
 const { t, locale } = useI18n()
@@ -62,10 +63,16 @@ const registrationWindow = ref({
   controlMode: 'season',
 })
 
-const registrationAllowed = computed(() => !registrationWindow.value.loading && registrationWindow.value.allowed !== false)
+const { isMinorCoach, loadCoachProfile } = useCoachProfile()
+
+/** Underage coaches (day-precise) may not start a new team/class/group enrollment. */
+const registrationAllowed = computed(
+  () => !registrationWindow.value.loading && registrationWindow.value.allowed !== false && !isMinorCoach.value,
+)
 
 const registrationOpensMessage = computed(() => {
   if (registrationAllowed.value) return ''
+  if (isMinorCoach.value) return t('dashboard.minorCoachEnrollHint')
   const custom = (registrationWindow.value.closedMessage || '').trim()
   if (custom) return custom
   if (!registrationWindow.value.opensAt) {
@@ -515,7 +522,7 @@ function goToTask(item) {
 onMounted(async () => {
   loadLists()
   loadUpcomingCalendar()
-  await loadRegistrationWindow()
+  await Promise.all([loadCoachProfile(), loadRegistrationWindow()])
   if (route.query?.wizard === '1' && registrationAllowed.value) {
     wizardHistoryDepth.value = 0
     wizardOpen.value = true

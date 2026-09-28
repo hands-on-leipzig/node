@@ -49,6 +49,11 @@ const props = defineProps({
     type: String,
     default: 'addr',
   },
+  /** When true, all inputs/selects/buttons in this selector are non-interactive (wrapped in a <fieldset disabled>). */
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -416,6 +421,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="address-selector">
     <h4 class="address-label">{{ label }}</h4>
+    <fieldset class="address-selector-fieldset" :disabled="disabled">
     <div
       class="address-mode-cards"
       role="radiogroup"
@@ -793,12 +799,21 @@ onBeforeUnmount(() => {
         </template>
       </form>
     </template>
+    </fieldset>
   </div>
 </template>
 
 <style scoped>
 .address-selector {
   margin-bottom: 1.25rem;
+}
+.address-selector-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.address-selector-fieldset:disabled {
+  opacity: 0.6;
 }
 .address-label {
   margin: 0 0 0.55rem;
