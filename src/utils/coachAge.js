@@ -1,9 +1,9 @@
 /**
  * Day-precise minor (under 18) check for a coach's date of birth.
  *
- * Backend contract (planned, draht-dev): `GET /handson/node/me` → `data.dateOfBirth`,
- * a plain calendar date string `YYYY-MM-DD` mapped from Dolibarr's `$contact->birthdate`
- * (send `null` when not set — do not send `0` or `""`). Using a plain date string (no time,
+ * Backend contract: `GET /handson/node/me` → `data.dateOfBirth`,
+ * a plain calendar date string `YYYY-MM-DD` mapped from Dolibarr's `$contact->birthday`
+ * (`null` when not set). Using a plain date string (no time,
  * no timezone) avoids off-by-one-day errors that a Unix timestamp would risk when compared
  * against "today" in the browser's local timezone.
  *
@@ -13,7 +13,7 @@
 /**
  * Parse a backend date-of-birth value into a local Date (midnight).
  * Accepts `YYYY-MM-DD` (and full ISO datetime strings), a Date instance, or a Unix
- * timestamp in seconds (defensive — the planned contract is a plain date string).
+ * timestamp in seconds (defensive — the contract is a plain date string).
  *
  * @param {string|number|Date|null|undefined} value
  * @returns {Date|null}

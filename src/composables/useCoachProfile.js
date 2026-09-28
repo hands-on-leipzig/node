@@ -23,12 +23,9 @@ function extractProfile(res) {
     lastname: d.lastname ?? '',
     email: d.email ?? '',
     defaultLang: d.defaultLang ?? null,
-    // Planned draht-dev contract: `dateOfBirth` as `YYYY-MM-DD` (from $contact->birthdate).
-    // Not shipped yet — until it is, dateOfBirth stays null and isMinorCoach stays false
-    // (fail-open), so this restriction is a no-op for every coach.
+    // `YYYY-MM-DD` from the contact's `birthday` field; null when not set (then treated as adult).
     dateOfBirth: d.dateOfBirth ?? null,
-    // Backend may alternatively/also send a precomputed boolean (avoids any client
-    // timezone concerns); prefer it over computing from dateOfBirth when present.
+    // Precomputed by DRAHT on the server date; preferred over computing from dateOfBirth.
     isMinorFromApi: typeof rawIsMinor === 'boolean' ? rawIsMinor : null,
   }
 }
