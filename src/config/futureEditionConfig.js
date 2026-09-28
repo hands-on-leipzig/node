@@ -46,6 +46,15 @@ export const FUTURE_EVENT_TEAM_SIZE = 8
 export const FUTURE_TEAM_MAX_PLAYERS = FUTURE_EVENT_TEAM_SIZE
 
 /**
+ * Future 5+ (Programm 6) ist reines Bildungsprogramm — Event-Anmeldungen gibt es nur bei 8+ (Programm 7).
+ * @param {unknown} program program id 6|7
+ * @returns {boolean}
+ */
+export function futureProgramHasEvents(program) {
+  return Number(program) !== 6
+}
+
+/**
  * Max named team members for a Future event team.
  * @param {unknown} program program id 6|7
  * @returns {number|null}
