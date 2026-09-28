@@ -3138,10 +3138,7 @@ watch(deliveryAddressDifferent, (different) => {
                 >
                   <span class="wizard-cart-line-label">
                     <span class="wizard-cart-product-name">{{ quoteLineProductName(line) || '—' }}</span>
-                    <span v-if="line.category === 'group' && futurePupils != null" class="wizard-cart-muted">
-                      · {{ futurePupils }} <I18nText k="enrollFuture.pupils" />
-                    </span>
-                    <span v-else-if="Number(line.qty) > 0" class="wizard-cart-muted">
+                    <span v-if="Number(line.qty) > 0" class="wizard-cart-muted">
                       · {{ line.qty }}×
                     </span>
                     <span v-if="line.free" class="wizard-cart-muted"> · <I18nText k="wizard.priceFree" /></span>
