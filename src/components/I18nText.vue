@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import BrandText from '@hands-on/glass/brand-text'
 import { showTranslationKeys, translationEditMode } from '@/i18n'
 import { hasAdminRole } from '@/auth/keycloak'
 import { openTranslationQuickEdit } from '@/utils/translationQuickEditModal'
@@ -74,7 +75,7 @@ function onKeyLeave() {
     @focusin="onKeyEnter"
     @focusout="onKeyLeave"
   >
-    <span class="i18n-text-main">{{ text }}</span>
+    <span class="i18n-text-main"><BrandText :text="text" /></span>
     <button
       v-if="showPen"
       type="button"

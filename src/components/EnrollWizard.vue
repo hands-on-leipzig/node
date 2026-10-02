@@ -43,6 +43,7 @@ import logoFllChallengeV from '@/assets/fll_challenge_v.png'
 import logoFuture from '@/assets/first_rgb_fullcolor_ohne.png'
 import logoFounders from '@/assets/first_canopy_fll_founders_edition_rgb_fullcolor.png'
 import I18nText from "@/components/I18nText.vue";
+import BrandText from "@hands-on/glass/brand-text";
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -2397,7 +2398,7 @@ watch(deliveryAddressDifferent, (different) => {
               <div class="wizard-progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
                 <span :style="{ width: `${progress}%` }"></span>
               </div>
-              <p class="wizard-step-label">{{ stepTitle }} ({{ step + 1 }}/{{ totalSteps }})</p>
+              <p class="wizard-step-label"><BrandText :text="stepTitle" /> ({{ step + 1 }}/{{ totalSteps }})</p>
             </div>
             <div class="wizard-hero-stepper">
               <p class="wizard-hero-stepper-title"><I18nText k="wizard.progressTitle" /></p>

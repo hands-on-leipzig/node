@@ -73,7 +73,7 @@ export default {
         "resultsCount": "{count} Veranstaltungen",
         "sectionExplore": "FIRST LEGO League Explore",
         "sectionChallenge": "FIRST LEGO League Challenge",
-        "sectionFuture": "FIRST LEGO LEAGUE FUTURE 8+ Edition",
+        "sectionFuture": "FIRST LEGO League Future Edition 8+",
         "noEventsInRegion": "Keine Veranstaltungen in dieser Region.",
         "noFilterResults": "Keine Veranstaltungen für die gewählten Filter. Bitte Angebot oder Land in der Karte anpassen.",
         "qualiTitle": "Qualifikationswettbewerbe",
