@@ -374,7 +374,7 @@ export default {
         "coCoaches": "Co-Coaches",
         "cancelledBadge": "Abgemeldet",
         "cancelledBanner": "Diese Anmeldung ist abgemeldet. Alle Funktionen sind deaktiviert.",
-        "minorCoachAddressHint": "Minderjährige Coaches können keine Adressen anlegen oder ändern. Teamdaten wie TN-Namen könnt ihr weiterhin bearbeiten."
+        "minorCoachAddressHint": "Minderjährige Coaches können keine Adressen anlegen oder ändern. Teamdaten wie TN-Namen kannst du weiterhin bearbeiten."
     },
     "teamDetail": {
         "event": "Veranstaltung",
@@ -406,7 +406,7 @@ export default {
         "eventTeamsAdditionalLabel": "Weitere Teams nachmelden",
         "eventTeamsTotalAfterAdd": "Danach insgesamt {total} Team(s) bei „{event}“",
         "eventTeamsAtCapacity": "Die maximale Anzahl Event-Teams (4) ist erreicht.",
-        "minorCoachEventHint": "Minderjährige Coaches können hier keine Teams anmelden. Bitte eine erwachsene Person aus eurem Team/eurer Schule als Coach ergänzen.",
+        "minorCoachEventHint": "Minderjährige Coaches können keine Teams/Gruppen anmelden. Bitte eine volljährige Person, die Anmeldung durchzuführen und dich als Co-Coach:in hinzuzufügen.",
         "eventTeamsAddMoreSubmit": "Teams nachmelden",
         "registerForEventHint": "Du kannst diese Future-Gruppe jederzeit zusätzlich für ein Event vor Ort anmelden.",
         "teamCountHint": "Angemeldete Teilnehmende: {pupils}. Mit der aktuellen Größe bis zu {maxCurrent} Event-Team(s); du kannst bis zu {maxSelectable} Team(s) wählen — reicht die Kapazität nicht, setzen wir die Teilnehmendenzahl beim Speichern automatisch auf die nächste Stufe (8 / 16 / 24 / 32).",
@@ -435,7 +435,7 @@ export default {
         "registerNew": "Neue Anmeldung",
         "registrationOpensAt": "Die Anmeldung ist ab {date} um {hour}:00 Uhr möglich.",
         "registrationClosedHint": "Der Anmeldezeitraum hat noch nicht begonnen.",
-        "minorCoachEnrollHint": "Minderjährige Coaches können hier keine neue Anmeldung starten. Bitte eine erwachsene Person aus eurem Team/eurer Schule als Coach ergänzen (z. B. per Co-Coach-Einladung).",
+        "minorCoachEnrollHint": "Minderjährige Coaches können keine Teams/Gruppen anmelden. Bitte eine volljährige Person, die Anmeldung durchzuführen und dich als Co-Coach:in hinzuzufügen.",
         "documentsForDownload": "Coach:innen-Dokumente",
         "documentsLoadingList": "Dateien werden aus SharePoint geladen…",
         "documentsOpeningFile": "Dokument wird geöffnet…",
@@ -637,7 +637,7 @@ export default {
         "profileDrahtId": "DRAHT-ID",
         "profileDrahtIdUnavailable": "Die DRAHT-ID konnte weder von der App noch aus dem Browser-Token gelesen werden.",
         "addressesIntro": "Hier kannst du deine gespeicherten Adressen verwalten.",
-        "minorCoachAddressHint": "Minderjährige Coaches können hier keine Adressen anlegen, ändern oder löschen.",
+        "minorCoachAddressHint": "Minderjährige Coaches können keine Adressen anlegen, ändern oder löschen.",
         "savedAddressesTitle": "Gespeicherte Adressen",
         "deliveryAddressesTitle": "Lieferadressen",
         "invoiceAddressesTitle": "Rechnungsadressen",
