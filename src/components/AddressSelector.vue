@@ -8,8 +8,10 @@ import { addressAutocomplete, addressFieldName } from '@/utils/addressAutofill'
 import {
   emptyAddressNewFields,
   ADDRESS_MODE_INVOICE,
+  invoiceCountryAsksNetInvoice,
   invoiceCountryUsesRegisteredAsCompany,
   invoiceCountryUsesVatId,
+  invoiceNeedsNetInvoiceAnswer,
   invoiceNeedsRegisteredAsCompany,
   invoiceNeedsVatId,
   syncExistingAddressSelection,
@@ -101,6 +103,9 @@ const isInvoiceMode = computed(() => props.mode === 'invoice')
 const isDeliveryMode = computed(() => props.mode === 'delivery')
 
 const invoiceNewFields = computed(() => props.modelValue.new || {})
+const showNetInvoiceField = computed(
+  () => isInvoiceMode.value && invoiceNeedsNetInvoiceAnswer(invoiceNewFields.value),
+)
 const showVatIdField = computed(
   () => isInvoiceMode.value && invoiceNeedsVatId(invoiceNewFields.value),
 )
@@ -182,6 +187,9 @@ function patchNewFields(fields) {
 
 function patchInvoiceCountryDependentFields(newBlock, country) {
   const next = { ...newBlock }
+  if (!invoiceCountryAsksNetInvoice(country)) {
+    next.netInvoiceDesired = null
+  }
   if (!invoiceCountryUsesVatId(country)) {
     next.vatId = ''
   }
@@ -728,7 +736,7 @@ onBeforeUnmount(() => {
               @input="setNewField('orderReference', $event.target.value)"
             >
           </div>
-          <div class="field">
+          <div v-if="showNetInvoiceField" class="field">
             <span class="field-label-block">
               <I18nText k="enroll.netInvoiceDesired" /> <span class="field-required" :title="t('enroll.requiredField')">*</span>
             </span>

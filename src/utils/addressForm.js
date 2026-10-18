@@ -104,15 +104,32 @@ export function normalizeInvoiceCountry(country) {
   return String(country || '').trim().toLowerCase()
 }
 
-/** USt-IdNr. nur für Deutschland und Österreich. */
-export function invoiceCountryUsesVatId(country) {
+const EU_COUNTRY_CODES = new Set([
+  'at', 'be', 'bg', 'cy', 'cz', 'de', 'dk', 'ee', 'es', 'fi', 'fr', 'gr', 'hr', 'hu',
+  'ie', 'it', 'lt', 'lu', 'lv', 'mt', 'nl', 'pl', 'pt', 'ro', 'se', 'si', 'sk',
+])
+
+const HOME_COUNTRY_CODE = 'de'
+
+/** Nettorechnung (Reverse Charge) nur für EU-Länder außerhalb Deutschlands. */
+export function invoiceCountryAsksNetInvoice(country) {
   const c = normalizeInvoiceCountry(country)
-  return c === 'de' || c === 'at'
+  return c !== HOME_COUNTRY_CODE && EU_COUNTRY_CODES.has(c)
+}
+
+/** USt-IdNr. nur zusammen mit der Nettorechnungs-Abfrage. */
+export function invoiceCountryUsesVatId(country) {
+  return invoiceCountryAsksNetInvoice(country)
 }
 
 /** „Als Unternehmen registriert“ nur für die Schweiz. */
 export function invoiceCountryUsesRegisteredAsCompany(country) {
   return normalizeInvoiceCountry(country) === 'ch'
+}
+
+/** @param {Record<string, unknown> | null | undefined} n */
+export function invoiceNeedsNetInvoiceAnswer(n) {
+  return invoiceCountryAsksNetInvoice(n?.country)
 }
 
 /** @param {Record<string, unknown> | null | undefined} n */
@@ -140,8 +157,7 @@ export function isAddressNewValid(n, mode) {
   if (!street || !houseNumber || !postalCode || !city || !country) return false
   if (mode === ADDRESS_MODE_INVOICE) {
     if (!String(n.institution || '').trim()) return false
-    const netInvoice = parseYesNo(n.netInvoiceDesired)
-    if (netInvoice === null) return false
+    if (invoiceNeedsNetInvoiceAnswer(n) && parseYesNo(n.netInvoiceDesired) === null) return false
     if (invoiceNeedsVatId(n) && !String(n.vatId || '').trim()) return false
     if (invoiceNeedsRegisteredAsCompany(n) && parseYesNo(n.registeredAsCompany) === null) return false
     return true
@@ -182,7 +198,7 @@ export function buildNewAddressPayload(addr, mode) {
     const orderReference = String(n.orderReference || '').trim()
     if (orderReference) payload.orderReference = orderReference
     const netInvoice = parseYesNo(n.netInvoiceDesired)
-    if (netInvoice !== null) payload.netInvoiceDesired = netInvoice
+    if (invoiceNeedsNetInvoiceAnswer(n) && netInvoice !== null) payload.netInvoiceDesired = netInvoice
     if (invoiceNeedsVatId(n)) {
       payload.vatId = String(n.vatId || '').trim()
     }
