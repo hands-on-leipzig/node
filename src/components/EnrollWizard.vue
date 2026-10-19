@@ -15,7 +15,9 @@ import {
   registerTeamForEvent,
   listAddressBookGrouped,
   isDolibarrRowId,
+  getPlayerAgeRule,
 } from '@/services/draht'
+import { formatAgeReferenceDate, normalizePlayerAgeRule, playerAgeOutOfRange } from '@/utils/playerAge'
 import {
   emptyAddressState,
   buildNewAddressPayload,
@@ -257,6 +259,43 @@ const founderTeamMaxPlayers = computed(() =>
 
 const founderTeamAtMaxPlayers = computed(
   () => founderTeamPlayers.value.length >= founderTeamMaxPlayers.value,
+)
+
+/** Age rule for the season a new Founders team would get (from DRAHT). */
+const founderPlayerAgeRule = ref(null)
+
+watch(
+  () => (foundersTeamHasParticipantsStep.value ? foundersVariant.value : null),
+  async (variant) => {
+    founderPlayerAgeRule.value = null
+    if (variant !== 'explore' && variant !== 'challenge') return
+    try {
+      const res = await getPlayerAgeRule(variant === 'explore' ? 1 : 2)
+      if (foundersVariant.value === variant) {
+        founderPlayerAgeRule.value = normalizePlayerAgeRule(res?.data?.data ?? res?.data)
+      }
+    } catch {
+      founderPlayerAgeRule.value = null
+    }
+  },
+  { immediate: true },
+)
+
+const founderPlayerAgeHint = computed(() => {
+  const rule = founderPlayerAgeRule.value
+  if (!rule) return ''
+  return t('detail.playerAgeHint', { min: rule.minAge, max: rule.maxAge, date: formatAgeReferenceDate(rule, locale.value) })
+})
+
+function founderParticipantAgeError(p) {
+  const rule = founderPlayerAgeRule.value
+  const age = playerAgeOutOfRange(p.birthdayStr, rule)
+  if (age === null) return ''
+  return t('detail.playerAgeInvalid', { age, min: rule.minAge, max: rule.maxAge, date: formatAgeReferenceDate(rule, locale.value) })
+}
+
+const founderParticipantsHaveAgeErrors = computed(() =>
+  founderTeamPlayers.value.some((p) => founderParticipantAgeError(p) !== ''),
 )
 
 const foundersClassEnrollment = computed(
@@ -1445,7 +1484,7 @@ function canNext() {
   }
   if (s === 7) {
     if (edition.value === 'future') return areAddressesValid()
-    if (ft) return true
+    if (ft) return !founderParticipantsHaveAgeErrors.value
     if (foundersClassEnrollment.value) return false
     return false
   }
@@ -1480,6 +1519,13 @@ function next() {
     return
   }
   if (step.value === foundersTeamNameStepIndex.value && nameValidation.value.blocked) {
+    return
+  }
+  if (
+    step.value === participantsStepIndex.value
+    && foundersTeamHasParticipantsStep.value
+    && founderParticipantsHaveAgeErrors.value
+  ) {
     return
   }
   if (step.value === 0 && introSubStep.value === 'fll') {
@@ -2830,6 +2876,7 @@ watch(deliveryAddressDifferent, (different) => {
             <p class="wizard-hint">
               <I18nText k="wizard.participantsHint" :values="{ max: founderTeamMaxPlayers }" />
             </p>
+            <p v-if="founderPlayerAgeHint" class="wizard-hint">{{ founderPlayerAgeHint }}</p>
             <div class="wizard-participants">
               <div class="wizard-participant-row wizard-participant-header">
                 <span class="wizard-participant-label"><I18nText k="detail.firstname" /></span>
@@ -2845,7 +2892,14 @@ watch(deliveryAddressDifferent, (different) => {
               >
                 <input v-model="p.firstname" type="text" class="wizard-participant-input" :placeholder="t('detail.firstname')" />
                 <input v-model="p.name" type="text" class="wizard-participant-input" :placeholder="t('detail.lastname')" />
-                <input v-model="p.birthdayStr" type="date" class="wizard-participant-input wizard-participant-dob" :title="t('detail.dateOfBirth')" />
+                <input
+                  v-model="p.birthdayStr"
+                  type="date"
+                  class="wizard-participant-input wizard-participant-dob"
+                  :class="{ 'wizard-participant-input--invalid': founderParticipantAgeError(p) }"
+                  :aria-invalid="!!founderParticipantAgeError(p)"
+                  :title="t('detail.dateOfBirth')"
+                />
                 <CustomSelect
                   v-model="p.gender"
                   class="wizard-participant-gender"
@@ -2856,6 +2910,9 @@ watch(deliveryAddressDifferent, (different) => {
                 <button type="button" class="wizard-participant-remove" :aria-label="t('detail.remove')" @click="removeFounderParticipant(idx)">
                   <i class="bi bi-trash"></i>
                 </button>
+                <p v-if="founderParticipantAgeError(p)" class="wizard-form-field-error wizard-participant-error" role="alert">
+                  {{ founderParticipantAgeError(p) }}
+                </p>
               </div>
               <button
                 v-if="!founderTeamAtMaxPlayers"
@@ -3585,6 +3642,13 @@ html[data-theme='dark'] .wizard-sticky-top {
   grid-template-columns: 1fr 1fr minmax(8rem, auto) minmax(6rem, auto) auto;
   gap: 0.5rem;
   align-items: center;
+}
+.wizard-participant-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.wizard-participant-input--invalid {
+  border-color: var(--color-error, #dc2626);
 }
 .wizard-participant-row.wizard-participant-header {
   padding-bottom: 0.25rem;

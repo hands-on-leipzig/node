@@ -667,6 +667,15 @@ export function updateTeamPlayers(teamId, payload) {
 }
 
 /**
+ * Team member age rule for a new team of `program` (1 Explore, 2 Challenge, 7 Future 8+), from the
+ * season the enrollment would get. GET /handson/node/player-age-rule?program=…
+ * @returns {Promise<{ data: { data: { minAge: number, maxAge: number, referenceDate: string } | null } }>}
+ */
+export function getPlayerAgeRule(program) {
+  return api.get('/player-age-rule', { params: { program: Number(program) || 0 } })
+}
+
+/**
  * Update team name. Payload: { label: string }. Returns updated team card.
  */
 export function updateTeamLabel(teamId, payload) {
