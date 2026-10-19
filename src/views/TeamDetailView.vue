@@ -16,6 +16,12 @@ import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import { foundersTeamMaxPlayers } from '@/config/foundersEditionConfig'
 import { futureTeamMaxPlayers } from '@/config/futureEditionConfig'
 import { useCoachProfile } from '@/composables/useCoachProfile'
+import {
+  birthdayToDateStr,
+  formatAgeReferenceDate,
+  normalizePlayerAgeRule,
+  playerAgeOutOfRange,
+} from '@/utils/playerAge'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +37,7 @@ const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: ''
 const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
+const playersError = ref('')
 const savingTeamName = ref(false)
 const teamNameError = ref('')
 
@@ -63,6 +70,37 @@ const teamAtMaxPlayers = computed(() => {
   if (max == null) return false
   return displayedPlayers.value.length >= max
 })
+
+const playerAgeRule = computed(() => normalizePlayerAgeRule(team.value?.playerAgeRule))
+
+const playerAgeHint = computed(() => {
+  const rule = playerAgeRule.value
+  if (!rule) return ''
+  return t('detail.playerAgeHint', { min: rule.minAge, max: rule.maxAge, date: formatAgeReferenceDate(rule, locale.value) })
+})
+
+function playerAgeError(birthday) {
+  const rule = playerAgeRule.value
+  const age = playerAgeOutOfRange(birthday, rule)
+  if (age === null) return ''
+  return t('detail.playerAgeInvalid', { age, min: rule.minAge, max: rule.maxAge, date: formatAgeReferenceDate(rule, locale.value) })
+}
+
+function playerAgeWarning(p) {
+  const rule = playerAgeRule.value
+  const age = playerAgeOutOfRange(p.birthday, rule)
+  if (age === null) return ''
+  return t('detail.playerAgeOutOfRange', { age, date: formatAgeReferenceDate(rule, locale.value) })
+}
+
+/** Birthday of the player being edited as loaded; unchanged out-of-range dates are exceptions set by the RP. */
+const editingPlayerOriginalBirthday = ref('')
+const editingPlayerAgeError = computed(() =>
+  editingPlayer.value.birthdayStr === editingPlayerOriginalBirthday.value
+    ? ''
+    : playerAgeError(editingPlayer.value.birthdayStr),
+)
+const newPlayerAgeError = computed(() => playerAgeError(newPlayer.value.birthdayStr))
 
 const genderOptions = computed(() => [
   { value: '', label: t('detail.gender') },
@@ -121,12 +159,6 @@ function playerMeta(p) {
   return parts.length ? parts.join(' · ') : ''
 }
 
-function toBirthdayStr(ts) {
-  if (!ts) return ''
-  const d = new Date(typeof ts === 'number' ? ts * 1000 : ts)
-  return d.toISOString().slice(0, 10)
-}
-
 function startEditPlayer(idx) {
   const list = displayedPlayers.value
   const p = list[idx] || {}
@@ -135,19 +167,20 @@ function startEditPlayer(idx) {
     firstname: p.firstname || '',
     name: p.name || '',
     gender: p.gender || '',
-    birthdayStr: toBirthdayStr(p.birthday) || '',
+    birthdayStr: birthdayToDateStr(p.birthday),
   }
+  editingPlayerOriginalBirthday.value = editingPlayer.value.birthdayStr
 }
 
 function saveEditPlayer() {
   const idx = editingPlayerIndex.value
-  if (idx < 0) return
+  if (idx < 0 || editingPlayerAgeError.value) return
   const e = editingPlayer.value
   const copy = [...editingPlayers.value]
   if (!copy.length && team.value?.players?.length) {
     copy.push(...team.value.players.map((p) => ({ ...p })))
   }
-  const birthday = e.birthdayStr ? Math.floor(new Date(e.birthdayStr).getTime() / 1000) : null
+  const birthday = e.birthdayStr || null
   copy[idx] = { firstname: e.firstname, name: e.name, gender: e.gender, birthday }
   editingPlayers.value = copy
   editingPlayerIndex.value = -1
@@ -176,11 +209,11 @@ function startAddPlayer() {
 }
 
 function addPlayer() {
-  if (teamAtMaxPlayers.value) return
+  if (teamAtMaxPlayers.value || newPlayerAgeError.value) return
   const e = newPlayer.value
   let copy = editingPlayers.value.length ? [...editingPlayers.value] : [...(team.value?.players || [])]
   if (teamMaxPlayers.value != null && copy.length >= teamMaxPlayers.value) return
-  const birthday = e.birthdayStr ? Math.floor(new Date(e.birthdayStr).getTime() / 1000) : null
+  const birthday = e.birthdayStr || null
   copy.push({ firstname: e.firstname, name: e.name, gender: e.gender, birthday })
   editingPlayers.value = copy
   isAddingPlayer.value = false
@@ -218,19 +251,12 @@ async function saveVersandaufschub(dateStrOrNull) {
 }
 
 function buildPlayersPayload(list) {
-  return list.map((p) => {
-    let birthday = null
-    if (p.birthday) {
-      const ts = typeof p.birthday === 'number' ? p.birthday : null
-      if (ts) birthday = new Date(ts * 1000).toISOString().slice(0, 10)
-    }
-    return {
-      firstname: p.firstname || '',
-      name: p.name || '',
-      gender: p.gender || '',
-      birthday,
-    }
-  })
+  return list.map((p) => ({
+    firstname: p.firstname || '',
+    name: p.name || '',
+    gender: p.gender || '',
+    birthday: birthdayToDateStr(p.birthday) || null,
+  }))
 }
 
 async function persistPlayers() {
@@ -242,13 +268,15 @@ async function persistPlayers() {
     editingPlayers.value = list
   }
   savingPlayers.value = true
+  playersError.value = ''
   try {
     const payload = buildPlayersPayload(list)
     const res = await updateTeamPlayers(id.value, { players: payload })
     team.value = res.data
     editingPlayers.value = []
   } catch (e) {
-    error.value = e.response?.data?.message || e.message || t('errors.loadFailed')
+    editingPlayers.value = []
+    playersError.value = e.response?.data?.error?.message || e.response?.data?.message || e.message || t('errors.loadFailed')
   } finally {
     savingPlayers.value = false
   }
@@ -421,6 +449,7 @@ watch(
       <section class="detail-section detail-section-wide">
         <h3 class="detail-section-title"><I18nText k="detail.players" /></h3>
         <div class="detail-players-block">
+          <p v-if="playerAgeHint && !cancelled" class="detail-hint">{{ playerAgeHint }}</p>
           <ul v-if="(team.players && team.players.length) || editingPlayers.length" class="detail-players-list">
             <li v-for="(p, idx) in displayedPlayers" :key="'p-' + idx" class="detail-player-row">
               <template v-if="editingPlayerIndex === idx">
@@ -433,15 +462,28 @@ watch(
                   :options="genderOptions"
                   :placeholder="t('detail.gender')"
                 />
-                <input v-model="editingPlayer.birthdayStr" type="date" class="detail-player-input" />
+                <input
+                  v-model="editingPlayer.birthdayStr"
+                  type="date"
+                  class="detail-player-input"
+                  :class="{ 'detail-player-input--invalid': editingPlayerAgeError }"
+                  :aria-invalid="!!editingPlayerAgeError"
+                />
                 <div class="detail-player-actions">
-                  <button type="button" class="detail-btn detail-btn-primary" @click="saveEditPlayer"><I18nText k="common.save" /></button>
+                  <button type="button" class="detail-btn detail-btn-primary" :disabled="!!editingPlayerAgeError" @click="saveEditPlayer"><I18nText k="common.save" /></button>
                   <button type="button" class="detail-btn" @click="cancelEditPlayer"><I18nText k="common.cancel" /></button>
                 </div>
+                <p v-if="editingPlayerAgeError" class="detail-message detail-message-error detail-player-error" role="alert">
+                  <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ editingPlayerAgeError }}
+                </p>
               </template>
               <template v-else>
                 <span class="detail-player-name">{{ playerDisplayName(p) }}</span>
                 <span class="detail-player-meta">{{ playerMeta(p) }}</span>
+                <span v-if="playerAgeWarning(p)" class="detail-player-warning">
+                  <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                  {{ playerAgeWarning(p) }}
+                </span>
                 <div v-if="!cancelled" class="detail-player-actions">
                   <button type="button" class="detail-btn detail-btn-ghost" @click="startEditPlayer(idx)" :aria-label="t('detail.edit')"><i class="bi bi-pencil"></i></button>
                   <button type="button" class="detail-btn detail-btn-ghost" @click="removePlayer(idx)" :aria-label="t('detail.remove')"><i class="bi bi-trash"></i></button>
@@ -465,12 +507,24 @@ watch(
                 :options="genderOptions"
                 :placeholder="t('detail.gender')"
               />
-              <input v-model="newPlayer.birthdayStr" type="date" class="detail-player-input" />
-              <button type="button" class="detail-btn detail-btn-primary" @click="addPlayer"><I18nText k="detail.add" /></button>
+              <input
+                v-model="newPlayer.birthdayStr"
+                type="date"
+                class="detail-player-input"
+                :class="{ 'detail-player-input--invalid': newPlayerAgeError }"
+                :aria-invalid="!!newPlayerAgeError"
+              />
+              <button type="button" class="detail-btn detail-btn-primary" :disabled="!!newPlayerAgeError" @click="addPlayer"><I18nText k="detail.add" /></button>
               <button type="button" class="detail-btn" @click="cancelAddPlayer"><I18nText k="common.cancel" /></button>
+              <p v-if="newPlayerAgeError" class="detail-message detail-message-error detail-player-error" role="alert">
+                <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ newPlayerAgeError }}
+              </p>
             </template>
           </div>
           <div v-if="savingPlayers" class="detail-saving-hint"><I18nText k="dashboard.loading" /></div>
+          <p v-if="playersError" class="detail-message detail-message-error" role="alert">
+            <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ playersError }}
+          </p>
         </div>
 
         <div id="team-co-coaches-anchor" class="detail-co-coaches-wrap">
@@ -662,6 +716,17 @@ watch(
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   min-width: 6rem;
+}
+.detail-player-input--invalid {
+  border-color: var(--color-error, #dc2626);
+}
+.detail-player-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.detail-player-warning {
+  font-size: var(--text-sm);
+  color: var(--color-warning, #b45309);
 }
 .detail-player-select-wrap {
   min-width: 7rem;

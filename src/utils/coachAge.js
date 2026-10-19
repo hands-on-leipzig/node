@@ -41,23 +41,35 @@ export function parseDateOfBirth(value) {
 }
 
 /**
- * True if a person born on `dateOfBirth` is a minor (under 18) on `referenceDate`,
- * computed day-precise using calendar year/month/day (not elapsed time / timezone).
+ * Full years of age on `referenceDate`, computed day-precise using calendar year/month/day
+ * (not elapsed time / timezone).
  *
  * @param {string|number|Date|null|undefined} dateOfBirth
- * @param {Date} [referenceDate] Defaults to now (local time)
- * @returns {boolean} false when `dateOfBirth` is missing/unparseable (fail-open — unknown treated as adult)
+ * @param {string|Date} [referenceDate] Defaults to now (local time)
+ * @returns {number|null} null when either date is missing/unparseable
  */
-export function isMinorOnDate(dateOfBirth, referenceDate = new Date()) {
+export function ageOnDate(dateOfBirth, referenceDate = new Date()) {
   const dob = parseDateOfBirth(dateOfBirth)
-  if (!dob) return false
-  const ref = referenceDate instanceof Date ? referenceDate : new Date(referenceDate)
-  if (Number.isNaN(ref.getTime())) return false
+  if (!dob) return null
+  const ref = referenceDate instanceof Date ? referenceDate : parseDateOfBirth(referenceDate)
+  if (!ref || Number.isNaN(ref.getTime())) return null
 
   let age = ref.getFullYear() - dob.getFullYear()
   const hasHadBirthdayThisYear =
     ref.getMonth() > dob.getMonth() ||
     (ref.getMonth() === dob.getMonth() && ref.getDate() >= dob.getDate())
   if (!hasHadBirthdayThisYear) age -= 1
-  return age < 18
+  return age
+}
+
+/**
+ * True if a person born on `dateOfBirth` is a minor (under 18) on `referenceDate`.
+ *
+ * @param {string|number|Date|null|undefined} dateOfBirth
+ * @param {Date} [referenceDate] Defaults to now (local time)
+ * @returns {boolean} false when `dateOfBirth` is missing/unparseable (fail-open — unknown treated as adult)
+ */
+export function isMinorOnDate(dateOfBirth, referenceDate = new Date()) {
+  const age = ageOnDate(dateOfBirth, referenceDate)
+  return age !== null && age < 18
 }
