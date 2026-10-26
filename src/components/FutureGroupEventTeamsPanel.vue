@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
+import { useModalDismiss } from '@/composables/useModalDismiss'
 import {
   getEventsNearest,
   getGroup,
@@ -18,7 +19,6 @@ import {
   FUTURE_TEAM_EVENT_UNIT_EUR,
   FUTURE_EVENT_TEAM_SIZE,
   futureMaxEventTeams,
-  futureMaxSelectableEventTeams,
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
@@ -47,7 +47,6 @@ const { t } = useI18n()
 
 /** null | 'yes' | 'later' — wie Wizard Schritt Event */
 const registrationChoice = ref(null)
-const panelOpen = ref(false)
 const events = ref([])
 const eventsLoading = ref(false)
 
@@ -87,7 +86,11 @@ const maxTeamsByPupils = computed(() =>
   registeredPupils.value > 0 ? futureMaxEventTeams(registeredPupils.value) : 1,
 )
 
-const maxTeamsSelectable = computed(() => futureMaxSelectableEventTeams())
+/** Join enrollment stops at 24 participants, so a group can hold at most 3 event teams. */
+const maxTeamsSelectable = computed(() => futureMaxEventTeams(Math.max(...FUTURE_PUPIL_OPTIONS)))
+
+const addModalOpen = ref(false)
+const addModalEl = ref(null)
 
 /** Only actual event teams count as registered (not a leftover meta eventTeamCount). */
 const hasEventRegistration = computed(() => enrolledTeams.value.length > 0)
@@ -99,12 +102,6 @@ function firstEnrolledTeamEvent() {
   }
   return null
 }
-
-const currentEventLabel = computed(() => {
-  const ev = firstEnrolledTeamEvent()
-  if (!ev) return ''
-  return ev.label || ev.ref || (ev.id != null ? `Event ${ev.id}` : '')
-})
 
 /** All event teams of a group share one event, so one schedule link covers the list. */
 const enrolledEvent = computed(() => firstEnrolledTeamEvent())
@@ -205,12 +202,7 @@ const willAutoIncreasePupils = computed(
   () => pupilsRequiredAfterSubmit.value > registeredPupils.value,
 )
 
-const estimatedSubmitCostEur = computed(() => {
-  const count = isInitialRegistration.value
-    ? selectedTeamCount.value
-    : selectedTeamCount.value
-  return (Number(count) || 0) * unitEur.value
-})
+const eventFeeEur = computed(() => (Number(selectedTeamCount.value) || 0) * unitEur.value)
 
 const allTeamEventsSelected = computed(() => {
   if (teamEvents.value.length === 0) return false
@@ -223,9 +215,13 @@ const allTeamEventsSelected = computed(() => {
 })
 
 const showRegistrationForm = computed(
-  () => isInitialRegistration.value
-    ? registrationChoice.value === 'yes'
-    : panelOpen.value,
+  () => isInitialRegistration.value && registrationChoice.value === 'yes',
+)
+
+const addMoreDisabled = computed(() => locked.value || maxAdditionalTeams.value <= 0)
+
+const atEventTeamCapacity = computed(
+  () => hasEventRegistration.value && maxAdditionalTeams.value <= 0,
 )
 
 const canSubmit = computed(() => {
@@ -247,8 +243,10 @@ const submitBlockedHintKey = computed(() => {
   if (canSubmit.value || submitting.value) return ''
   if (props.minorLocked) return 'groupDetail.minorCoachEventHint'
   if (props.disabled) return 'detail.cancelledBanner'
-  if (!showRegistrationForm.value) return ''
+  const inForm = showRegistrationForm.value || addModalOpen.value
+  if (!inForm) return ''
   if (!isInitialRegistration.value && maxAdditionalTeams.value <= 0) return 'groupDetail.eventTeamsAtCapacity'
+  if (addModalOpen.value && !allTeamEventsSelected.value) return 'groupDetail.eventTeamsAddMoreNeedsFields'
   if (!allTeamEventsSelected.value) return 'groupDetail.submitNeedsTeamAndEvent'
   if (needsInvoiceAddress.value && !invoiceAddressValid.value) return 'groupDetail.submitNeedsInvoiceAddress'
   return ''
@@ -313,21 +311,45 @@ function selectTeamCount(count) {
   }
 }
 
+function enrolledEventId() {
+  const ev = firstEnrolledTeamEvent()
+  const id = ev?.id != null ? Number(ev.id) : NaN
+  return Number.isFinite(id) && id > 0 ? id : null
+}
+
 function syncTeamEventsArray() {
   const count = Math.max(1, Number(selectedTeamCount.value) || 1)
-  const enrolledEventId = (() => {
-    const ev = firstEnrolledTeamEvent()
-    const id = ev?.id != null ? Number(ev.id) : NaN
-    return Number.isFinite(id) && id > 0 ? id : null
-  })()
+  const presetEventId = enrolledEventId()
   while (teamEvents.value.length < count) {
     teamEvents.value.push({
-      eventId: !isInitialRegistration.value && enrolledEventId != null ? enrolledEventId : null,
+      eventId: !isInitialRegistration.value && presetEventId != null ? presetEventId : null,
       name: '',
     })
   }
   teamEvents.value = teamEvents.value.slice(0, count)
 }
+
+function openAddModal() {
+  if (addMoreDisabled.value) return
+  selectedTeamCount.value = 1
+  teamAutoUpgrade.value = null
+  submitError.value = null
+  submitSuccess.value = false
+  teamEvents.value = [{ eventId: enrolledEventId(), name: '' }]
+  addModalOpen.value = true
+  if (events.value.length === 0) loadEvents()
+  if (needsInvoiceAddress.value) void loadInvoiceAddresses()
+}
+
+function closeAddModal() {
+  if (submitting.value) return
+  addModalOpen.value = false
+}
+
+useModalDismiss(addModalOpen, {
+  dialogRef: addModalEl,
+  onClose: closeAddModal,
+})
 
 function selectTeamEvent(teamIndex, eventId) {
   const idx = Number(teamIndex)
@@ -343,15 +365,12 @@ function chooseRegistration(mode) {
   if (locked.value) return
   registrationChoice.value = mode
   if (mode === 'yes') {
-    panelOpen.value = true
     if (events.value.length === 0) loadEvents()
     if (needsInvoiceAddress.value) void loadInvoiceAddresses()
     if (!Number.isFinite(Number(selectedTeamCount.value)) || selectedTeamCount.value < 1) {
       selectedTeamCount.value = 1
     }
     syncTeamEventsArray()
-  } else {
-    panelOpen.value = false
   }
 }
 
@@ -376,6 +395,14 @@ function buildEventTeamsPayload() {
     .filter(Boolean)
   if (isInitialRegistration.value) return rows
   return rows.slice(-Math.max(1, Number(selectedTeamCount.value) || 1))
+}
+
+function resetRegistrationDraft() {
+  selectedTeamCount.value = 1
+  teamAutoUpgrade.value = null
+  registrationChoice.value = null
+  invoiceAddress.value = { ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false }
+  syncTeamEventsArray()
 }
 
 async function submit() {
@@ -421,22 +448,20 @@ async function submit() {
       submitSuccess.value = false
     } else if (card?.eventRegistrationSkipped === 'already_registered') {
       // 200 without new teams — surface that teams already exist (stale UI / retry).
+      addModalOpen.value = false
       submitSuccess.value = true
       setTimeout(() => {
         submitSuccess.value = false
       }, 4000)
+      resetRegistrationDraft()
     } else {
+      addModalOpen.value = false
       submitSuccess.value = true
       setTimeout(() => {
         submitSuccess.value = false
       }, 4000)
+      resetRegistrationDraft()
     }
-    selectedTeamCount.value = 1
-    teamAutoUpgrade.value = null
-    registrationChoice.value = null
-    panelOpen.value = false
-    invoiceAddress.value = { ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false }
-    syncTeamEventsArray()
   } catch (e) {
     const errData = e.response?.data
     const msg =
@@ -460,32 +485,21 @@ async function submit() {
   }
 }
 
-function togglePanel() {
-  if (locked.value) return
-  panelOpen.value = !panelOpen.value
-  if (panelOpen.value && events.value.length === 0) {
-    loadEvents()
-  }
-  if (panelOpen.value && needsInvoiceAddress.value) {
-    void loadInvoiceAddresses()
-  }
-}
-
 watch(
   () => props.group?.id,
   () => {
     selectedTeamCount.value = 1
     teamAutoUpgrade.value = null
     registrationChoice.value = null
-    panelOpen.value = enrolledTeams.value.length > 0
+    addModalOpen.value = false
+    submitError.value = null
+    submitSuccess.value = false
     invoiceAddress.value = { ...emptyAddressState(ADDRESS_MODE_INVOICE), useExisting: false }
     invoiceAddresses.value = []
     addressesLoadAttempted.value = false
+    events.value = []
     syncTeamEventsArray()
-    if (panelOpen.value) {
-      loadEvents()
-      if (needsInvoiceAddress.value) void loadInvoiceAddresses()
-    }
+    if (isInitialRegistration.value) loadEvents()
   },
 )
 
@@ -502,14 +516,7 @@ watch(
 
 onMounted(() => {
   syncTeamEventsArray()
-  if (isInitialRegistration.value) {
-    loadEvents()
-  } else {
-    // Nachmeldung: Panel offen, damit der Flow sofort bedienbar ist.
-    panelOpen.value = true
-    loadEvents()
-    if (needsInvoiceAddress.value) void loadInvoiceAddresses()
-  }
+  if (isInitialRegistration.value) loadEvents()
 })
 </script>
 
@@ -537,14 +544,45 @@ onMounted(() => {
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
     <EventScheduleLink v-if="enrolledTeams.length" :event="enrolledEvent" />
+    <div v-if="hasEventRegistration" class="future-event-add-more">
+      <p v-if="minorLocked" class="future-event-hint future-event-hint-warn">
+        <i class="bi bi-info-circle" aria-hidden="true" />
+        <I18nText k="groupDetail.minorCoachEventHint" />
+      </p>
+      <button
+        type="button"
+        class="future-event-add-btn"
+        :disabled="addMoreDisabled"
+        :aria-describedby="atEventTeamCapacity ? 'future-event-capacity-hint' : undefined"
+        @click="openAddModal"
+      >
+        <i class="bi bi-plus-circle" aria-hidden="true" />
+        <span><I18nText k="groupDetail.eventTeamsPanelAddMore" /></span>
+      </button>
+      <p
+        v-if="atEventTeamCapacity"
+        id="future-event-capacity-hint"
+        class="future-event-hint future-event-hint-warn future-event-add-capacity"
+      >
+        <i class="bi bi-info-circle" aria-hidden="true" />
+        <I18nText k="groupDetail.eventTeamsAtCapacity" :values="{ count: enrolledTeams.length }" />
+      </p>
+      <p v-if="submitSuccess" class="detail-message detail-message-success">
+        <i class="bi bi-check-circle-fill" aria-hidden="true" />
+        <I18nText k="groupDetail.registerEventSuccess" />
+      </p>
+    </div>
 
-    <div class="future-event-registration" :class="{ 'future-event-registration--readonly': locked }">
+    <div
+      v-if="isInitialRegistration"
+      class="future-event-registration"
+      :class="{ 'future-event-registration--readonly': locked }"
+    >
     <p v-if="minorLocked" class="future-event-hint future-event-hint-warn">
       <i class="bi bi-info-circle" aria-hidden="true" />
       <I18nText k="groupDetail.minorCoachEventHint" />
     </p>
-    <template v-if="isInitialRegistration">
-      <p class="onsite-event-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
+    <p class="onsite-event-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
       <p class="future-event-hint onsite-event-hint"><I18nText k="wizard.onSiteEventHint" /></p>
       <div class="onsite-event-options">
         <button
@@ -569,19 +607,6 @@ onMounted(() => {
           <span class="onsite-event-option-desc"><I18nText k="wizard.onSiteEventSkipDesc" /></span>
         </button>
       </div>
-    </template>
-
-    <button
-      v-else
-      type="button"
-      class="future-event-panel-toggle"
-      :aria-expanded="panelOpen"
-      :disabled="locked"
-      @click="togglePanel"
-    >
-      <i class="bi" :class="panelOpen ? 'bi-chevron-up' : 'bi-chevron-down'" aria-hidden="true" />
-      <span><I18nText k="groupDetail.eventTeamsPanelAddMore" /></span>
-    </button>
 
     <div v-show="showRegistrationForm" class="future-event-panel-body">
       <p class="future-event-hint wizard-event-team-hint">
@@ -591,18 +616,9 @@ onMounted(() => {
         />
       </p>
 
-      <template v-if="!isInitialRegistration && maxAdditionalTeams <= 0">
-        <p class="future-event-hint future-event-hint-warn">
-          <I18nText k="groupDetail.eventTeamsAtCapacity" />
-        </p>
-      </template>
-
-      <template v-else>
-        <p class="future-event-label">
-          <I18nText
-            :k="isInitialRegistration ? 'wizard.onSiteEventTeamCountLabel' : 'groupDetail.eventTeamsAdditionalLabel'"
-          />
-        </p>
+      <p class="future-event-label">
+        <I18nText k="wizard.onSiteEventTeamCountLabel" />
+      </p>
         <div class="future-event-team-count-row" role="group">
           <button
             v-for="count in teamOptionCounts"
@@ -635,14 +651,7 @@ onMounted(() => {
           <I18nText k="wizard.onSiteEventTeamsExpandHint" />
         </p>
 
-        <p v-if="!isInitialRegistration && hasEventRegistration" class="future-event-hint">
-          <I18nText
-            k="groupDetail.eventTeamsTotalAfterAdd"
-            :values="{ total: totalTeamsAfterSubmit, event: currentEventLabel }"
-          />
-        </p>
-
-        <div v-if="teamAutoUpgrade" class="future-event-upgrade">
+      <div v-if="teamAutoUpgrade" class="future-event-upgrade">
           <p>
             <I18nText
               k="wizard.eventTeamAutoUpgraded"
@@ -716,21 +725,22 @@ onMounted(() => {
         </div>
 
         <p class="future-event-hint">
-          <I18nText k="groupDetail.eventCostHint" :values="{ cost: estimatedSubmitCostEur }" />
+          <I18nText
+            k="groupDetail.eventCostHint"
+            :values="{ cost: eventFeeEur, unit: unitEur }"
+          />
         </p>
 
         <button type="button" class="detail-btn detail-btn-primary" :disabled="!canSubmit" @click="submit">
           <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true" />
           <i v-else class="bi bi-plus-circle" aria-hidden="true" />
           <I18nText v-if="submitting" k="groupDetail.registering" />
-          <I18nText v-else-if="isInitialRegistration" k="groupDetail.registerForEventButton" />
-          <I18nText v-else k="groupDetail.eventTeamsAddMoreSubmit" />
+          <I18nText v-else k="groupDetail.registerForEventButton" />
         </button>
         <p v-if="submitBlockedHintKey" class="future-event-hint future-event-submit-hint">
           <i class="bi bi-info-circle" aria-hidden="true" />
-          <I18nText :k="submitBlockedHintKey" />
+          <I18nText :k="submitBlockedHintKey" :values="{ count: enrolledTeams.length }" />
         </p>
-      </template>
 
       <p v-if="submitError" class="detail-message detail-message-error">
         <i class="bi bi-exclamation-circle" aria-hidden="true" />
@@ -742,6 +752,113 @@ onMounted(() => {
       </p>
     </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="addModalOpen"
+        class="future-add-modal-backdrop"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('groupDetail.eventTeamsAddMoreModalTitle')"
+        @click.self="closeAddModal"
+      >
+        <div ref="addModalEl" class="future-add-modal-dialog" tabindex="-1" @click.stop>
+          <header class="future-add-modal-head">
+            <h2 class="future-add-modal-title">
+              <I18nText k="groupDetail.eventTeamsAddMoreModalTitle" />
+            </h2>
+            <button
+              type="button"
+              class="future-add-modal-close"
+              :aria-label="t('common.cancel')"
+              @click="closeAddModal"
+            >
+              <i class="bi bi-x-lg" aria-hidden="true" />
+            </button>
+          </header>
+          <div class="future-add-modal-body">
+            <label class="future-add-modal-label future-add-modal-label--name">
+              <span><I18nText k="wizard.futureEventTeamNameLabel" /></span>
+              <input
+                v-if="teamEvents[0]"
+                v-model="teamEvents[0].name"
+                type="text"
+                class="future-add-modal-input"
+                :placeholder="t('wizard.futureEventTeamNamePlaceholder')"
+                autocomplete="off"
+              >
+            </label>
+            <div class="future-add-modal-label">
+              <span><I18nText k="groupDetail.eventTeamsAddMoreLocationLabel" /></span>
+              <EventSelectDropdown
+                :events="events"
+                :loading="eventsLoading"
+                :model-value="teamEvents[0]?.eventId"
+                :placeholder="t('groupDetail.eventTeamsAddMoreLocationPlaceholder')"
+                :event-label-fn="(ev) => formatEventOptionLabel(ev, t)"
+                @update:model-value="selectTeamEvent(0, $event)"
+              />
+            </div>
+            <p v-if="willAutoIncreasePupils" class="future-add-modal-note">
+              <i class="bi bi-info-circle" aria-hidden="true" />
+              <I18nText
+                k="groupDetail.eventTeamsAddMorePupilsNote"
+                :values="{ pupils: pupilsRequiredAfterSubmit }"
+              />
+            </p>
+            <div v-if="needsInvoiceAddress" class="future-event-invoice">
+              <p class="future-event-hint future-event-invoice-hint">
+                <i class="bi bi-receipt" aria-hidden="true" />
+                <I18nText k="groupDetail.invoiceAddressRequiredHint" />
+              </p>
+              <p v-if="addressesLoading && !addressesLoadAttempted" class="future-event-hint">
+                <i class="bi bi-arrow-repeat spin" aria-hidden="true" />
+                <I18nText k="dashboard.loading" />
+              </p>
+              <AddressSelector
+                v-model="invoiceAddress"
+                mode="invoice"
+                :addresses="invoiceAddresses"
+                :label="t('enroll.invoiceAddress')"
+                id-prefix="future-event-add-invoice"
+                :disabled="locked"
+              />
+            </div>
+            <p class="future-add-modal-fee">
+              <I18nText k="groupDetail.eventTeamsAddMoreFee" :values="{ cost: eventFeeEur }" />
+            </p>
+            <p v-if="submitBlockedHintKey" class="future-event-hint future-event-submit-hint">
+              <i class="bi bi-info-circle" aria-hidden="true" />
+              <I18nText :k="submitBlockedHintKey" :values="{ count: enrolledTeams.length }" />
+            </p>
+            <p v-if="submitError" class="detail-message detail-message-error">
+              <i class="bi bi-exclamation-circle" aria-hidden="true" />
+              {{ submitError }}
+            </p>
+          </div>
+          <footer class="future-add-modal-foot">
+            <button
+              type="button"
+              class="future-add-modal-btn future-add-modal-btn-ghost"
+              :disabled="submitting"
+              @click="closeAddModal"
+            >
+              <I18nText k="common.cancel" />
+            </button>
+            <button
+              type="button"
+              class="future-add-modal-btn future-add-modal-btn-primary"
+              :disabled="!canSubmit"
+              @click="submit"
+            >
+              <i v-if="submitting" class="bi bi-arrow-repeat spin" aria-hidden="true" />
+              <I18nText v-if="submitting" k="groupDetail.registering" />
+              <I18nText v-else k="groupDetail.eventTeamsAddMoreSubmit" />
+            </button>
+          </footer>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -851,10 +968,52 @@ onMounted(() => {
   margin-top: 0.15rem;
   flex-shrink: 0;
 }
-.future-event-panel-toggle:disabled,
 .onsite-event-option:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+.future-event-add-more {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.85rem;
+}
+.future-event-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.future-event-add-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg));
+}
+.future-event-add-btn:disabled {
+  opacity: 0.5;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-bg-muted);
+}
+.future-event-add-capacity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  max-width: 36rem;
+}
+.future-event-add-capacity .bi {
+  margin-top: 0.12rem;
+  flex-shrink: 0;
 }
 .future-event-team-list {
   list-style: none;
@@ -942,26 +1101,6 @@ onMounted(() => {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.82rem;
-}
-.future-event-panel-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  width: 100%;
-  padding: 0.55rem 0.75rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-bg-muted);
-  color: var(--color-text);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-.future-event-panel-toggle:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
 }
 .future-event-panel-body {
   padding: 0.25rem 0 0.5rem;
@@ -1144,5 +1283,161 @@ onMounted(() => {
 }
 .detail-message-success {
   color: #16a34a;
+}
+.future-add-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10040;
+  background: var(--liquid-modal-scrim-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+.future-add-modal-dialog {
+  width: 100%;
+  max-width: 32rem;
+  max-height: min(92vh, 760px);
+  overflow: auto;
+  background: var(--liquid-popover-fill);
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(var(--liquid-popover-saturate));
+  color: var(--color-text);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--liquid-border);
+  box-shadow: var(--shadow-lg);
+}
+.future-add-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.future-add-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.future-add-modal-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius);
+  line-height: 1;
+}
+.future-add-modal-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.future-add-modal-body {
+  padding: 1rem;
+}
+.future-add-modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.future-add-modal-label--name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.future-add-modal-input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.875rem 1.125rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-family: inherit;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.future-add-modal-input::placeholder {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.future-add-modal-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+.future-add-modal-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-muted));
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.45;
+}
+.future-add-modal-note .bi {
+  margin-top: 0.12rem;
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+.future-add-modal-fee {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+.future-add-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--color-border);
+}
+.future-add-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+}
+.future-add-modal-btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+.future-add-modal-btn-ghost:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.future-add-modal-btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+.future-add-modal-btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
+}
+.future-add-modal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>
