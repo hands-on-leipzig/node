@@ -1,4 +1,21 @@
 import { isDolibarrRowId } from '@/services/draht'
+import {
+  DELIVERY_NAME_MAX_LENGTH,
+  addressBookShipToName,
+  deliveryNameFromForm,
+  deliveryNameLength,
+  invoiceNameForDelivery,
+  isDeliveryNameTooLong,
+} from '@/utils/deliveryName'
+
+export {
+  DELIVERY_NAME_MAX_LENGTH,
+  addressBookShipToName,
+  deliveryNameFromForm,
+  deliveryNameLength,
+  invoiceNameForDelivery,
+  isDeliveryNameTooLong,
+}
 
 /** @typedef {'invoice' | 'delivery'} AddressFormMode */
 
@@ -163,7 +180,8 @@ export function isAddressNewValid(n, mode) {
     return true
   }
   if (mode === ADDRESS_MODE_DELIVERY) {
-    return !!String(n.name || '').trim()
+    const name = String(n.name || '').trim()
+    return !!name && !isDeliveryNameTooLong(name)
   }
   return true
 }
