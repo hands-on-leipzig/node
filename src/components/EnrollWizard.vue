@@ -23,6 +23,10 @@ import {
   buildNewAddressPayload,
   ADDRESS_MODE_INVOICE,
   ADDRESS_MODE_DELIVERY,
+  DELIVERY_NAME_MAX_LENGTH,
+  deliveryNameFromForm,
+  invoiceNameForDelivery,
+  isDeliveryNameTooLong,
   syncExistingAddressSelection,
 } from '@/utils/addressForm'
 import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuote'
@@ -1754,13 +1758,32 @@ function buildDeliveryPayload() {
   return buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
 }
 
+function isExplicitDeliveryValid() {
+  if (!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)) return false
+  return !isDeliveryNameTooLong(deliveryNameFromForm(deliveryAddress.value, deliveryAddresses.value))
+}
+
+/** Invoice name would be copied onto the DHL label when delivery stays the invoice address. */
+const invoiceNameBlocksDelivery = computed(() => {
+  if (voucherForcesInvoiceAddress.value || deliveryAddressDifferent.value) return false
+  if (!isInvoiceAddressValid()) return false
+  return isDeliveryNameTooLong(invoiceNameForDelivery(invoiceAddress.value, invoiceAddresses.value))
+})
+
+const explicitDeliveryNameTooLong = computed(() => {
+  if (!deliveryAddressDifferent.value && !voucherForcesInvoiceAddress.value) return false
+  return isDeliveryNameTooLong(deliveryNameFromForm(deliveryAddress.value, deliveryAddresses.value))
+})
+
 /** Delivery address is valid when an existing one is selected or new address has at least street/city/country. */
 function isDeliveryAddressValid() {
   if (voucherForcesInvoiceAddress.value) {
-    return !!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
+    return isExplicitDeliveryValid()
   }
-  if (!deliveryAddressDifferent.value) return isInvoiceAddressValid()
-  return !!buildAddressPayload(deliveryAddress.value, ADDRESS_MODE_DELIVERY)
+  if (!deliveryAddressDifferent.value) {
+    return isInvoiceAddressValid() && !invoiceNameBlocksDelivery.value
+  }
+  return isExplicitDeliveryValid()
 }
 
 function syncDeliveryRequiredForVoucherInvoice() {
@@ -2147,6 +2170,14 @@ async function submit() {
   }
   if (voucher.value?.trim() && voucherValid.value === false) {
     error.value = t('enroll.voucherInvalid')
+    return
+  }
+  if (invoiceNameBlocksDelivery.value) {
+    error.value = t('wizard.deliverySameAsInvoiceNameTooLong', { max: DELIVERY_NAME_MAX_LENGTH })
+    return
+  }
+  if (explicitDeliveryNameTooLong.value) {
+    error.value = t('enroll.deliveryNameTooLong', { max: DELIVERY_NAME_MAX_LENGTH })
     return
   }
   if (!areAddressesValid()) {
@@ -3107,7 +3138,11 @@ watch(deliveryAddressDifferent, (different) => {
 
           <!-- Step 7: Addresses only (Future) -->
           <div v-show="step === 7 && edition === 'future'" class="wizard-step wizard-step-form wizard-step-animate">
-            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
+            <p v-if="invoiceNameBlocksDelivery" class="wizard-hint wizard-hint-required" role="alert">
+              <i class="bi bi-exclamation-circle"></i>
+              <I18nText k="wizard.deliverySameAsInvoiceNameTooLong" :values="{ max: DELIVERY_NAME_MAX_LENGTH }" />
+            </p>
+            <p v-else-if="!areAddressesValid() && !explicitDeliveryNameTooLong" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
               <template v-if="voucherForcesInvoiceAddress">
                 <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>
@@ -3243,7 +3278,11 @@ watch(deliveryAddressDifferent, (different) => {
             v-show="edition === 'founders' && step === foundersAddressesStep"
             class="wizard-step wizard-step-form wizard-step-animate"
           >
-            <p v-if="!areAddressesValid()" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
+            <p v-if="invoiceNameBlocksDelivery" class="wizard-hint wizard-hint-required" role="alert">
+              <i class="bi bi-exclamation-circle"></i>
+              <I18nText k="wizard.deliverySameAsInvoiceNameTooLong" :values="{ max: DELIVERY_NAME_MAX_LENGTH }" />
+            </p>
+            <p v-else-if="!areAddressesValid() && !explicitDeliveryNameTooLong" class="wizard-hint wizard-hint-required"><i class="bi bi-info-circle"></i> <I18nText k="wizard.addressesRequiredHint" /></p>
             <div class="wizard-address-section">
               <template v-if="voucherForcesInvoiceAddress">
                 <h4 class="wizard-address-title"><I18nText k="enroll.invoiceAddress" /></h4>

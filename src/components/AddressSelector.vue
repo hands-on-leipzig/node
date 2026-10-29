@@ -8,12 +8,15 @@ import { addressAutocomplete, addressFieldName } from '@/utils/addressAutofill'
 import {
   emptyAddressNewFields,
   ADDRESS_MODE_INVOICE,
+  DELIVERY_NAME_MAX_LENGTH,
+  addressBookShipToName,
   invoiceCountryAsksNetInvoice,
   invoiceCountryUsesRegisteredAsCompany,
   invoiceCountryUsesVatId,
   invoiceNeedsNetInvoiceAnswer,
   invoiceNeedsRegisteredAsCompany,
   invoiceNeedsVatId,
+  isDeliveryNameTooLong,
   syncExistingAddressSelection,
   splitStreetAndHouseNumber,
 } from '@/utils/addressForm'
@@ -101,6 +104,21 @@ const addressOptions = computed(() =>
 const isExistingMode = computed(() => props.modelValue.useExisting !== false)
 const isInvoiceMode = computed(() => props.mode === 'invoice')
 const isDeliveryMode = computed(() => props.mode === 'delivery')
+const deliveryNameMax = DELIVERY_NAME_MAX_LENGTH
+
+const selectedDeliveryEntry = computed(() => {
+  if (!isDeliveryMode.value || !isExistingMode.value) return null
+  const id = String(props.modelValue.addressId ?? '').trim()
+  if (!id) return null
+  return props.addresses.find((entry) => String(entry?.id ?? '') === id) || null
+})
+
+const deliveryNameTooLong = computed(
+  () => isDeliveryMode.value && !isExistingMode.value && isDeliveryNameTooLong(props.modelValue.new?.name),
+)
+const selectedDeliveryNameTooLong = computed(
+  () => !!selectedDeliveryEntry.value && isDeliveryNameTooLong(addressBookShipToName(selectedDeliveryEntry.value)),
+)
 
 const invoiceNewFields = computed(() => props.modelValue.new || {})
 const showNetInvoiceField = computed(
@@ -493,6 +511,9 @@ onBeforeUnmount(() => {
           :placeholder="t('enroll.selectAddress')"
           @update:model-value="setAddressId"
         />
+        <p v-if="selectedDeliveryNameTooLong" class="address-field-error" role="alert">
+          <I18nText k="enroll.deliverySavedNameTooLong" :values="{ max: deliveryNameMax }" />
+        </p>
       </template>
       <div v-else class="address-empty-state">
         <i class="bi bi-info-circle" />
@@ -541,10 +562,18 @@ onBeforeUnmount(() => {
               :name="fn('name')"
               type="text"
               required
+              :maxlength="deliveryNameMax"
               :autocomplete="ac('name')"
+              :aria-invalid="deliveryNameTooLong ? 'true' : undefined"
               :value="modelValue.new?.name"
               @input="setNewField('name', $event.target.value)"
             >
+            <p v-if="deliveryNameTooLong" class="address-field-error" role="alert">
+              <I18nText k="enroll.deliveryNameTooLong" :values="{ max: deliveryNameMax }" />
+            </p>
+            <p v-else class="address-field-hint">
+              <I18nText k="enroll.deliveryNameMaxHint" :values="{ max: deliveryNameMax }" />
+            </p>
           </div>
         </template>
         <div class="field field-select">
@@ -948,6 +977,18 @@ onBeforeUnmount(() => {
 }
 .address-fields .field:last-child {
   margin-bottom: 0;
+}
+.address-field-hint,
+.address-field-error {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.address-field-hint {
+  color: var(--color-text-muted);
+}
+.address-field-error {
+  color: #dc2626;
 }
 .address-fields label {
   display: block;

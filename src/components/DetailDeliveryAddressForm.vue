@@ -13,7 +13,9 @@ import {
 } from '@/services/draht'
 import {
   ADDRESS_MODE_DELIVERY,
+  deliveryNameFromForm,
   emptyAddressState,
+  isDeliveryNameTooLong,
   syncExistingAddressSelection,
   buildNewAddressPayload,
 } from '@/utils/addressForm'
@@ -44,6 +46,7 @@ const error = ref('')
 
 const canSave = computed(() => {
   const addr = deliveryAddress.value
+  if (isDeliveryNameTooLong(deliveryNameFromForm(addr, deliveryAddresses.value))) return false
   if (addr?.useExisting !== false && isDolibarrRowId(addr?.addressId)) return true
   return !!buildNewAddressPayload(addr, ADDRESS_MODE_DELIVERY)
 })
