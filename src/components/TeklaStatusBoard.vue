@@ -33,6 +33,8 @@ const props = defineProps({
   versandaufschub: { type: [Number, null], default: undefined },
   /** Deregistered ("abgemeldet"): hide interactive shipment controls, keep info read-only. */
   readOnly: { type: Boolean, default: false },
+  /** Short lines under the "team data incomplete" point: what is still missing. */
+  teamDataNotes: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['versandaufschub-save', 'shipment-date-save'])
@@ -279,13 +281,21 @@ function submitShipmentDate() {
   emit('versandaufschub-save', val)
 }
 
-const lanes = computed(() =>
-  buildStatusLanes({
+const lanes = computed(() => {
+  const built = buildStatusLanes({
     steps: props.steps,
     alert: props.alert,
     schedule: schedule.value,
-  }),
-)
+  })
+  const notes = (Array.isArray(props.teamDataNotes) ? props.teamDataNotes : []).filter(Boolean)
+  if (!notes.length) return built
+  return built.map((lane) => ({
+    ...lane,
+    factors: lane.factors.map((factor) =>
+      factor.id === 'teamdata' ? { ...factor, hints: notes } : factor,
+    ),
+  }))
+})
 
 function laneNodeIcon(lane) {
   if (lane.status === 'closed') return 'bi-check-lg'
@@ -417,7 +427,10 @@ function onFactorAction(factor) {
                       />
                     </button>
                   </div>
-                  <p v-if="factor.hintKey" class="tekla-point-hint"><I18nText :k="factor.hintKey" /></p>
+                  <ul v-if="factor.hints && factor.hints.length" class="tekla-point-hints">
+                    <li v-for="(line, hintIdx) in factor.hints" :key="hintIdx">{{ line }}</li>
+                  </ul>
+                  <p v-else-if="factor.hintKey" class="tekla-point-hint"><I18nText :k="factor.hintKey" /></p>
                   <div
                     v-if="datePickerOpen(factor) && !shipmentLocked && shipmentSelectionDirty"
                     class="tekla-shipment-form-actions"
@@ -788,6 +801,18 @@ function onFactorAction(factor) {
   font-size: var(--text-xs);
   line-height: 1.4;
   color: var(--color-text-muted);
+}
+
+.tekla-point-hints {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.tekla-point-hints li + li {
+  margin-top: 0.15rem;
 }
 
 .tekla-point-action {

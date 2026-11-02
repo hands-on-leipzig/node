@@ -22,6 +22,7 @@ import {
   normalizePlayerAgeRule,
   playerAgeOutOfRange,
 } from '@/utils/playerAge'
+import { describeTeamDataGaps, playerFieldGaps } from '@/utils/teamDataGaps'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,7 +113,7 @@ const editingPlayerAgeError = computed(() =>
 const newPlayerAgeError = computed(() => playerAgeError(newPlayer.value.birthdayStr))
 
 const genderOptions = computed(() => [
-  { value: '', label: t('detail.gender') },
+  { value: '', label: t('detail.chooseOption') },
   { value: 'M', label: t('detail.genderM') },
   { value: 'F', label: t('detail.genderF') },
   { value: 'D', label: t('detail.genderD') },
@@ -167,6 +168,53 @@ function playerMeta(p) {
   }
   return parts.length ? parts.join(' · ') : ''
 }
+
+const FIELD_LABEL_KEY = {
+  firstname: 'detail.firstname',
+  lastname: 'detail.lastname',
+  gender: 'detail.gender',
+  birthday: 'detail.dateOfBirth',
+}
+
+function joinFieldLabels(labels) {
+  if (labels.length <= 1) return labels[0] || ''
+  if (labels.length === 2) {
+    return locale.value === 'de' ? `${labels[0]} und ${labels[1]}` : `${labels[0]} and ${labels[1]}`
+  }
+  const head = labels.slice(0, -1).join(', ')
+  const last = labels[labels.length - 1]
+  return locale.value === 'de' ? `${head} und ${last}` : `${head}, and ${last}`
+}
+
+function labelsForFields(fields) {
+  return fields.map((field) => t(FIELD_LABEL_KEY[field]))
+}
+
+function playerMissingText(p) {
+  const fields = playerFieldGaps(p)
+  if (!fields.length) return ''
+  const joined = joinFieldLabels(labelsForFields(fields))
+  return fields.length === 1
+    ? t('detail.playerFieldMissing', { field: joined })
+    : t('detail.playerFieldsMissing', { fields: joined })
+}
+
+const teamDataNotes = computed(() => {
+  const gaps = describeTeamDataGaps(team.value?.label, displayedPlayers.value)
+  const lines = []
+  if (gaps.placeholderName) lines.push(t('detail.teamDataNamePlaceholder'))
+  if (gaps.tooFew) lines.push(t('detail.teamDataTooFew'))
+  for (const player of gaps.players) {
+    const joined = joinFieldLabels(labelsForFields(player.fields))
+    const name = player.name || t('detail.teamMemberN', { n: player.index + 1 })
+    lines.push(
+      player.fields.length === 1
+        ? t('detail.teamDataPlayerMissing', { name, field: joined })
+        : t('detail.teamDataPlayersMissing', { name, fields: joined }),
+    )
+  }
+  return lines
+})
 
 function startEditPlayer(idx) {
   const list = displayedPlayers.value
@@ -403,6 +451,7 @@ watch(
         :shipment-schedule="shipmentScheduleProp"
         :versandaufschub="showShipmentSchedule ? (team.versandaufschub ?? null) : undefined"
         :read-only="cancelled"
+        :team-data-notes="teamDataNotes"
         class="detail-timeline-first"
         @versandaufschub-save="saveVersandaufschub"
       />
@@ -492,35 +541,60 @@ watch(
           </label>
           <p v-if="playerAgeHint && !cancelled" class="detail-hint">{{ playerAgeHint }}</p>
           <ul v-if="(team.players && team.players.length) || editingPlayers.length" class="detail-players-list">
-            <li v-for="(p, idx) in displayedPlayers" :key="'p-' + idx" class="detail-player-row">
+            <li
+              v-for="(p, idx) in displayedPlayers"
+              :key="'p-' + idx"
+              class="detail-player-row"
+              :class="{ 'detail-player-row--gap': editingPlayerIndex !== idx && playerMissingText(p) }"
+            >
               <template v-if="editingPlayerIndex === idx">
-                <input v-model="editingPlayer.firstname" class="detail-player-input" :placeholder="t('detail.firstname')" />
-                <input v-model="editingPlayer.name" class="detail-player-input" :placeholder="t('detail.lastname')" />
-                <CustomSelect
-                  v-model="editingPlayer.gender"
-                  size="sm"
-                  class="detail-player-select-wrap"
-                  :options="genderOptions"
-                  :placeholder="t('detail.gender')"
-                />
-                <input
-                  v-model="editingPlayer.birthdayStr"
-                  type="date"
-                  class="detail-player-input"
-                  :class="{ 'detail-player-input--invalid': editingPlayerAgeError }"
-                  :aria-invalid="!!editingPlayerAgeError"
-                />
-                <div class="detail-player-actions">
-                  <button type="button" class="detail-btn detail-btn-primary" :disabled="!!editingPlayerAgeError" @click="saveEditPlayer"><I18nText k="common.save" /></button>
-                  <button type="button" class="detail-btn" @click="cancelEditPlayer"><I18nText k="common.cancel" /></button>
+                <div class="detail-player-form">
+                  <div class="detail-player-field">
+                    <label class="detail-player-field-label" for="player-edit-firstname">{{ t('detail.firstname') }}</label>
+                    <input id="player-edit-firstname" v-model="editingPlayer.firstname" class="detail-player-input" autocomplete="off" />
+                  </div>
+                  <div class="detail-player-field">
+                    <label class="detail-player-field-label" for="player-edit-lastname">{{ t('detail.lastname') }}</label>
+                    <input id="player-edit-lastname" v-model="editingPlayer.name" class="detail-player-input" autocomplete="off" />
+                  </div>
+                  <div class="detail-player-field">
+                    <label class="detail-player-field-label" for="player-edit-gender">{{ t('detail.gender') }}</label>
+                    <CustomSelect
+                      id="player-edit-gender"
+                      v-model="editingPlayer.gender"
+                      size="sm"
+                      class="detail-player-select-wrap"
+                      :options="genderOptions"
+                      :placeholder="t('detail.chooseOption')"
+                    />
+                  </div>
+                  <div class="detail-player-field">
+                    <label class="detail-player-field-label" for="player-edit-birthday">{{ t('detail.dateOfBirth') }}</label>
+                    <input
+                      id="player-edit-birthday"
+                      v-model="editingPlayer.birthdayStr"
+                      type="date"
+                      class="detail-player-input"
+                      :class="{ 'detail-player-input--invalid': editingPlayerAgeError }"
+                      :aria-invalid="!!editingPlayerAgeError"
+                    />
+                  </div>
+                  <div class="detail-player-actions">
+                    <button type="button" class="detail-btn detail-btn-primary" :disabled="!!editingPlayerAgeError" @click="saveEditPlayer"><I18nText k="common.save" /></button>
+                    <button type="button" class="detail-btn" @click="cancelEditPlayer"><I18nText k="common.cancel" /></button>
+                  </div>
+                  <p v-if="editingPlayerAgeError" class="detail-message detail-message-error detail-player-error" role="alert">
+                    <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ editingPlayerAgeError }}
+                  </p>
                 </div>
-                <p v-if="editingPlayerAgeError" class="detail-message detail-message-error detail-player-error" role="alert">
-                  <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ editingPlayerAgeError }}
-                </p>
               </template>
               <template v-else>
                 <span class="detail-player-name">{{ playerDisplayName(p) }}</span>
-                <span class="detail-player-meta">{{ playerMeta(p) }}</span>
+                <span v-if="playerMeta(p)" class="detail-player-meta">{{ playerMeta(p) }}</span>
+                <span v-if="playerMissingText(p)" class="detail-player-missing">
+                  <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                  {{ playerMissingText(p) }}
+                </span>
                 <span v-if="playerAgeWarning(p)" class="detail-player-warning">
                   <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                   {{ playerAgeWarning(p) }}
@@ -538,29 +612,45 @@ watch(
               <I18nText k="detail.playersMaxReached" :values="{ max: teamMaxPlayers }" />
             </p>
             <button v-else-if="!isAddingPlayer" type="button" class="detail-btn detail-btn-primary" @click="startAddPlayer"><I18nText k="detail.addPlayer" /></button>
-            <template v-else>
-              <input v-model="newPlayer.firstname" class="detail-player-input" :placeholder="t('detail.firstname')" />
-              <input v-model="newPlayer.name" class="detail-player-input" :placeholder="t('detail.lastname')" />
-              <CustomSelect
-                v-model="newPlayer.gender"
-                size="sm"
-                class="detail-player-select-wrap"
-                :options="genderOptions"
-                :placeholder="t('detail.gender')"
-              />
-              <input
-                v-model="newPlayer.birthdayStr"
-                type="date"
-                class="detail-player-input"
-                :class="{ 'detail-player-input--invalid': newPlayerAgeError }"
-                :aria-invalid="!!newPlayerAgeError"
-              />
-              <button type="button" class="detail-btn detail-btn-primary" :disabled="!!newPlayerAgeError" @click="addPlayer"><I18nText k="detail.add" /></button>
-              <button type="button" class="detail-btn" @click="cancelAddPlayer"><I18nText k="common.cancel" /></button>
+            <div v-else class="detail-player-form">
+              <div class="detail-player-field">
+                <label class="detail-player-field-label" for="player-new-firstname">{{ t('detail.firstname') }}</label>
+                <input id="player-new-firstname" v-model="newPlayer.firstname" class="detail-player-input" autocomplete="off" />
+              </div>
+              <div class="detail-player-field">
+                <label class="detail-player-field-label" for="player-new-lastname">{{ t('detail.lastname') }}</label>
+                <input id="player-new-lastname" v-model="newPlayer.name" class="detail-player-input" autocomplete="off" />
+              </div>
+              <div class="detail-player-field">
+                <label class="detail-player-field-label" for="player-new-gender">{{ t('detail.gender') }}</label>
+                <CustomSelect
+                  id="player-new-gender"
+                  v-model="newPlayer.gender"
+                  size="sm"
+                  class="detail-player-select-wrap"
+                  :options="genderOptions"
+                  :placeholder="t('detail.chooseOption')"
+                />
+              </div>
+              <div class="detail-player-field">
+                <label class="detail-player-field-label" for="player-new-birthday">{{ t('detail.dateOfBirth') }}</label>
+                <input
+                  id="player-new-birthday"
+                  v-model="newPlayer.birthdayStr"
+                  type="date"
+                  class="detail-player-input"
+                  :class="{ 'detail-player-input--invalid': newPlayerAgeError }"
+                  :aria-invalid="!!newPlayerAgeError"
+                />
+              </div>
+              <div class="detail-player-actions">
+                <button type="button" class="detail-btn detail-btn-primary" :disabled="!!newPlayerAgeError" @click="addPlayer"><I18nText k="detail.add" /></button>
+                <button type="button" class="detail-btn" @click="cancelAddPlayer"><I18nText k="common.cancel" /></button>
+              </div>
               <p v-if="newPlayerAgeError" class="detail-message detail-message-error detail-player-error" role="alert">
                 <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ newPlayerAgeError }}
               </p>
-            </template>
+            </div>
           </div>
           <div v-if="savingPlayers" class="detail-saving-hint"><I18nText k="dashboard.loading" /></div>
           <p v-if="playersError" class="detail-message detail-message-error" role="alert">
@@ -740,6 +830,27 @@ watch(
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--color-border);
 }
+.detail-player-row--gap {
+  align-items: flex-start;
+}
+.detail-player-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+  width: 100%;
+}
+.detail-player-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 8rem;
+}
+.detail-player-field-label {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
 .detail-player-row:last-child {
   border-bottom: none;
 }
@@ -765,8 +876,13 @@ watch(
   flex-basis: 100%;
   margin: 0;
 }
-.detail-player-warning {
+.detail-player-warning,
+.detail-player-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: var(--text-sm);
+  font-weight: 600;
   color: var(--color-warning, #b45309);
 }
 .detail-player-select-wrap {
