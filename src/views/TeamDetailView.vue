@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, updateTeamPlayers, updateTeamVersandaufschub, updateTeamLabel } from '@/services/draht'
+import { getTeam, updateTeamPlayers, updateTeamPlayersComplete, updateTeamVersandaufschub, updateTeamLabel } from '@/services/draht'
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
@@ -37,6 +37,7 @@ const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: ''
 const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
+const savingComplete = ref(false)
 const playersError = ref('')
 const savingTeamName = ref(false)
 const teamNameError = ref('')
@@ -72,6 +73,14 @@ const teamAtMaxPlayers = computed(() => {
 })
 
 const playerAgeRule = computed(() => normalizePlayerAgeRule(team.value?.playerAgeRule))
+const teamDataLocked = computed(() => !!team.value?.teamDataLocked)
+const hasTeamDataConfirmation = computed(() => !!team.value && Object.prototype.hasOwnProperty.call(team.value, 'playersComplete'))
+const canEditPlayers = computed(() => !cancelled.value && !teamDataLocked.value)
+const teamDataDeadlineLabel = computed(() => {
+  const date = team.value?.teamDataDeadline
+  if (!date) return ''
+  return formatAgeReferenceDate({ referenceDate: date }, locale.value)
+})
 
 const playerAgeHint = computed(() => {
   const rule = playerAgeRule.value
@@ -257,6 +266,25 @@ function buildPlayersPayload(list) {
     gender: p.gender || '',
     birthday: birthdayToDateStr(p.birthday) || null,
   }))
+}
+
+async function onCompleteChange(event) {
+  if (!id.value) return
+  const complete = !!event.target.checked
+  savingComplete.value = true
+  playersError.value = ''
+  try {
+    const res = await updateTeamPlayersComplete(id.value, { complete })
+    team.value = res.data
+  } catch (e) {
+    event.target.checked = !!team.value?.playersComplete
+    const code = e.response?.data?.code || e.response?.data?.error?.code
+    playersError.value = code === 'team_data_locked'
+      ? t('detail.teamDataLocked')
+      : (e.response?.data?.error?.message || e.response?.data?.message || e.message || t('errors.loadFailed'))
+  } finally {
+    savingComplete.value = false
+  }
 }
 
 async function persistPlayers() {
@@ -449,6 +477,19 @@ watch(
       <section class="detail-section detail-section-wide">
         <h3 class="detail-section-title"><I18nText k="detail.players" /></h3>
         <div class="detail-players-block">
+          <p v-if="teamDataDeadlineLabel && !cancelled" class="detail-hint">
+            {{ t('detail.teamDataDeadline', { date: teamDataDeadlineLabel }) }}
+          </p>
+          <p v-if="teamDataLocked && !cancelled" class="detail-hint">{{ t('detail.teamDataLocked') }}</p>
+          <label v-if="!cancelled && hasTeamDataConfirmation" class="detail-complete">
+            <input
+              type="checkbox"
+              :checked="!!team.playersComplete"
+              :disabled="teamDataLocked || savingComplete"
+              @change="onCompleteChange"
+            >
+            {{ t('detail.teamDataComplete') }}
+          </label>
           <p v-if="playerAgeHint && !cancelled" class="detail-hint">{{ playerAgeHint }}</p>
           <ul v-if="(team.players && team.players.length) || editingPlayers.length" class="detail-players-list">
             <li v-for="(p, idx) in displayedPlayers" :key="'p-' + idx" class="detail-player-row">
@@ -484,7 +525,7 @@ watch(
                   <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                   {{ playerAgeWarning(p) }}
                 </span>
-                <div v-if="!cancelled" class="detail-player-actions">
+                <div v-if="canEditPlayers" class="detail-player-actions">
                   <button type="button" class="detail-btn detail-btn-ghost" @click="startEditPlayer(idx)" :aria-label="t('detail.edit')"><i class="bi bi-pencil"></i></button>
                   <button type="button" class="detail-btn detail-btn-ghost" @click="removePlayer(idx)" :aria-label="t('detail.remove')"><i class="bi bi-trash"></i></button>
                 </div>
@@ -492,7 +533,7 @@ watch(
             </li>
           </ul>
           <p v-else class="detail-empty-hint"><I18nText k="detail.noData" /></p>
-          <div v-if="!cancelled" class="detail-players-toolbar">
+          <div v-if="canEditPlayers" class="detail-players-toolbar">
             <p v-if="teamMaxPlayers != null && teamAtMaxPlayers && !isAddingPlayer" class="detail-empty-hint">
               <I18nText k="detail.playersMaxReached" :values="{ max: teamMaxPlayers }" />
             </p>
@@ -805,6 +846,13 @@ watch(
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin: 0 0 0.75rem;
+}
+.detail-complete {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: var(--text-sm);
 }
 .detail-hint-sm {
   margin-bottom: 0.5rem;
