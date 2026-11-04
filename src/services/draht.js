@@ -675,6 +675,14 @@ export function updateTeamPlayersComplete(teamId, payload) {
 }
 
 /**
+ * After the team-data deadline, ask the event's regional partner to change the roster.
+ * Payload: { message: string }.
+ */
+export function requestTeamDataChange(teamId, payload) {
+  return api.post('/teams/' + encodeURIComponent(teamId) + '/team-data-change', payload)
+}
+
+/**
  * Team member age rule for a new team of `program` (1 Explore, 2 Challenge, 7 Future 8+), from the
  * season the enrollment would get. GET /handson/node/player-age-rule?program=…
  * @returns {Promise<{ data: { data: { minAge: number, maxAge: number, referenceDate: string } | null } }>}

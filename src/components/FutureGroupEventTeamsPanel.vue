@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import EventDeadlineBanner from '@/components/EventDeadlineBanner.vue'
 import EventScheduleLink from '@/components/EventScheduleLink.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import AddressSelector from '@/components/AddressSelector.vue'
@@ -22,7 +23,7 @@ import {
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity } from '@/utils/events'
+import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity, eventRegistrationClosed, eventSelectionClosed } from '@/utils/events'
 import {
   emptyAddressState,
   buildNewAddressPayload,
@@ -208,10 +209,15 @@ const allTeamEventsSelected = computed(() => {
   if (teamEvents.value.length === 0) return false
   return teamEvents.value.every((entry) => {
     const id = Number(entry?.eventId)
-    const hasEvent = Number.isFinite(id) && id > 0
+    const hasEvent = Number.isFinite(id) && id > 0 && !eventSelectionClosed(events.value, id)
     const hasName = String(entry?.name ?? '').trim().length > 0
     return hasEvent && hasName
   })
+})
+
+const eventsAllClosed = computed(() => {
+  const list = events.value
+  return list.length > 0 && list.every((ev) => eventRegistrationClosed(ev))
 })
 
 const showRegistrationForm = computed(
@@ -596,7 +602,7 @@ onMounted(() => {
           <span class="onsite-event-option-desc"><I18nText k="wizard.onSiteEventYesDesc" /></span>
         </button>
         <button
-          v-if="registrationChoice !== 'yes'"
+          v-if="registrationChoice !== 'yes' || eventsAllClosed"
           type="button"
           class="onsite-event-option"
           :class="{ active: registrationChoice === 'later' }"
@@ -663,6 +669,7 @@ onMounted(() => {
         <p v-if="selectedTeamCount > 1" class="future-event-label">
           <I18nText k="wizard.onSiteEventPerTeam" />
         </p>
+        <EventDeadlineBanner />
         <div v-if="selectedTeamCount > 0" class="future-event-team-rows">
             <div
               v-for="(entry, idx) in teamEvents"
@@ -777,6 +784,7 @@ onMounted(() => {
             </button>
           </header>
           <div class="future-add-modal-body">
+            <EventDeadlineBanner />
             <label class="future-add-modal-label future-add-modal-label--name">
               <span><I18nText k="wizard.futureEventTeamNameLabel" /></span>
               <input

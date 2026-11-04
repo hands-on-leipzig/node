@@ -13,37 +13,42 @@ export function useDropdownPanelPosition(open, triggerRef, options = {}) {
 
   const panelStyle = ref({})
 
+  function requestedMaxPx() {
+    if (typeof maxHeight === 'number' && Number.isFinite(maxHeight)) return maxHeight
+    if (typeof maxHeight !== 'string') return 280
+    const n = parseFloat(maxHeight)
+    if (!Number.isFinite(n)) return 280
+    if (maxHeight.endsWith('rem') || maxHeight.endsWith('em')) {
+      const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+      return n * root
+    }
+    return n
+  }
+
   function updatePanelPosition() {
     const el = triggerRef.value
     if (!el || !open.value) return
     const rect = el.getBoundingClientRect()
     const viewportH = window.innerHeight || document.documentElement.clientHeight
-    const spaceBelow = viewportH - rect.bottom
-    const spaceAbove = rect.top
-    const maxH = typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight
-    const panelMaxPx =
-      typeof maxHeight === 'string' && maxHeight.endsWith('px') ? parseFloat(maxHeight) : 220
-    const preferBelow = spaceBelow >= panelMaxPx * 0.45 || spaceBelow >= spaceAbove
+    const edge = 8
+    const spaceBelow = Math.max(0, viewportH - rect.bottom - gap - edge)
+    const spaceAbove = Math.max(0, rect.top - gap - edge)
+    const requested = requestedMaxPx()
+    const openBelow = spaceBelow >= requested || spaceBelow >= spaceAbove
+    const available = openBelow ? spaceBelow : spaceAbove
+    const maxPx = Math.max(0, Math.min(requested, available))
 
-    if (preferBelow) {
-      panelStyle.value = {
-        position: 'fixed',
-        top: `${Math.round(rect.bottom + gap)}px`,
-        left: `${Math.round(rect.left)}px`,
-        width: `${Math.round(rect.width)}px`,
-        maxHeight: maxH,
-        zIndex: String(zIndex),
-      }
-    } else {
-      panelStyle.value = {
-        position: 'fixed',
-        bottom: `${Math.round(viewportH - rect.top + gap)}px`,
-        left: `${Math.round(rect.left)}px`,
-        width: `${Math.round(rect.width)}px`,
-        maxHeight: maxH,
-        zIndex: String(zIndex),
-      }
+    const shared = {
+      position: 'fixed',
+      left: `${Math.round(rect.left)}px`,
+      width: `${Math.round(rect.width)}px`,
+      maxHeight: `${Math.round(maxPx)}px`,
+      overflowY: 'auto',
+      zIndex: String(zIndex),
     }
+    panelStyle.value = openBelow
+      ? { ...shared, top: `${Math.round(rect.bottom + gap)}px` }
+      : { ...shared, bottom: `${Math.round(viewportH - rect.top + gap)}px` }
   }
 
   watch(open, (isOpen) => {
