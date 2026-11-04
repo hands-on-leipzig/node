@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDropdownPanelPosition } from '@/composables/useDropdownPanelPosition'
-import { organizeEventsForSelect, flatEventSelectOptions, eventCapacityFromEvent } from '@/utils/events'
+import { organizeEventsForSelect, flatEventSelectOptions, eventCapacityFromEvent, eventRegistrationClosed } from '@/utils/events'
 
 const { t, locale } = useI18n()
 
@@ -65,11 +65,26 @@ function getEventLabel(ev) {
   return props.eventLabelFn(ev)
 }
 
-function isEventDisabled(ev) {
-  if (!ev) return true
-  if (String(ev.id) === String(props.modelValue)) return false
+function isRegistrationClosed(ev) {
+  return eventRegistrationClosed(ev)
+}
+
+function isEventFull(ev) {
   const need = Math.max(1, Number(props.slotsNeeded) || 1)
   return !eventCapacityFromEvent(ev).canRegister(need)
+}
+
+function isEventDisabled(ev) {
+  if (!ev) return true
+  if (isRegistrationClosed(ev)) return true
+  if (String(ev.id) === String(props.modelValue)) return false
+  return isEventFull(ev)
+}
+
+function optionBadgeKey(ev) {
+  if (isRegistrationClosed(ev)) return 'wizard.eventSelectDeadlinePassed'
+  if (isEventDisabled(ev) && isEventFull(ev)) return 'wizard.eventSelectFull'
+  return ''
 }
 
 function nextSelectableIndex(from, direction) {
@@ -213,7 +228,7 @@ watch(() => flatOptions.value.length, () => {
                 @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
               >
                 <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
-                <span v-if="isEventDisabled(ev)" class="event-select-option-badge"><I18nText k="wizard.eventSelectFull" /></span>
+                <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
               </button>
             </template>
             <template v-for="group in eventSections.countryGroups" :key="'country-' + group.country">
@@ -236,7 +251,7 @@ watch(() => flatOptions.value.length, () => {
                 @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
               >
                 <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
-                <span v-if="isEventDisabled(ev)" class="event-select-option-badge"><I18nText k="wizard.eventSelectFull" /></span>
+                <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
               </button>
             </template>
             <p v-if="!loading && flatOptions.length === 0" class="event-select-empty"><I18nText k="wizard.eventSelectNoEvents" /></p>
@@ -244,6 +259,9 @@ watch(() => flatOptions.value.length, () => {
         </Transition>
       </Teleport>
     </div>
+    <p v-if="selectedEvent && isRegistrationClosed(selectedEvent)" class="event-select-closed-note">
+      <I18nText k="wizard.eventSelectDeadlinePassed" />
+    </p>
   </div>
 </template>
 
@@ -383,8 +401,14 @@ watch(() => flatOptions.value.length, () => {
 }
 .event-select-option.disabled,
 .event-select-option:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+.event-select-option.disabled.selected {
+  background: none;
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 .event-select-option.disabled:hover,
 .event-select-option.disabled.highlighted,
@@ -413,6 +437,12 @@ watch(() => flatOptions.value.length, () => {
   font-size: 0.875rem;
   color: var(--color-text-muted);
   text-align: center;
+}
+.event-select-closed-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 .event-select-drop-enter-active,
 .event-select-drop-leave-active {

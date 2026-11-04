@@ -30,6 +30,52 @@ export function eventCapacityFromEvent(ev) {
   }
 }
 
+/**
+ * Calendar day YYYY-MM-DD of an event Anmeldefrist, when the API sent one.
+ * @param {Record<string, unknown>|null|undefined} ev
+ * @returns {string|null}
+ */
+export function eventRegisterEndDay(ev) {
+  const raw = ev?.registerEnd ?? ev?.register_end ?? null
+  if (raw == null || raw === '' || raw === '0000-00-00') return null
+  const match = String(raw).trim().match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
+/**
+ * Anmeldefrist is over. The deadline day itself is still open (through 23:59 in Europe/Berlin).
+ * An explicit `registrationClosed` flag from the API wins over the date.
+ * @param {Record<string, unknown>|null|undefined} ev
+ * @param {Date} [now]
+ */
+export function eventRegistrationClosed(ev, now = new Date()) {
+  if (ev?.registrationClosed === true || ev?.registration_closed === true) return true
+  if (ev?.registrationClosed === false || ev?.registration_closed === false) return false
+  const day = eventRegisterEndDay(ev)
+  if (!day) return false
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
+  return today > day
+}
+
+/**
+ * Selected event id is in the list and its Anmeldefrist has passed.
+ * Unknown ids are left to the server.
+ * @param {Array<Record<string, unknown>>|null|undefined} events
+ * @param {unknown} eventId
+ * @param {Date} [now]
+ */
+export function eventSelectionClosed(events, eventId, now = new Date()) {
+  if (eventId == null || eventId === '' || Number(eventId) <= 0) return false
+  const ev = (Array.isArray(events) ? events : []).find((row) => String(row?.id) === String(eventId))
+  if (!ev) return false
+  return eventRegistrationClosed(ev, now)
+}
+
 /** Events that still have at least `slotsNeeded` free team slots. */
 export function filterEventsWithCapacity(events, slotsNeeded = 1) {
   const list = Array.isArray(events) ? events : []

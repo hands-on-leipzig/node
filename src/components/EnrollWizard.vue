@@ -33,6 +33,7 @@ import { useEnrollmentPricingQuote } from '@/composables/useEnrollmentPricingQuo
 import AddressSelector from '@/components/AddressSelector.vue'
 import CustomSelect from '@/components/CustomSelect.vue'
 import EnrollConsentCheckboxes from '@/components/EnrollConsentCheckboxes.vue'
+import EventDeadlineBanner from '@/components/EventDeadlineBanner.vue'
 import EventSelectDropdown from '@/components/EventSelectDropdown.vue'
 import { FUTURE_PUPIL_OPTIONS, REASON_ATTENTION_OPTIONS } from '@/config/enrollmentOptions'
 import { SCHOOL_TYPE_OPTIONS } from '@/config/schoolTypes'
@@ -41,6 +42,8 @@ import { extractEventMode, extractLockedPupils, extractLockedSeasonSetCount } fr
 import { fetchPlacesForPostalCode, normalizeCountryForZipLookup } from '@/utils/postalCodeLookup'
 import { buildCountryOptions } from '@/utils/countryOptions'
 import {
+  eventRegistrationClosed,
+  eventSelectionClosed,
   formatEventOptionLabel,
 } from '@/utils/events'
 import { foundersTeamMaxPlayers as maxPlayersForFoundersTeam } from '@/config/foundersEditionConfig'
@@ -398,6 +401,11 @@ const futureEventsForSelect = computed(() => {
   return [{ id: Number(locked), label: `Event ${locked}` }]
 })
 
+const futureEventsAllClosed = computed(() => {
+  const list = futureEventsForSelect.value
+  return list.length > 0 && list.every((ev) => eventRegistrationClosed(ev))
+})
+
 const futureEventSelectDisabled = computed(
   () => presetLockedEventId.value != null && Number(presetLockedEventId.value) > 0,
 )
@@ -422,6 +430,7 @@ const futureTeamEventsAllSelected = computed(() => {
   return futureTeamEvents.value.every((entry) => {
     const evId = Number(entry?.eventId)
     const hasEvent = Number.isFinite(evId) && evId > 0
+      && !eventSelectionClosed(futureEventsForSelect.value, evId)
     const hasName = String(entry?.name ?? '').trim().length > 0
     return hasEvent && hasName
   })
@@ -1460,7 +1469,7 @@ function canNext() {
     if (ft) {
       // Event-Auswahl ist für Challenge-/Explore-Team ein Pflichtfeld.
       const evId = Number(founderTeamEventId.value)
-      if (Number.isFinite(evId) && evId > 0) return true
+      if (Number.isFinite(evId) && evId > 0 && !eventSelectionClosed(founderEventsNearest.value, evId)) return true
       // Keine Sackgasse: wenn (fertig geladen) keine Events verfügbar sind, trotzdem weiter.
       if (!founderEventsNearestLoading.value && founderEventsNearest.value.length === 0) return true
       return false
@@ -3004,6 +3013,7 @@ watch(deliveryAddressDifferent, (different) => {
           <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint"><I18nText k="wizard.founderTeamEventHint" /> <span class="field-required" :title="t('enroll.requiredField')">*</span></p>
             <div class="wizard-event-select-wrap">
+              <EventDeadlineBanner />
               <EventSelectDropdown
                 :title="t('wizard.eventSelectSimple')"
                 :events="founderEventsNearest"
@@ -3078,6 +3088,7 @@ watch(deliveryAddressDifferent, (different) => {
                   <p v-if="futureEventTeamCount > 1" class="wizard-event-label wizard-event-per-team-label">
                     <I18nText k="wizard.onSiteEventPerTeam" />
                   </p>
+                  <EventDeadlineBanner />
                   <div v-if="futureEventTeamCount > 0" class="wizard-event-team-rows">
                     <div
                       v-for="(entry, idx) in futureTeamEvents"
@@ -3123,7 +3134,7 @@ watch(deliveryAddressDifferent, (different) => {
                   </div>
                 </div>
                 <button
-                  v-if="futureOnSiteEvent !== 'yes'"
+                  v-if="futureOnSiteEvent !== 'yes' || futureEventsAllClosed"
                   type="button"
                   class="wizard-option wizard-option-card"
                   :class="{ active: futureOnSiteEvent === 'later' }"
