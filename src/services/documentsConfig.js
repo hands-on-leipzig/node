@@ -42,18 +42,44 @@ function normalizeParticipationTermsPdf(raw) {
   }
 }
 
+function normalizePageLang(locale) {
+  return String(locale || '').toLowerCase().startsWith('en') ? 'en' : 'de'
+}
+
+function folderLinksFromConfig(j) {
+  const legacy = String(j?.folderUrl ?? '').trim()
+  const de = String(j?.folderUrlDe ?? '').trim()
+  const en = String(j?.folderUrlEn ?? '').trim()
+  return {
+    de: de || legacy,
+    en: en || legacy,
+  }
+}
+
+function folderUrlForLocale(links, locale) {
+  const lang = normalizePageLang(locale)
+  const primary = links[lang]
+  const secondary = lang === 'en' ? links.de : links.en
+  return primary || secondary || ''
+}
+
 function normalizeConfig(j) {
   if (!j || typeof j !== 'object') {
     return {
       folderUrl: '',
+      folderUrlDe: '',
+      folderUrlEn: '',
       title: '',
       files: [],
       skipGraphFileListing: false,
       participationTermsPdf: { de: '', en: '' },
     }
   }
+  const links = folderLinksFromConfig(j)
   return {
-    folderUrl: String(j.folderUrl ?? '').trim(),
+    folderUrl: links.de || links.en,
+    folderUrlDe: links.de,
+    folderUrlEn: links.en,
     title: String(j.title ?? '').trim(),
     files: normalizeFiles(j.files),
     skipGraphFileListing: !!j.skipGraphFileListing,
@@ -89,7 +115,7 @@ function unwrapPayload(data) {
 }
 
 function isConfigured(base) {
-  return !!(base.folderUrl || base.title || (base.files && base.files.length > 0))
+  return !!(base.folderUrl || base.folderUrlDe || base.folderUrlEn || base.title || (base.files && base.files.length > 0))
 }
 
 /**
@@ -131,7 +157,7 @@ function mergeFileLists(graphFiles, manualFiles) {
  * Loads documents-config, then documents-folder-files when Graph is enabled.
  * @returns {Promise<{ folderUrl: string, title: string, files: Array<{name: string, url: string}>, graphFolders?: string[], skipGraphFileListing: boolean, graphMeta?: { ok: boolean, code: string } }>}
  */
-export async function fetchDocumentsConfig() {
+export async function fetchDocumentsConfig(locale = 'de') {
   const empty = {
     folderUrl: '',
     title: '',
@@ -168,11 +194,13 @@ export async function fetchDocumentsConfig() {
   let mergedFiles = [...base.files]
   let graphFolders = []
 
-  const wantGraph = base.folderUrl && !base.skipGraphFileListing
+  const lang = normalizePageLang(locale)
+  const folderUrl = folderUrlForLocale(folderLinksFromConfig(base), lang)
+  const wantGraph = folderUrl && !base.skipGraphFileListing
 
   if (wantGraph) {
     try {
-      const gRes = await getDocumentsFolderFiles()
+      const gRes = await getDocumentsFolderFiles(lang)
       const g = unwrapPayload(gRes?.data)
       const graphFiles = normalizeFiles(g?.files)
       graphFolders = Array.isArray(g?.folders)
@@ -186,12 +214,12 @@ export async function fetchDocumentsConfig() {
       graphMeta.code = 'request_failed'
       mergedFiles = base.files.length ? base.files : []
     }
-  } else if (base.folderUrl && base.skipGraphFileListing) {
+  } else if (folderUrl && base.skipGraphFileListing) {
     graphMeta.code = 'skipped_config'
   }
 
   return {
-    folderUrl: base.folderUrl,
+    folderUrl,
     title: base.title,
     files: mergedFiles,
     graphFolders,

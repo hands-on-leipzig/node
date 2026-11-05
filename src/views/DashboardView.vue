@@ -582,16 +582,24 @@ watch(
   },
 )
 
-async function ensureDocumentsLoaded() {
-  if (documentsLoadedOnce.value || documentsLoading.value) return
+async function ensureDocumentsLoaded(force = false) {
+  if (!force && (documentsLoadedOnce.value || documentsLoading.value)) return
   documentsLoading.value = true
   try {
-    documentsConfig.value = await fetchDocumentsConfig()
+    documentsConfig.value = await fetchDocumentsConfig(locale.value)
     documentsLoadedOnce.value = true
+    if (force) documentsPath.value = []
   } finally {
     documentsLoading.value = false
   }
 }
+
+watch(locale, () => {
+  documentsLoadedOnce.value = false
+  if (!isMobileDashboard.value || documentsModalOpen.value) {
+    ensureDocumentsLoaded(true)
+  }
+})
 
 async function openDocumentsModal() {
   documentsModalOpen.value = true
@@ -624,6 +632,7 @@ function openExternalUrl(url) {
 }
 
 const { openDocumentFile } = useDocumentFileOpen({
+  lang: () => locale.value,
   openPdfFromBlob,
   openExternalUrl,
   openPdfDirect: (url, title) => {

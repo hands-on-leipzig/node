@@ -10,7 +10,8 @@ import {
 
 const { t } = useI18n()
 
-const folderUrl = ref('')
+const folderUrlDe = ref('')
+const folderUrlEn = ref('')
 const title = ref('')
 const participationTermsDe = ref('')
 const participationTermsEn = ref('')
@@ -83,7 +84,8 @@ async function load() {
       ('folderUrl' in raw.data || 'files' in raw.data || 'participationTermsPdf' in raw.data)
         ? raw.data
         : raw
-    folderUrl.value = j?.folderUrl || ''
+    folderUrlDe.value = j?.folderUrlDe || (!j?.folderUrlEn ? (j?.folderUrl || '') : '')
+    folderUrlEn.value = j?.folderUrlEn || ''
     title.value = j?.title || ''
     const pt = j?.participationTermsPdf
     participationTermsDe.value =
@@ -183,7 +185,7 @@ function saveProbeSkipMessage(reason) {
 }
 
 async function runProbeFolder() {
-  const url = folderUrl.value.trim()
+  const url = folderUrlDe.value.trim() || folderUrlEn.value.trim()
   if (!url) {
     probeResult.value = { summaryKey: 'no_url_entered' }
     return
@@ -211,7 +213,9 @@ async function save() {
   success.value = false
   try {
     const res = await putDocumentsConfig({
-      folderUrl: folderUrl.value.trim(),
+      folderUrl: folderUrlDe.value.trim() || folderUrlEn.value.trim(),
+      folderUrlDe: folderUrlDe.value.trim(),
+      folderUrlEn: folderUrlEn.value.trim(),
       title: title.value.trim(),
       participationTermsPdf: {
         de: participationTermsDe.value.trim(),
@@ -225,7 +229,8 @@ async function save() {
       raw?.data && typeof raw.data === 'object' && ('folderUrl' in raw.data || 'files' in raw.data)
         ? raw.data
         : raw
-    folderUrl.value = j?.folderUrl || ''
+    folderUrlDe.value = j?.folderUrlDe || (!j?.folderUrlEn ? (j?.folderUrl || '') : '')
+    folderUrlEn.value = j?.folderUrlEn || ''
     title.value = j?.title || ''
     const ptSaved = j?.participationTermsPdf
     participationTermsDe.value =
@@ -351,9 +356,20 @@ onMounted(load)
       </fieldset>
 
       <label class="admin-label">
-        <span><I18nText k="admin.documentsFolderUrl" /></span>
+        <span><I18nText k="admin.documentsFolderUrlDe" /></span>
         <input
-          v-model="folderUrl"
+          v-model="folderUrlDe"
+          type="text"
+          inputmode="url"
+          class="admin-input"
+          :placeholder="t('admin.documentsFolderPlaceholder')"
+          autocomplete="off"
+        />
+      </label>
+      <label class="admin-label">
+        <span><I18nText k="admin.documentsFolderUrlEn" /></span>
+        <input
+          v-model="folderUrlEn"
           type="text"
           inputmode="url"
           class="admin-input"

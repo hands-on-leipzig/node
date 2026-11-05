@@ -23,9 +23,14 @@ function unwrapLinkPayload(data) {
  * Open a coach-dashboard document (Graph-listed SharePoint file or manual https link).
  * SharePoint bytes are loaded via DRAHT (documents-file-stream), never fetch() from the SPA.
  */
-export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfDirect }) {
+export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfDirect, lang }) {
+  function currentLang() {
+    const value = typeof lang === 'function' ? lang() : (lang && lang.value) || lang || 'de'
+    return String(value).toLowerCase().startsWith('en') ? 'en' : 'de'
+  }
+
   async function openUrlShortcutViaStream(driveId, itemId, file) {
-    const blob = await getDocumentsFileStreamBlob(driveId, itemId)
+    const blob = await getDocumentsFileStreamBlob(driveId, itemId, currentLang())
     if (!blob) return
     const target = await parseInternetShortcutUrlFromBlob(blob)
     if (/^https?:\/\//i.test(target)) {
@@ -41,7 +46,7 @@ export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfD
       await openUrlShortcutViaStream(driveId, itemId, file)
       return
     }
-    const blob = await getDocumentsFileStreamBlob(driveId, itemId)
+    const blob = await getDocumentsFileStreamBlob(driveId, itemId, currentLang())
     if (!blob) {
       return
     }
@@ -70,7 +75,7 @@ export function useDocumentFileOpen({ openPdfFromBlob, openExternalUrl, openPdfD
         return
       }
       try {
-        const res = await getDocumentsFileLink(driveId, itemId)
+        const res = await getDocumentsFileLink(driveId, itemId, currentLang())
         const link = unwrapLinkPayload(res?.data)
         if (link?.useStream) {
           await openViaStream(driveId, itemId, file)
