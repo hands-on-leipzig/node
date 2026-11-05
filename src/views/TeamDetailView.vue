@@ -1452,6 +1452,8 @@ html[data-theme='dark'] .detail-player-input {
   inset: 0;
   z-index: 10040;
   background: var(--liquid-modal-scrim-bg, rgba(6, 6, 8, 0.78));
+  backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
   display: flex;
   align-items: center;
   justify-content: center;

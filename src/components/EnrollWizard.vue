@@ -3511,8 +3511,8 @@ watch(deliveryAddressDifferent, (different) => {
   flex-shrink: 0;
   z-index: 50;
   background: color-mix(in srgb, var(--wizard-shell-fill) 96%, transparent);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.5)) saturate(1.12);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.12);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   border-bottom: 1px solid var(--liquid-border);
 }
@@ -3826,8 +3826,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   border-radius: var(--radius-lg);
   border: 1px solid var(--liquid-border);
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.38)) saturate(1.08);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.38)) saturate(1.08);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.08);
 }
 .wizard-event-team-hint {
   margin-top: 0.9rem;
@@ -3861,8 +3861,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   text-align: center;
   cursor: pointer;
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.05);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 .wizard-event-team-count-pill:hover {
@@ -3893,8 +3893,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   border: 1px solid var(--liquid-border);
   background: var(--liquid-tile-bg-inner);
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.06);
 }
 .wizard-event-team-combined-grid {
   display: grid;
@@ -3957,8 +3957,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   border-radius: var(--radius-lg);
   border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--liquid-border));
   background: color-mix(in srgb, var(--liquid-tile-bg) 88%, var(--color-accent-soft));
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.3)) saturate(1.05);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.3)) saturate(1.05);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
 }
 .wizard-event-team-upgrade p {
   margin: 0 0 0.55rem;
@@ -4020,8 +4020,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   background: var(--liquid-tile-bg-inner);
   color: var(--color-text);
   box-shadow: var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.28)) saturate(1.04);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.28)) saturate(1.04);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.04);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.04);
 }
 .wizard-event-select:focus {
   border-color: var(--color-accent);
@@ -4282,8 +4282,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   background: var(--liquid-tile-bg);
   border: 1px solid var(--liquid-border);
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.06);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.06);
 }
 .wizard-counter-btn {
   width: 2.5rem;
@@ -4339,8 +4339,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   cursor: pointer;
   font-family: inherit;
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.55)) saturate(calc(var(--liquid-saturate) * 0.96));
+  backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.96));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.96));
   transition:
     border-color 0.22s ease,
     background 0.22s ease,
@@ -4510,8 +4510,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.4)) saturate(1.05);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.4)) saturate(1.05);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
 }
 .wizard-cart-title {
   margin: 0 0 0.75rem;
@@ -4602,8 +4602,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   background: var(--liquid-tile-bg-inner);
   border: 1px solid var(--liquid-border);
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.04);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.32)) saturate(1.04);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.04);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.04);
 }
 .wizard-next-steps h4 {
   margin: 0 0 0.45rem;
@@ -4857,8 +4857,8 @@ html[data-theme='dark'] .wizard-sticky-top {
     0 8px 18px rgba(0, 0, 0, 0.08),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(10px) saturate(1.1);
-  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.1);
   font-size: 0.875rem;
   width: fit-content;
 }
@@ -4869,8 +4869,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   height: 100%;
   overflow: hidden;
   background: var(--wizard-shell-fill);
-  backdrop-filter: blur(calc(var(--liquid-popover-blur) * 0.42)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-popover-blur) * 0.42)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
+  backdrop-filter: blur(var(--liquid-popover-blur)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
+  -webkit-backdrop-filter: blur(var(--liquid-popover-blur)) saturate(calc(var(--liquid-popover-saturate) * 0.88));
 }
 .wizard-path {
   display: flex;
@@ -4893,8 +4893,8 @@ html[data-theme='dark'] .wizard-sticky-top {
     0 10px 22px rgba(0, 0, 0, 0.1),
     inset 0 1.5px 0 rgba(255, 255, 255, 0.72),
     inset 0 -1px 0 rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px) saturate(1.15);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.15);
   animation: wizardPopIn 0.4s ease;
 }
 .wizard-path-icon {
@@ -4966,8 +4966,8 @@ html[data-theme='dark'] .wizard-sticky-top {
   justify-content: center;
   padding: 1.25rem;
   background: rgba(6, 6, 8, 0.45);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
 }
 .wizard-abort-dialog {
   width: min(22rem, 100%);

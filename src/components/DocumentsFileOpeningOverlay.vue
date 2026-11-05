@@ -37,7 +37,7 @@ defineProps({
   padding: 1rem;
   border-radius: inherit;
   background: color-mix(in srgb, var(--color-bg) 78%, transparent);
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(var(--liquid-blur));
 }
 .documents-file-opening-inner {
   display: flex;

@@ -344,8 +344,8 @@ onBeforeUnmount(() => {
   margin: 0 0 1.25rem;
   border-radius: var(--radius-lg);
   background: var(--liquid-tile-bg);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.88));
+  backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.88));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.88));
   border: 1px solid var(--liquid-border);
   font-size: var(--text-sm);
   color: var(--color-text-muted);

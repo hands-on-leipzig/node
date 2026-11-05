@@ -338,8 +338,8 @@ html[data-theme='dark'] .btn-primary:hover {
   text-align: center;
   padding: 1rem;
   background: var(--liquid-tile-bg);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.9));
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.48)) saturate(calc(var(--liquid-saturate) * 0.9));
+  backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.9));
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(calc(var(--liquid-saturate) * 0.9));
   border-radius: var(--radius-xl);
   border: 1px solid var(--liquid-border);
   box-shadow: var(--liquid-shadow);

@@ -152,6 +152,8 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 10050;
   background: var(--liquid-modal-scrim-bg, rgba(12, 10, 8, 0.34));
+  backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
   display: flex;
   align-items: center;
   justify-content: center;

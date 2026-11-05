@@ -76,6 +76,8 @@ useModalDismiss(() => props.show, {
     env(safe-area-inset-bottom, 0)
     env(safe-area-inset-left, 0);
   background: var(--liquid-modal-scrim-bg);
+  backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
 }
 
 .pdf-modal-box {

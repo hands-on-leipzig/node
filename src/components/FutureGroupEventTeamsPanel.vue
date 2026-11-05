@@ -1297,6 +1297,8 @@ onMounted(() => {
   inset: 0;
   z-index: 10040;
   background: var(--liquid-modal-scrim-bg);
+  backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--liquid-modal-scrim-blur)) saturate(var(--liquid-saturate));
   display: flex;
   align-items: center;
   justify-content: center;

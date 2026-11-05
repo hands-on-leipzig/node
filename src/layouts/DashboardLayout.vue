@@ -1052,8 +1052,8 @@ const { canInstall, promptInstall } = usePwaInstall()
   border-radius: var(--radius-lg);
   background: var(--liquid-tile-bg-inner);
   box-shadow: var(--shadow-sm), var(--liquid-shadow-inset);
-  backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.05);
-  -webkit-backdrop-filter: blur(calc(var(--liquid-blur) * 0.35)) saturate(1.05);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(1.05);
   cursor: pointer;
   font-family: inherit;
   font-size: var(--text-sm);
