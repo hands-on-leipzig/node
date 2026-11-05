@@ -554,8 +554,9 @@ export async function getParticipationTermsPdfBlobUrl(lang = 'de') {
 /**
  * SharePoint folder file list via Microsoft Graph (GET /handson/node/documents-folder-files).
  */
-export function getDocumentsFolderFiles() {
-  return api.get('/documents-folder-files')
+export function getDocumentsFolderFiles(lang = 'de') {
+  const key = String(lang || 'de').toLowerCase().startsWith('en') ? 'en' : 'de'
+  return api.get('/documents-folder-files', { params: { lang: key } })
 }
 
 /**
@@ -563,9 +564,10 @@ export function getDocumentsFolderFiles() {
  * @param {string} driveId
  * @param {string} itemId
  */
-export function getDocumentsFileLink(driveId, itemId) {
+export function getDocumentsFileLink(driveId, itemId, lang = 'de') {
+  const key = String(lang || 'de').toLowerCase().startsWith('en') ? 'en' : 'de'
   return api.get('/documents-file-link', {
-    params: { driveId: String(driveId || ''), itemId: String(itemId || '') },
+    params: { driveId: String(driveId || ''), itemId: String(itemId || ''), lang: key },
   })
 }
 
@@ -575,10 +577,11 @@ export function getDocumentsFileLink(driveId, itemId) {
  * @param {string} itemId
  * @returns {Promise<Blob|null>}
  */
-export async function getDocumentsFileStreamBlob(driveId, itemId) {
+export async function getDocumentsFileStreamBlob(driveId, itemId, lang = 'de') {
+  const key = String(lang || 'de').toLowerCase().startsWith('en') ? 'en' : 'de'
   try {
     const res = await api.get('/documents-file-stream', {
-      params: { driveId: String(driveId || ''), itemId: String(itemId || '') },
+      params: { driveId: String(driveId || ''), itemId: String(itemId || ''), lang: key },
       responseType: 'blob',
     })
     const blob = res?.data
