@@ -35,6 +35,7 @@ import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import logoHot from '@/assets/hot.png'
 import AppShell from '@hands-on/glass/app-shell'
 import SidebarFooter from '@hands-on/glass/sidebar-footer'
+import JoinAppSwitch from '@/components/JoinAppSwitch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -529,19 +530,25 @@ const { canInstall, promptInstall } = usePwaInstall()
     @update:open="onShellOpen"
   >
     <template #brand>
-      <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="glass-sidebar__brand" @click="onGoHomeClick">
-        <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
-      </RouterLink>
+      <div class="join-brand-line">
+        <RouterLink :to="isCoachApp ? '/dashboard' : '/'" class="join-brand" @click="onGoHomeClick">
+          <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
+        </RouterLink>
+        <JoinAppSwitch />
+      </div>
     </template>
 
     <template #mobile-top>
-      <RouterLink
-        :to="isCoachApp ? '/dashboard' : '/'"
-        class="glass-sidebar__brand"
-        @click="onGoHomeClick"
-      >
-        <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
-      </RouterLink>
+      <div class="join-brand-line">
+        <RouterLink
+          :to="isCoachApp ? '/dashboard' : '/'"
+          class="join-brand"
+          @click="onGoHomeClick"
+        >
+          <img :src="logoJoin" alt="JOIN" class="glass-sidebar__brand-logo" />
+        </RouterLink>
+        <JoinAppSwitch />
+      </div>
     </template>
 
     <template #mobile-top-actions>
@@ -932,6 +939,29 @@ const { canInstall, promptInstall } = usePwaInstall()
 
 <style scoped>
 /* JOIN-specific sidebar extras on top of @hands-on/glass app shell */
+
+.join-brand-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.join-brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.join-brand .glass-sidebar__brand-logo {
+  width: auto;
+  max-width: 7.5rem;
+  max-height: 1.7rem;
+  object-fit: contain;
+  object-position: left center;
+}
 
 .sidebar-section-toggle {
   display: flex;
