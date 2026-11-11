@@ -11,7 +11,7 @@ import {
   nextWednesdayOnOrAfter,
   todayYmd,
 } from '@/utils/shipmentSchedule'
-import { buildStatusLanes } from '@/utils/timeline'
+import { applyTeamDataNotes, buildStatusLanes } from '@/utils/timeline'
 
 const props = defineProps({
   steps: { type: Array, default: () => [] },
@@ -281,21 +281,16 @@ function submitShipmentDate() {
   emit('versandaufschub-save', val)
 }
 
-const lanes = computed(() => {
-  const built = buildStatusLanes({
-    steps: props.steps,
-    alert: props.alert,
-    schedule: schedule.value,
-  })
-  const notes = (Array.isArray(props.teamDataNotes) ? props.teamDataNotes : []).filter(Boolean)
-  if (!notes.length) return built
-  return built.map((lane) => ({
-    ...lane,
-    factors: lane.factors.map((factor) =>
-      factor.id === 'teamdata' ? { ...factor, hints: notes } : factor,
-    ),
-  }))
-})
+const lanes = computed(() =>
+  applyTeamDataNotes(
+    buildStatusLanes({
+      steps: props.steps,
+      alert: props.alert,
+      schedule: schedule.value,
+    }),
+    props.teamDataNotes,
+  ),
+)
 
 function laneNodeIcon(lane) {
   if (lane.status === 'closed') return 'bi-check-lg'

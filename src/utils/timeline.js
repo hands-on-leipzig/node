@@ -461,3 +461,46 @@ export function buildStatusLanes({ steps = [], alert = null, schedule = null } =
     }
   })
 }
+
+/**
+ * Member gaps the form still sees (for example a missing gender) keep the
+ * team-data lane open, even when DRAHT already reports that step as complete.
+ *
+ * @param {ReturnType<typeof buildStatusLanes>} lanes
+ * @param {unknown} notes
+ * @returns {ReturnType<typeof buildStatusLanes>}
+ */
+export function applyTeamDataNotes(lanes, notes) {
+  const lines = (Array.isArray(notes) ? notes : [])
+    .map((line) => String(line ?? '').trim())
+    .filter(Boolean)
+  if (!lines.length || !Array.isArray(lanes)) return lanes
+
+  return lanes.map((lane) => {
+    if (lane.id !== 'participants') return lane
+    const factors = Array.isArray(lane.factors) ? lane.factors : []
+    const hasGap = factors.some((factor) => factor.id === 'teamdata')
+    const nextFactors = hasGap
+      ? factors.map((factor) =>
+          factor.id === 'teamdata' ? { ...factor, done: false, hints: lines } : factor,
+        )
+      : [
+          ...factors,
+          {
+            id: 'teamdata',
+            lane: 'participants',
+            done: false,
+            coachAction: false,
+            action: null,
+            labelKey: 'detail.factorTeamData',
+            items: [],
+            hints: lines,
+          },
+        ]
+    return {
+      ...lane,
+      status: lane.status === 'closed' ? 'progress' : lane.status,
+      factors: nextFactors,
+    }
+  })
+}

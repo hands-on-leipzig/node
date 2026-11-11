@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  applyTeamDataNotes,
   buildStatusFactors,
   buildStatusLanes,
   isCrcMissingAlert,
@@ -132,6 +133,37 @@ describe('buildStatusLanes', () => {
     assert.equal(lanes.find((l) => l.id === 'shipment').factors.find((f) => f.id === 'address'), undefined)
     assert.notEqual(lanes.find((l) => l.id === 'shipment').status, 'closed')
     assert.equal(lanes.find((l) => l.id === 'shipment').blockedKey, 'detail.laneShipmentBlocked')
+  })
+
+  it('keeps the team-data lane open when a member is still missing a field', () => {
+    const lanes = applyTeamDataNotes(
+      buildStatusLanes({
+        steps: [
+          { de: 'Anmeldung', en: 'Registration', status: 'closed', picto: 'user' },
+          { de: 'Teamdaten', en: 'Team data', status: 'closed', de_sub: 'vollständig' },
+        ],
+      }),
+      ['Bei Lea fehlt: Geschlecht.'],
+    )
+    const participants = lanes.find((l) => l.id === 'participants')
+    assert.equal(participants.status, 'progress')
+    assert.equal(participants.factors[0].id, 'teamdata')
+    assert.equal(participants.factors[0].done, false)
+    assert.deepEqual(participants.factors[0].hints, ['Bei Lea fehlt: Geschlecht.'])
+    assert.equal(lanes.find((l) => l.id === 'registration').status, 'closed')
+  })
+
+  it('leaves a complete team-data lane closed when nothing is missing', () => {
+    const lanes = applyTeamDataNotes(
+      buildStatusLanes({
+        steps: [
+          { de: 'Teamdaten', en: 'Team data', status: 'closed', de_sub: 'vollständig' },
+        ],
+      }),
+      [],
+    )
+    assert.equal(lanes.find((l) => l.id === 'participants').status, 'closed')
+    assert.deepEqual(lanes.find((l) => l.id === 'participants').factors, [])
   })
 
   it('does not mark shipment done while the invoice is unpaid, even if address and date are set', () => {
