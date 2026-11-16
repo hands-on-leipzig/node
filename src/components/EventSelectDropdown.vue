@@ -208,6 +208,29 @@ watch(() => flatOptions.value.length, () => {
             role="listbox"
             tabindex="-1"
           >
+            <template v-if="eventSections.home?.length">
+              <p class="event-select-section-title"><I18nText k="wizard.eventSelectHome" /></p>
+              <button
+                v-for="ev in eventSections.home"
+                :key="'home-' + ev.id"
+                type="button"
+                role="option"
+                class="event-select-option"
+                :class="{
+                  selected: String(ev.id) === String(modelValue),
+                  highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                  disabled: isEventDisabled(ev),
+                }"
+                :disabled="isEventDisabled(ev)"
+                :aria-selected="String(ev.id) === String(modelValue)"
+                :aria-disabled="isEventDisabled(ev)"
+                @click="select(ev)"
+                @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
+              >
+                <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+                <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
+              </button>
+            </template>
             <template v-if="eventSections.nearest.length">
               <p class="event-select-section-title"><I18nText k="wizard.eventSelectNearest" /></p>
               <button

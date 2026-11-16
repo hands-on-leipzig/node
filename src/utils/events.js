@@ -137,6 +137,27 @@ export function formatEventOptionLabel(ev, t) {
   return String(name)
 }
 
+/** Last day Future event teams and Challenge regionals are self-service. */
+export const TEAM_EVENT_SELF_SERVICE_DEADLINE = '2026-10-31'
+
+/**
+ * "Zu Hause" / "Zuhause" — still open for Challenge after the regional deadline.
+ * @param {Record<string, unknown>|null|undefined} ev
+ */
+export function isHomeEvent(ev) {
+  const label = String(ev?.label ?? ev?.name ?? ev?.title ?? '')
+  return /zu\s*hause/i.test(label)
+}
+
+/**
+ * Future Edition team registration is off after {@link TEAM_EVENT_SELF_SERVICE_DEADLINE}.
+ * Group enrollment (5+/8+) stays open.
+ * @param {Date} [now]
+ */
+export function futureTeamRegistrationClosed(now = new Date()) {
+  return eventRegistrationClosed({ registerEnd: TEAM_EVENT_SELF_SERVICE_DEADLINE }, now)
+}
+
 const EVENT_COUNTRY_ORDER = ['de', 'at', 'ch']
 
 /**
@@ -153,15 +174,19 @@ export function normalizeEventCountry(country) {
 }
 
 /**
- * Nearest block (distance order, capped) + remaining events grouped by country, sorted A–Z per country.
+ * When any other event is past its deadline, open "Zu Hause" options are pinned first.
+ * Otherwise: nearest block (distance order, capped) + remaining events grouped by country, sorted A–Z.
  * @param {Array<Record<string, unknown>>} events
  * @param {{ nearestLimit?: number, locale?: string }} [options]
  */
 export function organizeEventsForSelect(events, { nearestLimit = 5, locale = 'de' } = {}) {
   const list = Array.isArray(events) ? [...events] : []
-  const nearest = list.slice(0, nearestLimit)
+  const pinHome = list.some((ev) => !isHomeEvent(ev) && eventRegistrationClosed(ev))
+  const home = pinHome ? list.filter((ev) => isHomeEvent(ev)) : []
+  const pool = pinHome ? list.filter((ev) => !isHomeEvent(ev)) : list
+  const nearest = pool.slice(0, nearestLimit)
   const nearestIds = new Set(nearest.map((e) => String(e.id)))
-  const rest = list.filter((e) => !nearestIds.has(String(e.id)))
+  const rest = pool.filter((e) => !nearestIds.has(String(e.id)))
 
   const byCountry = new Map()
   for (const ev of rest) {
@@ -194,10 +219,10 @@ export function organizeEventsForSelect(events, { nearestLimit = 5, locale = 'de
     }))
     .filter((g) => g.events.length > 0)
 
-  return { nearest, countryGroups }
+  return { home, nearest, countryGroups }
 }
 
-/** Flat list for keyboard navigation (nearest, then all country groups). */
-export function flatEventSelectOptions({ nearest, countryGroups }) {
-  return [...nearest, ...countryGroups.flatMap((g) => g.events)]
+/** Flat list for keyboard navigation (home, then nearest, then all country groups). */
+export function flatEventSelectOptions({ home = [], nearest, countryGroups }) {
+  return [...home, ...nearest, ...countryGroups.flatMap((g) => g.events)]
 }

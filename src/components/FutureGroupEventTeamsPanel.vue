@@ -23,7 +23,7 @@ import {
   minPupilsForEventTeamCount,
 } from '@/config/futureEditionConfig'
 import { FUTURE_PUPIL_OPTIONS } from '@/config/enrollmentOptions'
-import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity, eventRegistrationClosed, eventSelectionClosed } from '@/utils/events'
+import { extractEventList, normalizeEvents, formatEventOptionLabel, filterEventsWithCapacity, eventRegistrationClosed, eventSelectionClosed, futureTeamRegistrationClosed } from '@/utils/events'
 import {
   emptyAddressState,
   buildNewAddressPayload,
@@ -41,6 +41,9 @@ const props = defineProps({
 
 /** Effective lock: either the caller's generic `disabled` (e.g. cancelled) or the minor-coach restriction. */
 const locked = computed(() => props.disabled || props.minorLocked)
+
+/** Future event teams are off after 31.10.2026. Existing teams stay visible. */
+const teamSignupClosed = computed(() => futureTeamRegistrationClosed())
 
 const emit = defineEmits(['updated'])
 
@@ -545,12 +548,13 @@ onMounted(() => {
         </RouterLink>
       </li>
     </ul>
-    <div v-else-if="!hasEventRegistration" class="future-event-status future-event-status--empty">
+    <div v-else-if="!hasEventRegistration && !teamSignupClosed" class="future-event-status future-event-status--empty">
       <i class="bi bi-calendar-x" aria-hidden="true" />
       <p><I18nText k="groupDetail.eventTeamsStatusNone" /></p>
     </div>
     <EventScheduleLink v-if="enrolledTeams.length" :event="enrolledEvent" />
-    <div v-if="hasEventRegistration" class="future-event-add-more">
+    <EventDeadlineBanner v-if="teamSignupClosed" variant="future" />
+    <div v-if="hasEventRegistration && !teamSignupClosed" class="future-event-add-more">
       <p v-if="minorLocked" class="future-event-hint future-event-hint-warn">
         <i class="bi bi-info-circle" aria-hidden="true" />
         <I18nText k="groupDetail.minorCoachEventHint" />
@@ -580,7 +584,7 @@ onMounted(() => {
     </div>
 
     <div
-      v-if="isInitialRegistration"
+      v-if="isInitialRegistration && !teamSignupClosed"
       class="future-event-registration"
       :class="{ 'future-event-registration--readonly': locked }"
     >
