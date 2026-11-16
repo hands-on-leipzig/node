@@ -4,6 +4,7 @@ import {
   eventRegisterEndDay,
   eventRegistrationClosed,
   eventSelectionClosed,
+  flatEventSelectOptions,
   futureTeamRegistrationClosed,
   isHomeEvent,
   organizeEventsForSelect,
@@ -56,6 +57,23 @@ describe('eventRegistrationClosed', () => {
     const organized = organizeEventsForSelect(events, { nearestLimit: 5 })
     assert.deepEqual(organized.home, [])
     assert.deepEqual(organized.nearest.map((ev) => ev.id), [1, 3])
+  })
+
+  it('lists events you can still sign up for above closed and full ones', () => {
+    const events = [
+      { id: 1, label: 'Berlin', country: 'de', registrationClosed: true },
+      { id: 2, label: 'Leipzig', country: 'de' },
+      { id: 3, label: 'Dresden', country: 'de', capacity: 8, registered: 8 },
+      { id: 4, label: 'Wien', country: 'at' },
+      { id: 5, label: 'Graz', country: 'at', registrationClosed: true },
+      { id: 6, label: 'Zürich', country: 'ch' },
+      { id: 7, label: 'Bern', country: 'ch' },
+    ]
+    const organized = organizeEventsForSelect(events, { nearestLimit: 2 })
+    const flat = flatEventSelectOptions(organized).map((ev) => ev.id)
+    assert.deepEqual(organized.nearest.map((ev) => ev.id), [2, 4])
+    assert.deepEqual(flat, [2, 4, 7, 6, 1, 3, 5])
+    assert.equal(organized.countryGroups.some((group) => group.later && group.country === 'de'), true)
   })
 
   it('does not close an event without a deadline', () => {

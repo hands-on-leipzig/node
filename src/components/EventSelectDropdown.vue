@@ -32,7 +32,11 @@ const { panelStyle, updatePanelPosition } = useDropdownPanelPosition(open, trigg
 })
 
 const eventSections = computed(() =>
-  organizeEventsForSelect(props.events, { nearestLimit: 5, locale: locale.value }),
+  organizeEventsForSelect(props.events, {
+    nearestLimit: 5,
+    locale: locale.value,
+    slotsNeeded: props.slotsNeeded,
+  }),
 )
 
 const flatOptions = computed(() => flatEventSelectOptions(eventSections.value))
@@ -254,7 +258,7 @@ watch(() => flatOptions.value.length, () => {
                 <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
               </button>
             </template>
-            <template v-for="group in eventSections.countryGroups" :key="'country-' + group.country">
+            <template v-for="group in eventSections.countryGroups" :key="'country-' + (group.later ? 'later-' : '') + group.country">
               <p class="event-select-section-title">{{ countrySectionLabel(group.country) }}</p>
               <button
                 v-for="ev in group.events"
