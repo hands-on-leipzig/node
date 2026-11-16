@@ -262,6 +262,9 @@ const teamDataNotes = computed(() => {
   const lines = []
   if (gaps.placeholderName) lines.push(t('detail.teamDataNamePlaceholder'))
   if (gaps.tooFew) lines.push(t('detail.teamDataTooFew'))
+  if (hasTeamDataConfirmation.value && team.value?.playersComplete !== true && !gaps.placeholderName && !gaps.tooFew && !gaps.players.length) {
+    lines.push(t('detail.teamDataNotConfirmed'))
+  }
   for (const player of gaps.players) {
     const joined = joinFieldLabels(labelsForFields(player.fields))
     const name = player.name || t('detail.teamMemberN', { n: player.index + 1 })
@@ -385,7 +388,9 @@ async function onCompleteChange(event) {
   } catch (e) {
     event.target.checked = !!team.value?.playersComplete
     const code = e.response?.data?.code || e.response?.data?.error?.code
-    playersError.value = code === 'team_data_locked'
+    playersError.value = code === 'team_data_incomplete'
+      ? t('detail.teamDataIncomplete')
+      : code === 'team_data_locked'
       ? teamDataLockedText.value
       : (e.response?.data?.error?.message || e.response?.data?.message || e.message || t('errors.loadFailed'))
   } finally {
@@ -748,6 +753,9 @@ watch(
             >
             {{ t('detail.teamDataComplete') }}
           </label>
+          <p v-if="!cancelled && hasTeamDataConfirmation" class="detail-hint">
+            {{ t('detail.teamDataCompleteHint') }}
+          </p>
           <p v-if="playerAgeHint && !cancelled" class="detail-hint">{{ playerAgeHint }}</p>
           <div v-if="displayedPlayers.length || isAddingPlayer" class="detail-players-wrap">
             <table class="detail-players-table">
