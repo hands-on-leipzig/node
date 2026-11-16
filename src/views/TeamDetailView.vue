@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getTeam, updateTeamPlayers, updateTeamPlayersComplete, updateTeamVersandaufschub, updateTeamLabel, requestTeamDataChange, checkCoCoachEmail, inviteCoCoach } from '@/services/draht'
+import { getTeam, updateTeamPlayers, updateTeamPlayersComplete, updateTeamVersandaufschub, updateTeamLabel, checkCoCoachEmail, inviteCoCoach } from '@/services/draht'
 import DetailDeliveryAddressForm from '@/components/DetailDeliveryAddressForm.vue'
 import { formatOverviewAddress } from '@/utils/formatOverviewAddress'
 import { isTeklaCancelled } from '@/utils/enrollmentDisplay'
@@ -88,59 +88,25 @@ const teamDataLockedText = computed(() =>
     ? t('detail.teamDataLocked', { date: teamDataDeadlineLabel.value })
     : t('detail.teamDataLockedNoDate'),
 )
-const canContactRegionalPartner = computed(() => !!team.value?.regionalPartner?.contactable)
-const rpModalOpen = ref(false)
-const rpModalEl = ref(null)
-const rpMessage = ref('')
-const rpSending = ref(false)
-const rpError = ref('')
-const rpSent = ref(false)
-const rpLead = computed(() => {
-  const name = String(team.value?.regionalPartner?.name || '').trim()
-  return name
-    ? t('detail.teamDataContactRpLead', { name })
-    : t('detail.teamDataContactRpLeadNoName')
+const eventContacts = computed(() => {
+  const list = team.value?.eventContacts
+  if (!Array.isArray(list)) return []
+  return list
+    .map((contact) => ({
+      name: String(contact?.name || '').trim(),
+      email: String(contact?.email || '').trim(),
+      infos: String(contact?.infos || '').trim(),
+    }))
+    .filter((contact) => contact.name || contact.email || contact.infos)
 })
 
-useModalDismiss(() => rpModalOpen.value, {
-  dialogRef: rpModalEl,
-  onClose: closeRpModal,
-})
-
-function openRpModal() {
-  rpError.value = ''
-  rpSent.value = false
-  rpMessage.value = ''
-  rpModalOpen.value = true
+function contactMailHref(email) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return ''
+  return `mailto:${email}`
 }
 
-function closeRpModal() {
-  if (rpSending.value) return
-  rpModalOpen.value = false
-}
-
-async function submitRpMessage() {
-  if (!id.value || rpSending.value || rpSent.value) return
-  const message = rpMessage.value.trim()
-  if (!message) {
-    rpError.value = t('detail.teamDataContactRpRequired')
-    return
-  }
-  rpSending.value = true
-  rpError.value = ''
-  try {
-    await requestTeamDataChange(id.value, { message })
-    rpSent.value = true
-  } catch (e) {
-    const code = e.response?.data?.code || e.response?.data?.error?.code
-    if (code === 'rp_contact_missing') rpError.value = t('detail.teamDataContactRpMissing')
-    else if (code === 'message_required') rpError.value = t('detail.teamDataContactRpRequired')
-    else if (code === 'message_too_long') rpError.value = t('detail.teamDataContactRpTooLong')
-    else if (code === 'team_data_open') rpError.value = t('detail.teamDataContactRpStillOpen')
-    else rpError.value = t('detail.teamDataContactRpError')
-  } finally {
-    rpSending.value = false
-  }
+function apiErrorCode(error) {
+  return error?.response?.data?.code || error?.response?.data?.error?.code || ''
 }
 
 const playerAgeHint = computed(() => {
@@ -352,7 +318,9 @@ async function saveTeamName(label) {
     const res = await updateTeamLabel(id.value, { label })
     team.value = res.data
   } catch (e) {
-    teamNameError.value = e.response?.data?.message || e.message || t('detail.teamNameSaveFailed')
+    teamNameError.value = apiErrorCode(e) === 'team_data_locked'
+      ? teamDataLockedText.value
+      : (e.response?.data?.message || e.message || t('detail.teamNameSaveFailed'))
   } finally {
     savingTeamName.value = false
   }
@@ -387,7 +355,7 @@ async function onCompleteChange(event) {
     team.value = res.data
   } catch (e) {
     event.target.checked = !!team.value?.playersComplete
-    const code = e.response?.data?.code || e.response?.data?.error?.code
+    const code = apiErrorCode(e)
     playersError.value = code === 'team_data_incomplete'
       ? t('detail.teamDataIncomplete')
       : code === 'team_data_locked'
@@ -415,7 +383,9 @@ async function persistPlayers() {
     editingPlayers.value = []
   } catch (e) {
     editingPlayers.value = []
-    playersError.value = e.response?.data?.error?.message || e.response?.data?.message || e.message || t('errors.loadFailed')
+    playersError.value = apiErrorCode(e) === 'team_data_locked'
+      ? teamDataLockedText.value
+      : (e.response?.data?.error?.message || e.response?.data?.message || e.message || t('errors.loadFailed'))
   } finally {
     savingPlayers.value = false
   }
@@ -551,7 +521,6 @@ async function fetchTeam() {
   loading.value = true
   error.value = null
   team.value = null
-  rpModalOpen.value = false
   try {
     const res = await getTeam(id.value)
     team.value = res.data
@@ -605,7 +574,7 @@ watch(
       <DetailTeklaHeader
         :card="team"
         kind="team"
-        editable-team-name
+        :editable-team-name="!teamDataLocked"
         :cancelled="cancelled"
         :saving-team-name="savingTeamName"
         :team-name-error="teamNameError"
@@ -636,14 +605,15 @@ watch(
 
       <div v-if="teamDataLocked && !cancelled" class="detail-lock" role="status">
         <p>{{ teamDataLockedText }}</p>
-        <button
-          v-if="canContactRegionalPartner"
-          type="button"
-          class="detail-btn detail-btn-primary"
-          @click="openRpModal"
-        >
-          {{ t('detail.teamDataContactRp') }}
-        </button>
+        <div v-if="eventContacts.length" class="detail-lock-contacts">
+          <p class="detail-lock-contacts-label">{{ t('detail.teamDataLockedContact') }}</p>
+          <p v-for="(contact, index) in eventContacts" :key="'event-contact-' + index" class="detail-lock-contact">
+            <span v-if="contact.name">{{ contact.name }}</span>
+            <a v-if="contactMailHref(contact.email)" :href="contactMailHref(contact.email)">{{ contact.email }}</a>
+            <span v-else-if="contact.email">{{ contact.email }}</span>
+            <span v-if="contact.infos" class="detail-lock-contact-infos">{{ contact.infos }}</span>
+          </p>
+        </div>
         <p v-else class="detail-lock-fallback">{{ t('detail.teamDataContactRpMissing') }}</p>
       </div>
 
@@ -1017,60 +987,6 @@ watch(
                 </button>
               </footer>
             </div>
-          </div>
-        </div>
-      </Teleport>
-
-      <Teleport to="body">
-        <div
-          v-if="rpModalOpen"
-          class="rp-modal-backdrop"
-          role="presentation"
-          @click.self="closeRpModal"
-        >
-          <div
-            ref="rpModalEl"
-            class="rp-modal-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rp-modal-title"
-            tabindex="-1"
-            @click.stop
-          >
-            <header class="rp-modal-head">
-              <h2 id="rp-modal-title" class="rp-modal-title">{{ t('detail.teamDataContactRpTitle') }}</h2>
-              <button type="button" class="rp-modal-close" :aria-label="t('common.closeDialog')" @click="closeRpModal">
-                <i class="bi bi-x-lg" aria-hidden="true" />
-              </button>
-            </header>
-            <form class="rp-modal-body" @submit.prevent="submitRpMessage">
-              <p v-if="!rpSent" class="rp-modal-lead">{{ rpLead }}</p>
-              <label v-if="!rpSent" class="rp-modal-label">
-                <span>{{ t('detail.teamDataContactRpMessage') }}</span>
-                <textarea
-                  v-model="rpMessage"
-                  class="rp-modal-input"
-                  rows="6"
-                  maxlength="4000"
-                  required
-                />
-              </label>
-              <p v-else class="rp-modal-success">{{ t('detail.teamDataContactRpSuccess') }}</p>
-              <p v-if="rpError" class="rp-modal-error" role="alert">{{ rpError }}</p>
-              <footer class="rp-modal-foot">
-                <button type="button" class="detail-btn" @click="closeRpModal">
-                  {{ t('common.closeDialog') }}
-                </button>
-                <button
-                  v-if="!rpSent"
-                  type="submit"
-                  class="detail-btn detail-btn-primary"
-                  :disabled="rpSending || !rpMessage.trim()"
-                >
-                  {{ t('detail.teamDataContactRpSend') }}
-                </button>
-              </footer>
-            </form>
           </div>
         </div>
       </Teleport>
@@ -1454,6 +1370,34 @@ html[data-theme='dark'] .detail-player-input {
 .detail-lock-fallback {
   font-weight: 500;
   color: var(--color-text-muted);
+}
+.detail-lock-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+.detail-lock-contacts-label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.detail-lock-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.45;
+}
+.detail-lock-contact a {
+  color: inherit;
+  font-weight: 600;
+  width: fit-content;
+}
+.detail-lock-contact-infos {
+  white-space: pre-line;
 }
 .rp-modal-backdrop {
   position: fixed;
