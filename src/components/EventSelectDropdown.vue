@@ -32,11 +32,7 @@ const { panelStyle, updatePanelPosition } = useDropdownPanelPosition(open, trigg
 })
 
 const eventSections = computed(() =>
-  organizeEventsForSelect(props.events, {
-    nearestLimit: 5,
-    locale: locale.value,
-    slotsNeeded: props.slotsNeeded,
-  }),
+  organizeEventsForSelect(props.events, { nearestLimit: 5, locale: locale.value }),
 )
 
 const flatOptions = computed(() => flatEventSelectOptions(eventSections.value))
@@ -258,11 +254,57 @@ watch(() => flatOptions.value.length, () => {
                 <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
               </button>
             </template>
-            <template v-for="group in eventSections.countryGroups" :key="'country-' + (group.later ? 'later-' : '') + group.country">
+            <template v-for="group in eventSections.countryGroups" :key="'country-' + group.country">
               <p class="event-select-section-title">{{ countrySectionLabel(group.country) }}</p>
               <button
                 v-for="ev in group.events"
                 :key="'country-' + group.country + '-' + ev.id"
+                type="button"
+                role="option"
+                class="event-select-option"
+                :class="{
+                  selected: String(ev.id) === String(modelValue),
+                  highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                  disabled: isEventDisabled(ev),
+                }"
+                :disabled="isEventDisabled(ev)"
+                :aria-selected="String(ev.id) === String(modelValue)"
+                :aria-disabled="isEventDisabled(ev)"
+                @click="select(ev)"
+                @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
+              >
+                <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+                <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
+              </button>
+            </template>
+            <template v-if="eventSections.laterNearest?.length">
+              <p class="event-select-section-title"><I18nText k="wizard.eventSelectNearest" /></p>
+              <button
+                v-for="ev in eventSections.laterNearest"
+                :key="'later-near-' + ev.id"
+                type="button"
+                role="option"
+                class="event-select-option"
+                :class="{
+                  selected: String(ev.id) === String(modelValue),
+                  highlighted: flatIndexForEvent(ev) === highlightedIndex,
+                  disabled: isEventDisabled(ev),
+                }"
+                :disabled="isEventDisabled(ev)"
+                :aria-selected="String(ev.id) === String(modelValue)"
+                :aria-disabled="isEventDisabled(ev)"
+                @click="select(ev)"
+                @mouseenter="highlightedIndex = flatIndexForEvent(ev)"
+              >
+                <span class="event-select-option-label">{{ getEventLabel(ev) }}</span>
+                <span v-if="optionBadgeKey(ev)" class="event-select-option-badge"><I18nText :k="optionBadgeKey(ev)" /></span>
+              </button>
+            </template>
+            <template v-for="group in eventSections.laterCountryGroups" :key="'later-country-' + group.country">
+              <p class="event-select-section-title">{{ countrySectionLabel(group.country) }}</p>
+              <button
+                v-for="ev in group.events"
+                :key="'later-country-' + group.country + '-' + ev.id"
                 type="button"
                 role="option"
                 class="event-select-option"
