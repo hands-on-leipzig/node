@@ -24,6 +24,9 @@ import {
   playerAgeOutOfRange,
 } from '@/utils/playerAge'
 import { describeTeamDataGaps, playerFieldGaps } from '@/utils/teamDataGaps'
+import EventQuestionsFields from '@/components/EventQuestionsFields.vue'
+import { getUserProfile } from '@/auth/keycloak'
+import { loadCoachEventForms } from '@/services/flowPublicForm'
 
 const route = useRoute()
 const router = useRouter()
@@ -532,8 +535,34 @@ async function fetchTeam() {
     if (team.value) {
       scrollToCoCoachesSection()
       scrollToDeliveryForm()
+      loadEventQuestions()
     }
   }
+}
+
+const eventQuestionForms = ref([])
+const eventQuestionSlug = ref('')
+
+async function loadEventQuestions() {
+  eventQuestionForms.value = []
+  eventQuestionSlug.value = ''
+  const drahtEventId = team.value?.event?.id
+  const email = getUserProfile()?.email
+  if (!drahtEventId || !email || cancelled.value) return
+  try {
+    const data = await loadCoachEventForms(drahtEventId)
+    if (!data?.enabled || !Array.isArray(data.forms)) return
+    const ref = String(team.value?.ref ?? '')
+    const forms = data.forms.filter((form) => ref === '' || String(form?.team?.team_number_hot ?? '') === ref)
+    eventQuestionSlug.value = data.slug || ''
+    eventQuestionForms.value = forms.length ? forms : data.forms
+  } catch {
+    eventQuestionForms.value = []
+  }
+}
+
+function onEventQuestionSaved(index, next) {
+  eventQuestionForms.value = eventQuestionForms.value.map((form, i) => (i === index ? next : form))
 }
 
 const registeredEventLabel = computed(() => {
@@ -588,6 +617,7 @@ watch(
       <FutureEnrollmentContextBanner v-if="!cancelled" kind="team" :card="team" />
 
       <!-- 2) Status -->
+      <h3 class="detail-section-title">{{ t('detail.sectionStatus') }}</h3>
       <TeklaStatusBoard
         v-if="timelineSteps.length || timelineAlert"
         :steps="timelineSteps"
@@ -617,6 +647,16 @@ watch(
         <p v-else class="detail-lock-fallback">{{ t('detail.teamDataContactRpMissing') }}</p>
       </div>
 
+      <section class="detail-section detail-section-event">
+        <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
+        <p v-if="registeredEventLabel" class="detail-event-current">{{ registeredEventLabel }}</p>
+        <EventScheduleLink v-if="registeredEventLabel" :event="team.event" />
+        <p v-if="!registeredEventLabel" class="detail-hint">
+          <I18nText k="teamDetail.noEventRegistered" />
+        </p>
+      </section>
+
+      <h3 class="detail-section-title">{{ t('detail.sectionBilling') }}</h3>
       <div class="detail-overview">
       <!-- 3) Coach infos (all fields, placeholder when missing) -->
       <section id="team-co-coaches-anchor" class="detail-section">
@@ -671,16 +711,6 @@ watch(
         </dl>
       </section>
 
-      <!-- 3b) Event (right column): registered event only -->
-      <section class="detail-section detail-section-event">
-        <h3 class="detail-section-title"><I18nText k="teamDetail.event" /></h3>
-        <p v-if="registeredEventLabel" class="detail-event-current">{{ registeredEventLabel }}</p>
-        <EventScheduleLink v-if="registeredEventLabel" :event="team.event" />
-        <p v-if="!registeredEventLabel" class="detail-hint">
-          <I18nText k="teamDetail.noEventRegistered" />
-        </p>
-      </section>
-
       <!-- 4) Invoice + shipping address (always both, placeholder when missing) -->
       <section id="detail-addresses" class="detail-section detail-section-addresses">
         <h3 class="detail-section-title"><I18nText k="wizard.stepAddresses" /></h3>
@@ -706,9 +736,10 @@ watch(
         />
         <p v-else class="detail-address"><I18nText k="detail.noData" /></p>
       </section>
+      </div>
 
       <!-- Players -->
-      <section class="detail-section detail-section-wide">
+      <section id="teilnehmende" class="detail-section detail-section-wide">
         <h3 class="detail-section-title"><I18nText k="detail.players" /></h3>
         <div class="detail-players-block">
           <p v-if="teamDataDeadlineLabel && !teamDataLocked && !cancelled" class="detail-hint">
@@ -895,7 +926,19 @@ watch(
           </p>
         </div>
       </section>
-      </div>
+
+      <section v-if="eventQuestionForms.length" id="event-fragen" class="detail-section detail-section-wide">
+        <h3 class="detail-section-title">{{ t('detail.sectionEventQuestions') }}</h3>
+        <p class="detail-hint">{{ t('detail.eventQuestionsHint') }}</p>
+        <EventQuestionsFields
+          v-for="(form, index) in eventQuestionForms"
+          :key="form.team?.id || index"
+          :slug="eventQuestionSlug"
+          :email="getUserProfile()?.email || ''"
+          :form="form"
+          @saved="onEventQuestionSaved(index, $event)"
+        />
+      </section>
 
       <Teleport to="body">
         <div

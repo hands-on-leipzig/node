@@ -22,6 +22,12 @@ const routes = [
         component: () => import('@/views/PublicEventView.vue'),
         meta: { public: true, titleKey: 'venues.title' },
       },
+      {
+        path: 'eintragen/:slug',
+        name: 'event-entry',
+        component: () => import('@/views/EventEntryView.vue'),
+        meta: { public: true, titleKey: 'detail.eventEntryTitle' },
+      },
     ],
   },
   {

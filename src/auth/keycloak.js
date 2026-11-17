@@ -103,8 +103,7 @@ export function getCoachDolibarrContactId() {
   return null
 }
 
-export async function login() {
-  const redirectUri = `${window.location.origin}/dashboard`
+export async function login(redirectUri = `${window.location.origin}/dashboard`) {
   try {
     await initKeycloak({ onLoad: 'check-sso' })
     return keycloak.login({ redirectUri })
