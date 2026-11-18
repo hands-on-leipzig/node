@@ -14,37 +14,39 @@ const props = defineProps({
 const emit = defineEmits(['saved'])
 const { t } = useI18n()
 
-const meals = ref({})
 const custom = ref({})
 const saving = ref(false)
 const error = ref('')
 const saved = ref(false)
 
-const hasPhoto = computed(() => (props.form?.columns || []).some((column) => column.kind === 'photo'))
-const hasMeal = computed(() => (props.form?.columns || []).some((column) => column.kind === 'meal'))
 const customColumns = computed(() => (props.form?.columns || []).filter((column) => column.kind === 'custom'))
-const peopleCount = computed(() => props.form?.team?.people_count ?? null)
-const mealSum = computed(() => Object.values(meals.value).reduce((sum, value) => sum + (Number(value) || 0), 0))
-const mealMismatch = computed(() => hasMeal.value && peopleCount.value != null && mealSum.value !== Number(peopleCount.value))
+
+function fieldKind(field) {
+  return field.type || field.editor || 'text'
+}
+
+function customOpen(field) {
+  const value = custom.value[field.field_key]
+  const kind = fieldKind(field)
+  if (kind === 'boolean') return value !== true && value !== false
+  if (kind === 'number') return value === null || value === undefined || value === ''
+  return value == null || String(value).trim() === ''
+}
+
+const answersOpen = computed(() => customColumns.value.some((field) => customOpen(field)))
 
 watch(() => props.form, (form) => {
-  meals.value = { ...(form?.meals || {}) }
   custom.value = { ...(form?.custom || {}) }
   saved.value = false
   error.value = ''
 }, { immediate: true })
-
-function setMeal(key, raw) {
-  const n = Number(raw)
-  meals.value = { ...meals.value, [key]: Number.isFinite(n) && n >= 0 ? n : 0 }
-}
 
 function setCustom(key, value) {
   custom.value = { ...custom.value, [key]: value }
 }
 
 async function submit() {
-  if (saving.value || mealMismatch.value || !props.form?.team?.id) return
+  if (saving.value || !props.form?.team?.id) return
   saving.value = true
   error.value = ''
   saved.value = false
@@ -53,7 +55,7 @@ async function submit() {
       props.slug,
       props.email,
       props.form.team.id,
-      hasMeal.value ? meals.value : undefined,
+      undefined,
       custom.value,
       props.formToken,
     )
@@ -68,38 +70,25 @@ async function submit() {
 </script>
 
 <template>
-  <form class="event-questions" @submit.prevent="submit">
+  <form v-if="customColumns.length" class="event-questions" @submit.prevent="submit">
     <p v-if="form.team?.name" class="event-questions-team">
       {{ form.team.name }}
       <span v-if="form.team.team_number_hot != null">({{ form.team.team_number_hot }})</span>
     </p>
-    <p v-if="hasPhoto" class="event-questions-note">{{ t('detail.eventQuestionsPhoto') }}</p>
-    <div v-if="hasMeal" class="event-questions-meals">
-      <label v-for="option in form.meal_options || []" :key="option.value" class="event-questions-meal">
-        <span>{{ option.label }}</span>
-        <input
-          type="number"
-          min="0"
-          class="detail-player-input"
-          :value="meals[option.value] ?? 0"
-          @input="setMeal(option.value, $event.target.value)"
-        >
-      </label>
-      <p class="event-questions-note" :class="{ 'event-questions-error': mealMismatch }">
-        {{ t('detail.eventQuestionsMealSum', { sum: mealSum, people: peopleCount ?? '—' }) }}
-      </p>
-    </div>
+    <p class="event-questions-status" :class="{ 'event-questions-status--open': answersOpen }">
+      {{ answersOpen ? t('detail.eventQuestionsOpen') : t('detail.eventQuestionsFilled') }}
+    </p>
     <label v-for="field in customColumns" :key="field.field_key" class="event-questions-field">
       <span>{{ field.label }}</span>
       <input
-        v-if="field.type === 'text' || field.type === 'number'"
+        v-if="fieldKind(field) === 'text' || fieldKind(field) === 'number'"
         class="detail-player-input"
-        :type="field.type === 'number' ? 'number' : 'text'"
+        :type="fieldKind(field) === 'number' ? 'number' : 'text'"
         :value="custom[field.field_key] ?? ''"
-        @input="setCustom(field.field_key, $event.target.value || null)"
+        @input="setCustom(field.field_key, fieldKind(field) === 'number' ? ($event.target.value === '' ? null : Number($event.target.value)) : ($event.target.value || null))"
       >
       <select
-        v-else-if="field.type === 'select'"
+        v-else-if="fieldKind(field) === 'select'"
         class="detail-player-input"
         :value="custom[field.field_key] ?? ''"
         @change="setCustom(field.field_key, $event.target.value || null)"
@@ -116,7 +105,7 @@ async function submit() {
     <p v-if="error" class="event-questions-error">{{ error }}</p>
     <p v-else-if="saved" class="event-questions-note">{{ t('detail.eventQuestionsSaved') }}</p>
     <div class="event-questions-actions">
-      <button type="submit" class="detail-btn detail-btn-primary" :disabled="saving || mealMismatch">
+      <button type="submit" class="detail-btn detail-btn-primary" :disabled="saving">
         {{ saving ? t('detail.eventQuestionsSaving') : t('detail.eventQuestionsSave') }}
       </button>
       <RouterLink v-if="participantHref" class="detail-btn detail-btn-ghost" :to="participantHref">
@@ -135,6 +124,14 @@ async function submit() {
 .event-questions-team {
   margin: 0;
   font-weight: 650;
+}
+.event-questions-status {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+.event-questions-status--open {
+  color: var(--color-danger, #c0392b);
 }
 .event-questions-note,
 .event-questions-error {
