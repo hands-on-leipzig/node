@@ -38,8 +38,11 @@ const error = ref(null)
 // Local copy of players for add/edit; null = use team.players
 const editingPlayers = ref([])
 const editingPlayerIndex = ref(-1)
-const editingPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
-const newPlayer = ref({ firstname: '', name: '', gender: '', birthdayStr: '' })
+function blankPlayerForm() {
+  return { firstname: '', name: '', gender: '', birthdayStr: '', photo: '', meal: '' }
+}
+const editingPlayer = ref(blankPlayerForm())
+const newPlayer = ref(blankPlayerForm())
 const isAddingPlayer = ref(false)
 const savingPlayers = ref(false)
 const savingComplete = ref(false)
@@ -81,6 +84,14 @@ const playerAgeRule = computed(() => normalizePlayerAgeRule(team.value?.playerAg
 const teamDataLocked = computed(() => !!team.value?.teamDataLocked)
 const hasTeamDataConfirmation = computed(() => !!team.value && Object.prototype.hasOwnProperty.call(team.value, 'playersComplete'))
 const canEditPlayers = computed(() => !cancelled.value && !teamDataLocked.value)
+const answersLocked = computed(() => !!team.value?.answersLocked)
+const canEditAnswers = computed(() => !cancelled.value && !answersLocked.value)
+const canEditPersonRow = computed(() => canEditPlayers.value || canEditAnswers.value)
+const answersDeadlineLabel = computed(() => {
+  const date = team.value?.answersDeadline
+  if (!date) return ''
+  return formatAgeReferenceDate({ referenceDate: date }, locale.value)
+})
 const teamDataDeadlineLabel = computed(() => {
   const date = team.value?.teamDataDeadline
   if (!date) return ''
@@ -147,6 +158,21 @@ const genderOptions = computed(() => [
   { value: 'F', label: t('detail.genderF') },
   { value: 'D', label: t('detail.genderD') },
 ])
+const photoOptions = [
+  { value: '', label: 'Offen' },
+  { value: 'yes', label: 'Ja' },
+  { value: 'no', label: 'Nein' },
+]
+const mealOptions = [
+  { value: '', label: 'Offen' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'vegetarisch', label: 'Vegetarisch' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'keine', label: 'Keine' },
+]
+function optionLabel(options, value) {
+  return options.find((option) => option.value === value)?.label || 'Offen'
+}
 
 function statusLabel(obj) {
   if (!obj || typeof obj !== 'object') return ''
@@ -255,6 +281,8 @@ function startEditPlayer(idx) {
     name: p.name || '',
     gender: p.gender || '',
     birthdayStr: birthdayToDateStr(p.birthday),
+    photo: p.photo === 'yes' || p.photo === 'no' ? p.photo : '',
+    meal: ['standard', 'vegetarisch', 'vegan', 'keine'].includes(p.meal) ? p.meal : '',
   }
   editingPlayerOriginalBirthday.value = editingPlayer.value.birthdayStr
 }
@@ -268,16 +296,16 @@ function saveEditPlayer() {
     copy.push(...team.value.players.map((p) => ({ ...p })))
   }
   const birthday = e.birthdayStr || null
-  copy[idx] = { firstname: e.firstname, name: e.name, gender: e.gender, birthday }
+  copy[idx] = { firstname: e.firstname, name: e.name, gender: e.gender, birthday, photo: e.photo || '', meal: e.meal || '' }
   editingPlayers.value = copy
   editingPlayerIndex.value = -1
-  editingPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
+  editingPlayer.value = blankPlayerForm()
   persistPlayers()
 }
 
 function cancelEditPlayer() {
   editingPlayerIndex.value = -1
-  editingPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
+  editingPlayer.value = blankPlayerForm()
 }
 
 function removePlayer(idx) {
@@ -292,7 +320,7 @@ function removePlayer(idx) {
 function startAddPlayer() {
   if (teamAtMaxPlayers.value) return
   isAddingPlayer.value = true
-  newPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
+  newPlayer.value = blankPlayerForm()
 }
 
 function addPlayer() {
@@ -301,16 +329,16 @@ function addPlayer() {
   let copy = editingPlayers.value.length ? [...editingPlayers.value] : [...(team.value?.players || [])]
   if (teamMaxPlayers.value != null && copy.length >= teamMaxPlayers.value) return
   const birthday = e.birthdayStr || null
-  copy.push({ firstname: e.firstname, name: e.name, gender: e.gender, birthday })
+  copy.push({ firstname: e.firstname, name: e.name, gender: e.gender, birthday, photo: e.photo || '', meal: e.meal || '' })
   editingPlayers.value = copy
   isAddingPlayer.value = false
-  newPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
+  newPlayer.value = blankPlayerForm()
   persistPlayers()
 }
 
 function cancelAddPlayer() {
   isAddingPlayer.value = false
-  newPlayer.value = { firstname: '', name: '', gender: '', birthdayStr: '' }
+  newPlayer.value = blankPlayerForm()
 }
 
 async function saveTeamName(label) {
@@ -345,6 +373,8 @@ function buildPlayersPayload(list) {
     name: p.name || '',
     gender: p.gender || '',
     birthday: birthdayToDateStr(p.birthday) || null,
+    photo: p.photo || '',
+    meal: p.meal || '',
   }))
 }
 
@@ -745,6 +775,11 @@ watch(
           <p v-if="teamDataDeadlineLabel && !teamDataLocked && !cancelled" class="detail-hint">
             {{ t('detail.teamDataDeadline', { date: teamDataDeadlineLabel }) }}
           </p>
+          <p v-if="answersDeadlineLabel && !answersLocked && !cancelled" class="detail-hint">
+            {{ answersDeadlineLabel === teamDataDeadlineLabel
+              ? t('detail.answersDeadlineSame', { date: answersDeadlineLabel })
+              : t('detail.answersDeadline', { date: answersDeadlineLabel }) }}
+          </p>
           <label v-if="!cancelled && hasTeamDataConfirmation" class="detail-complete">
             <input
               type="checkbox"
@@ -766,6 +801,8 @@ watch(
                   <th scope="col"><I18nText k="detail.lastname" /></th>
                   <th scope="col"><I18nText k="detail.gender" /></th>
                   <th scope="col"><I18nText k="detail.dateOfBirth" /></th>
+                  <th scope="col"><I18nText k="detail.photoConsent" /></th>
+                  <th scope="col"><I18nText k="detail.meal" /></th>
                   <th scope="col" class="detail-players-actions-col">
                     <span class="detail-sr"><I18nText k="detail.edit" /></span>
                   </th>
@@ -811,6 +848,27 @@ watch(
                         :class="{ 'detail-player-input--invalid': editingPlayerAgeError }"
                         :aria-invalid="!!editingPlayerAgeError"
                         :aria-label="t('detail.dateOfBirth')"
+                        :disabled="!canEditPlayers"
+                      />
+                    </td>
+                    <td>
+                      <CustomSelect
+                        :id="'player-edit-photo-' + idx"
+                        v-model="editingPlayer.photo"
+                        size="sm"
+                        class="detail-player-select-wrap"
+                        :options="photoOptions"
+                        :disabled="!canEditAnswers"
+                      />
+                    </td>
+                    <td>
+                      <CustomSelect
+                        :id="'player-edit-meal-' + idx"
+                        v-model="editingPlayer.meal"
+                        size="sm"
+                        class="detail-player-select-wrap"
+                        :options="mealOptions"
+                        :disabled="!canEditAnswers"
                       />
                     </td>
                     <td class="detail-players-actions-cell">
@@ -829,22 +887,24 @@ watch(
                     <td>{{ p.name || '—' }}</td>
                     <td>{{ playerGenderLabel(p) || '—' }}</td>
                     <td>{{ playerBirthdayLabel(p) || '—' }}</td>
+                    <td>{{ optionLabel(photoOptions, p.photo) }}</td>
+                    <td>{{ optionLabel(mealOptions, p.meal) }}</td>
                     <td class="detail-players-actions-cell">
-                      <div v-if="canEditPlayers" class="detail-player-actions">
+                      <div v-if="canEditPersonRow" class="detail-player-actions">
                         <button type="button" class="detail-btn detail-btn-ghost" @click="startEditPlayer(idx)" :aria-label="t('detail.edit')"><i class="bi bi-pencil"></i></button>
                         <button type="button" class="detail-btn detail-btn-ghost" @click="removePlayer(idx)" :aria-label="t('detail.remove')"><i class="bi bi-trash"></i></button>
                       </div>
                     </td>
                   </tr>
                   <tr v-if="editingPlayerIndex === idx && editingPlayerAgeError" class="detail-players-note">
-                    <td colspan="5">
+                    <td colspan="7">
                       <p class="detail-message detail-message-error" role="alert">
                         <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ editingPlayerAgeError }}
                       </p>
                     </td>
                   </tr>
                   <tr v-else-if="editingPlayerIndex !== idx && (playerMissingText(p) || playerAgeWarning(p))" class="detail-players-note">
-                    <td colspan="5">
+                    <td colspan="7">
                       <p v-if="playerMissingText(p)" class="detail-player-missing">
                         <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                         {{ playerMissingText(p) }}
@@ -893,18 +953,38 @@ watch(
                       class="detail-player-input"
                       :class="{ 'detail-player-input--invalid': newPlayerAgeError }"
                       :aria-invalid="!!newPlayerAgeError"
-                      :aria-label="t('detail.dateOfBirth')"
-                    />
-                  </td>
-                  <td class="detail-players-actions-cell">
-                    <div class="detail-player-actions">
-                      <button type="button" class="detail-btn detail-btn-primary" :disabled="!!newPlayerAgeError" @click="addPlayer"><I18nText k="detail.add" /></button>
+                        :aria-label="t('detail.dateOfBirth')"
+                      />
+                    </td>
+                    <td>
+                      <CustomSelect
+                        id="player-new-photo"
+                        v-model="newPlayer.photo"
+                        size="sm"
+                        class="detail-player-select-wrap"
+                        :options="photoOptions"
+                        :disabled="!canEditAnswers"
+                      />
+                    </td>
+                    <td>
+                      <CustomSelect
+                        id="player-new-meal"
+                        v-model="newPlayer.meal"
+                        size="sm"
+                        class="detail-player-select-wrap"
+                        :options="mealOptions"
+                        :disabled="!canEditAnswers"
+                      />
+                    </td>
+                    <td class="detail-players-actions-cell">
+                      <div class="detail-player-actions">
+                        <button type="button" class="detail-btn detail-btn-primary" :disabled="!!newPlayerAgeError" @click="addPlayer"><I18nText k="detail.add" /></button>
                       <button type="button" class="detail-btn" @click="cancelAddPlayer"><I18nText k="common.cancel" /></button>
                     </div>
                   </td>
                 </tr>
                 <tr v-if="isAddingPlayer && newPlayerAgeError" class="detail-players-note">
-                  <td colspan="5">
+                  <td colspan="7">
                     <p class="detail-message detail-message-error" role="alert">
                       <i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ newPlayerAgeError }}
                     </p>
