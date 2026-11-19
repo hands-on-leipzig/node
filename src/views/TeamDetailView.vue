@@ -123,12 +123,6 @@ function apiErrorCode(error) {
   return error?.response?.data?.code || error?.response?.data?.error?.code || ''
 }
 
-const playerAgeHint = computed(() => {
-  const rule = playerAgeRule.value
-  if (!rule) return ''
-  return t('detail.playerAgeHint', { min: rule.minAge, max: rule.maxAge, date: formatAgeReferenceDate(rule, locale.value) })
-})
-
 function playerAgeError(birthday) {
   const rule = playerAgeRule.value
   const age = playerAgeOutOfRange(birthday, rule)
@@ -772,14 +766,22 @@ watch(
       <section id="teilnehmende" class="detail-section detail-section-wide">
         <h3 class="detail-section-title"><I18nText k="detail.players" /></h3>
         <div class="detail-players-block">
-          <p v-if="teamDataDeadlineLabel && !teamDataLocked && !cancelled" class="detail-hint">
-            {{ t('detail.teamDataDeadline', { date: teamDataDeadlineLabel }) }}
-          </p>
-          <p v-if="answersDeadlineLabel && !answersLocked && !cancelled" class="detail-hint">
-            {{ answersDeadlineLabel === teamDataDeadlineLabel
-              ? t('detail.answersDeadlineSame', { date: answersDeadlineLabel })
-              : t('detail.answersDeadline', { date: answersDeadlineLabel }) }}
-          </p>
+          <i18n-t
+            v-if="teamDataDeadlineLabel && !teamDataLocked && !cancelled"
+            keypath="detail.teamDataDeadline"
+            tag="p"
+            class="detail-hint"
+          >
+            <template #date><strong>{{ teamDataDeadlineLabel }}</strong></template>
+          </i18n-t>
+          <i18n-t
+            v-if="answersDeadlineLabel && !answersLocked && !cancelled"
+            keypath="detail.answersDeadline"
+            tag="p"
+            class="detail-hint"
+          >
+            <template #date><strong>{{ answersDeadlineLabel }}</strong></template>
+          </i18n-t>
           <label v-if="!cancelled && hasTeamDataConfirmation" class="detail-complete">
             <input
               type="checkbox"
@@ -789,10 +791,16 @@ watch(
             >
             {{ t('detail.teamDataComplete') }}
           </label>
-          <p v-if="!cancelled && hasTeamDataConfirmation" class="detail-hint">
-            {{ t('detail.teamDataCompleteHint') }}
-          </p>
-          <p v-if="playerAgeHint && !cancelled" class="detail-hint">{{ playerAgeHint }}</p>
+          <i18n-t
+            v-if="playerAgeRule && !cancelled"
+            keypath="detail.playerAgeHint"
+            tag="p"
+            class="detail-hint"
+          >
+            <template #date><strong>{{ formatAgeReferenceDate(playerAgeRule, locale) }}</strong></template>
+            <template #min>{{ playerAgeRule.minAge }}</template>
+            <template #max>{{ playerAgeRule.maxAge }}</template>
+          </i18n-t>
           <div v-if="displayedPlayers.length || isAddingPlayer" class="detail-players-wrap">
             <table class="detail-players-table">
               <thead>
