@@ -45,7 +45,6 @@ import {
   eventRegistrationClosed,
   eventSelectionClosed,
   formatEventOptionLabel,
-  futureTeamRegistrationClosed,
 } from '@/utils/events'
 import { foundersTeamMaxPlayers as maxPlayersForFoundersTeam } from '@/config/foundersEditionConfig'
 import logoFllExploreV from '@/assets/fll_explore_v.png'
@@ -401,9 +400,6 @@ const futureEventsForSelect = computed(() => {
   if (match) return [match]
   return [{ id: Number(locked), label: `Event ${locked}` }]
 })
-
-/** Future event teams are off after 31.10.2026. Group enrollment stays open. */
-const futureTeamSignupClosed = computed(() => futureTeamRegistrationClosed())
 
 const futureEventsAllClosed = computed(() => {
   const list = futureEventsForSelect.value
@@ -1483,7 +1479,6 @@ function canNext() {
   if (s === 6) {
     if (edition.value === 'future') {
       if (shouldSkipOnSiteEventWizardStep.value) return true
-      if (futureTeamSignupClosed.value) return true
       if (!futureOnSiteEvent.value) return false
       if (futureOnSiteEvent.value === 'yes') {
         const n = Number(futureEventTeamCount.value)
@@ -2234,7 +2229,7 @@ async function submit() {
         payload.seasonSetCount = sc
         payload.num_boards = sc
       }
-      if (!futureGroupHasEvents.value || futureTeamSignupClosed.value) {
+      if (!futureGroupHasEvents.value) {
         payload.registerEventTeams = false
         payload.eventTeamCount = 0
       } else if (futureOnSiteEvent.value === 'yes') {
@@ -3017,11 +3012,11 @@ watch(deliveryAddressDifferent, (different) => {
           <!-- Step 5 (Founders team): event selection — comes before team name for duplicate check -->
           <div v-show="step === 5 && foundersTeamHasParticipantsStep" class="wizard-step wizard-step-form wizard-step-animate">
             <p class="wizard-hint">
-              <I18nText :k="foundersVariant === 'challenge' ? 'wizard.founderTeamEventHintChallenge' : 'wizard.founderTeamEventHint'" />
+              <I18nText k="wizard.founderTeamEventHint" />
               <span class="field-required" :title="t('enroll.requiredField')">*</span>
             </p>
             <div class="wizard-event-select-wrap">
-              <EventDeadlineBanner :variant="foundersVariant === 'challenge' ? 'challenge' : 'default'" />
+              <EventDeadlineBanner />
               <EventSelectDropdown
                 :title="t('wizard.eventSelectSimple')"
                 :events="founderEventsNearest"
@@ -3047,11 +3042,7 @@ watch(deliveryAddressDifferent, (different) => {
 
           <!-- Step 6: On-site event (Future 8+ only — 5+ has no events) -->
           <div v-show="step === 6 && futureGroupHasEvents" class="wizard-step wizard-step-animate">
-            <div v-if="futureTeamSignupClosed" class="wizard-step-voucher-inner wizard-step-onsite-event">
-              <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
-              <EventDeadlineBanner variant="future" />
-            </div>
-            <div v-else class="wizard-step-voucher-inner wizard-step-onsite-event">
+            <div class="wizard-step-voucher-inner wizard-step-onsite-event">
               <p class="wizard-question"><I18nText k="wizard.onSiteEventQuestion" /></p>
               <p class="wizard-hint"><I18nText k="wizard.onSiteEventHint" /></p>
               <div class="wizard-options wizard-options-stack">

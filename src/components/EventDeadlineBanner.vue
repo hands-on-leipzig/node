@@ -3,32 +3,10 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import I18nText from '@/components/I18nText.vue'
 
-const props = defineProps({
-  /** default | challenge | future */
-  variant: { type: String, default: 'default' },
-})
-
 const { t } = useI18n()
 
-const leadKey = computed(() => {
-  if (props.variant === 'challenge') return 'wizard.eventDeadlineBannerChallengeLead'
-  if (props.variant === 'future') return 'wizard.eventDeadlineBannerFutureLead'
-  return 'wizard.eventDeadlineBannerLead'
-})
-
-const tailKey = computed(() => {
-  if (props.variant === 'challenge') return 'wizard.eventDeadlineBannerChallengeTail'
-  if (props.variant === 'future') return 'wizard.eventDeadlineBannerFutureTail'
-  return 'wizard.eventDeadlineBannerTail'
-})
-
 const mailtoHref = computed(() => {
-  const subjectKey = props.variant === 'challenge'
-    ? 'wizard.eventDeadlineMailSubjectChallenge'
-    : props.variant === 'future'
-      ? 'wizard.eventDeadlineMailSubjectFuture'
-      : 'wizard.eventDeadlineMailSubject'
-  const subject = encodeURIComponent(t(subjectKey))
+  const subject = encodeURIComponent(t('wizard.eventDeadlineMailSubject'))
   return `mailto:info@hands-on-technology.org?subject=${subject}`
 })
 </script>
@@ -37,8 +15,8 @@ const mailtoHref = computed(() => {
   <div class="event-deadline-banner" role="note">
     <i class="bi bi-envelope" aria-hidden="true" />
     <p class="event-deadline-banner-text">
-      <I18nText :k="leadKey" />
-      <a class="event-deadline-banner-link" :href="mailtoHref">info@hands-on-technology.org</a><I18nText :k="tailKey" />
+      <I18nText k="wizard.eventDeadlineBannerLead" />
+      <a class="event-deadline-banner-link" :href="mailtoHref">info@hands-on-technology.org</a><I18nText k="wizard.eventDeadlineBannerTail" />
     </p>
   </div>
 </template>

@@ -137,27 +137,6 @@ export function formatEventOptionLabel(ev, t) {
   return String(name)
 }
 
-/** Last day Future event teams and Challenge regionals are self-service. */
-export const TEAM_EVENT_SELF_SERVICE_DEADLINE = '2026-10-31'
-
-/**
- * "Zu Hause" / "Zuhause" — still open for Challenge after the regional deadline.
- * @param {Record<string, unknown>|null|undefined} ev
- */
-export function isHomeEvent(ev) {
-  const label = String(ev?.label ?? ev?.name ?? ev?.title ?? '')
-  return /zu\s*hause/i.test(label)
-}
-
-/**
- * Future Edition team registration is off after {@link TEAM_EVENT_SELF_SERVICE_DEADLINE}.
- * Group enrollment (5+/8+) stays open.
- * @param {Date} [now]
- */
-export function futureTeamRegistrationClosed(now = new Date()) {
-  return eventRegistrationClosed({ registerEnd: TEAM_EVENT_SELF_SERVICE_DEADLINE }, now)
-}
-
 const EVENT_COUNTRY_ORDER = ['de', 'at', 'ch']
 
 /**
@@ -175,16 +154,13 @@ export function normalizeEventCountry(country) {
 
 /**
  * Nearest block (distance order, capped) plus the remainder grouped by country, A–Z.
- * When `pinHome` is set, "Zu Hause" rows are taken out of that pool.
  * @param {Array<Record<string, unknown>>} list
- * @param {{ nearestLimit?: number, locale?: string, pinHome?: boolean }} options
+ * @param {{ nearestLimit?: number, locale?: string }} options
  */
-function organizeEventPool(list, { nearestLimit = 5, locale = 'de', pinHome = false } = {}) {
-  const home = pinHome ? list.filter((ev) => isHomeEvent(ev)) : []
-  const pool = pinHome ? list.filter((ev) => !isHomeEvent(ev)) : list
-  const nearest = nearestLimit > 0 ? pool.slice(0, nearestLimit) : []
+function organizeEventPool(list, { nearestLimit = 5, locale = 'de' } = {}) {
+  const nearest = nearestLimit > 0 ? list.slice(0, nearestLimit) : []
   const nearestIds = new Set(nearest.map((e) => String(e.id)))
-  const rest = nearestLimit > 0 ? pool.filter((e) => !nearestIds.has(String(e.id))) : pool
+  const rest = nearestLimit > 0 ? list.filter((e) => !nearestIds.has(String(e.id))) : list
 
   const byCountry = new Map()
   for (const ev of rest) {
@@ -217,11 +193,10 @@ function organizeEventPool(list, { nearestLimit = 5, locale = 'de', pinHome = fa
     }))
     .filter((g) => g.events.length > 0)
 
-  return { home, nearest, countryGroups }
+  return { nearest, countryGroups }
 }
 
 /**
- * When any other event is past its Anmeldefrist, open "Zu Hause" options are pinned first.
  * Events whose Anmeldefrist is still open stay above events whose deadline has passed.
  * Each of those two blocks keeps the usual order: nearest (distance, capped), then country A–Z.
  * A full event with an open deadline stays in the open block and is only marked full.
@@ -236,11 +211,9 @@ export function organizeEventsForSelect(events, { nearestLimit = 5, locale = 'de
     if (eventRegistrationClosed(ev)) later.push(ev)
     else open.push(ev)
   }
-  const pinHome = list.some((ev) => !isHomeEvent(ev) && eventRegistrationClosed(ev))
-  const openParts = organizeEventPool(open, { nearestLimit, locale, pinHome })
-  const laterParts = organizeEventPool(later, { nearestLimit, locale, pinHome: false })
+  const openParts = organizeEventPool(open, { nearestLimit, locale })
+  const laterParts = organizeEventPool(later, { nearestLimit, locale })
   return {
-    home: openParts.home,
     nearest: openParts.nearest,
     countryGroups: openParts.countryGroups,
     laterNearest: laterParts.nearest,
@@ -250,14 +223,12 @@ export function organizeEventsForSelect(events, { nearestLimit = 5, locale = 'de
 
 /** Flat list for keyboard navigation (open block, then events past their Anmeldefrist). */
 export function flatEventSelectOptions({
-  home = [],
   nearest = [],
   countryGroups = [],
   laterNearest = [],
   laterCountryGroups = [],
 }) {
   return [
-    ...home,
     ...nearest,
     ...countryGroups.flatMap((g) => g.events),
     ...laterNearest,
