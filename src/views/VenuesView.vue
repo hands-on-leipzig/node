@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -207,13 +207,15 @@ function doLogin() {
 }
 
 const pageEl = ref(null)
-const heroEl = ref(null)
-const barAnchorEl = ref(null)
 const barEl = ref(null)
 const barHeight = ref(0)
-const viewHeight = ref(0)
+/** Height left for the page below the shell's own content above it (install button, banner). */
+const pageViewHeight = ref(0)
 let scrollEl = null
 let sizeObserver = null
+
+/** An open event replaces hero and tab content; only the event page itself scrolls. */
+const eventMode = computed(() => frameSrc.value !== null)
 
 function findScrollParent(el) {
   let node = el?.parentElement
@@ -225,57 +227,25 @@ function findScrollParent(el) {
   return document.scrollingElement || document.documentElement
 }
 
-/** Scroll position that parks the bar at the top; null while no event page is shown. */
-let pinnedTop = null
-
-function barTop() {
-  return barAnchorEl.value.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
-}
-
-/**
- * Late fonts, a resized window or a phone's address bar move the bar or briefly clamp the
- * scroll position; stay parked until the visitor scrolls by hand.
- */
 function measure() {
   barHeight.value = barEl.value?.offsetHeight || 0
-  viewHeight.value = scrollEl?.clientHeight || 0
-  if (pinnedTop === null) return
-  nextTick(() => {
-    if (pinnedTop === null || !scrollEl || !barAnchorEl.value) return
-    pinnedTop = barTop()
-    scrollEl.scrollTop = pinnedTop
-  })
+  if (!scrollEl || !pageEl.value) return
+  const pageTop = pageEl.value.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
+  pageViewHeight.value = Math.max(0, scrollEl.clientHeight - pageTop)
 }
 
-function unpin() {
-  pinnedTop = null
-}
-
-const UNPIN_EVENTS = ['wheel', 'touchmove', 'keydown']
-
-/**
- * The event page fills the view below the bar, so it can only be seen whole with the hero
- * scrolled away — and wheel turns over the iframe never scroll the page itself.
- */
-function scrollHeroAway() {
-  if (!scrollEl || !barAnchorEl.value) return
-  const top = barTop()
-  pinnedTop = top
-  if (scrollEl.scrollTop >= top - 1) return
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  scrollEl.scrollTo({ top, behavior: reduced ? 'auto' : 'smooth' })
-}
-
-const frameStyle = computed(() => {
-  const free = viewHeight.value - barHeight.value - 12
-  return free > 0 ? { height: `max(24rem, ${free}px)` } : null
-})
+const pageStyle = computed(() => ({
+  '--venues-sticky-top': `${barHeight.value}px`,
+  '--venues-bar-height': `${barHeight.value}px`,
+  height: eventMode.value && pageViewHeight.value ? `${pageViewHeight.value}px` : null,
+}))
 
 watch(
-  () => frameSrc.value !== null,
-  (shown) => {
-    if (shown) nextTick(scrollHeroAway)
-    else pinnedTop = null
+  eventMode,
+  (on) => {
+    if (!on || !scrollEl) return
+    scrollEl.scrollTop = 0
+    measure()
   },
   { flush: 'post' },
 )
@@ -287,15 +257,13 @@ onMounted(() => {
     window.addEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
   }
   scrollEl = findScrollParent(pageEl.value)
-  UNPIN_EVENTS.forEach((type) => scrollEl.addEventListener(type, unpin, { passive: true }))
+  if (eventMode.value) scrollEl.scrollTop = 0
   measure()
   if (typeof ResizeObserver !== 'undefined') {
     sizeObserver = new ResizeObserver(measure)
     if (barEl.value) sizeObserver.observe(barEl.value)
-    if (heroEl.value) sizeObserver.observe(heroEl.value)
     if (scrollEl) sizeObserver.observe(scrollEl)
   }
-  if (frameSrc.value !== null) nextTick(scrollHeroAway)
 })
 
 onBeforeUnmount(() => {
@@ -303,7 +271,6 @@ onBeforeUnmount(() => {
     window.removeEventListener(BROWSER_BACK_EVENT, handleBrowserBackRequest)
   }
   sizeObserver?.disconnect()
-  UNPIN_EVENTS.forEach((type) => scrollEl?.removeEventListener(type, unpin))
 })
 </script>
 
@@ -311,10 +278,11 @@ onBeforeUnmount(() => {
   <div
     ref="pageEl"
     class="venues-page venues-page--shell liquid-surface-scope"
-    :style="{ '--venues-sticky-top': `${barHeight}px` }"
+    :class="{ 'is-event': eventMode }"
+    :style="pageStyle"
   >
     <main class="venues-main">
-      <section ref="heroEl" class="venues-hero venues-column liquid-surface liquid-surface--accent">
+      <section v-if="!eventMode" class="venues-hero venues-column liquid-surface liquid-surface--accent">
         <div v-if="showForbidden" class="venues-forbidden liquid-surface liquid-surface--radius-lg liquid-surface--accent">
           <p><i class="bi bi-shield-exclamation"></i> <I18nText k="auth.forbiddenMessage" /></p>
           <button type="button" class="btn btn-secondary btn-sm" @click="logout">
@@ -342,7 +310,6 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <div ref="barAnchorEl" aria-hidden="true"></div>
       <div ref="barEl" class="venues-bar">
         <SegmentSwitch
           v-model="tab"
@@ -365,11 +332,7 @@ onBeforeUnmount(() => {
         </SegmentSwitch>
       </div>
 
-      <div
-        v-if="frameSrc !== null"
-        class="venues-frame liquid-surface liquid-surface--radius-lg"
-        :style="frameStyle"
-      >
+      <div v-if="eventMode" class="venues-frame">
         <PublicEventFrame
           :bar="false"
           :src="frameSrc"
@@ -650,10 +613,31 @@ onBeforeUnmount(() => {
   color: var(--color-accent);
   outline: none;
 }
-.venues-frame {
+.venues-page.is-event {
   display: flex;
-  margin-inline: -0.75rem;
-  height: max(24rem, calc(100dvh - 10rem));
+  flex-direction: column;
+  min-height: 20rem;
+  overflow: hidden;
+}
+.is-event .venues-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.25rem 0 0;
+}
+/* Half over the event page's top edge, floating above it. */
+.is-event .venues-bar {
+  position: relative;
+  margin-bottom: calc(var(--venues-bar-height) / -2);
+}
+.venues-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-radius: var(--radius-xl);
   overflow: hidden;
 }
 .venues-count {
