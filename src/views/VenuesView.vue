@@ -2,23 +2,33 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { VenuesCatalog, publicEventPathFromUrl } from '@hands-on/glass/venues'
+import {
+  VenuesCatalog,
+  VenueDetailModal,
+  VenueEventRow,
+  PublicEventFrame,
+  publicEventPathFromUrl,
+  sortVenues,
+  venueDisplayName,
+} from '@hands-on/glass/venues'
 import {
   isAuthenticated,
   login,
   logout,
   hasCoachRole,
+  getToken,
 } from '@/auth/keycloak'
 import { fetchPublicVenues } from '@/services/publicVenues'
 import { fetchPublicEventLinks } from '@/services/publicEventLinks'
 import { publicPlanUrl } from '@/utils/publicPlan'
 import EventScheduleLink from '@/components/EventScheduleLink.vue'
+import SegmentSwitch from '@/components/SegmentSwitch.vue'
 import logoFll from '@/assets/FIRSTLego_IconVert_RGB.png'
 import { BROWSER_BACK_EVENT, popOverlayHistory, pushOverlayHistory } from '@/utils/spaBrowserBack'
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const showForbidden = computed(() => !!route.query.forbidden && authenticated.value)
 
@@ -29,7 +39,58 @@ const venuesMeta = ref({})
 const selectedVenue = ref(null)
 /** DRAHT event id → schedule URL, fetched from FLOW. */
 const planLinks = ref(new Map())
+const planLinksDone = ref(false)
 let planLinksRequest = null
+
+const TABS = ['regio', 'quali', 'final']
+
+/** In the query so "back" from an event page lands on the same tab. */
+const tab = computed({
+  get: () => (TABS.includes(route.query.ansicht) ? route.query.ansicht : 'regio'),
+  set: (value) => {
+    const query = { ...route.query }
+    delete query.finale
+    if (value === 'regio') delete query.ansicht
+    else query.ansicht = value
+    router.replace({ query })
+  },
+})
+
+const tabOptions = computed(() => [
+  { id: 'regio', label: t('venues.tabRegio') },
+  { id: 'quali', label: t('venues.tabQuali') },
+  { id: 'final', label: t('venues.tabFinal') },
+])
+
+function venuesOfType(type) {
+  return venues.value.filter((venue) => (venue.type || 'regio') === type)
+}
+
+const regioVenues = computed(() => venuesOfType('regio'))
+const qualiVenues = computed(() => sortVenues(venuesOfType('quali'), locale.value, 'date'))
+const finalVenues = computed(() => sortVenues(venuesOfType('final'), locale.value, 'date'))
+
+/** One finale per season is the rule; with more, the visitor picks one first. */
+const activeFinal = computed(() => {
+  const finals = finalVenues.value
+  if (finals.length === 1) return finals[0]
+  const id = Number(route.query.finale)
+  return finals.find((venue) => Number(venue.id) === id) || null
+})
+
+function pickFinal(venue) {
+  router.push({ query: { ...route.query, ansicht: 'final', finale: String(venue.id) } })
+}
+
+function leaveFinal() {
+  if (finalVenues.value.length > 1) {
+    const query = { ...route.query }
+    delete query.finale
+    router.push({ query })
+    return
+  }
+  tab.value = 'regio'
+}
 
 const authenticated = computed(() => isAuthenticated())
 const coachAccess = computed(() => authenticated.value && hasCoachRole())
@@ -77,6 +138,9 @@ function loadPlanLinks() {
     .catch(() => {
       planLinksRequest = null
     })
+    .finally(() => {
+      planLinksDone.value = true
+    })
 
   return planLinksRequest
 }
@@ -113,7 +177,7 @@ async function loadVenues() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetchPublicVenues()
+    const res = await fetchPublicVenues({ types: ['regio', 'quali', 'final'] })
     venues.value = res.data
     venuesMeta.value = res.meta || {}
   } catch (e) {
@@ -187,26 +251,90 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-else>
+        <SegmentSwitch
+          v-model="tab"
+          class="venues-switch"
+          :options="tabOptions"
+          :aria-label="t('venues.tabsLabel')"
+        />
+
         <p v-if="venuesMeta.noActiveSeason" class="venues-hint venues-hint-warn">
           <i class="bi bi-calendar-x"></i>
           <I18nText k="venues.noActiveSeason" />
         </p>
-        <p v-else-if="venues.length === 0" class="venues-hint">
-          <i class="bi bi-info-circle"></i>
-          <I18nText k="venues.emptyListHint" />
-        </p>
-        <VenuesCatalog
-          :venues="venues"
-          :selected-venue="selectedVenueWithPlan"
-          state-key="node.venues.catalog"
-          :event-href="venueEventHref"
-          @select="openVenueDetail"
+
+        <template v-else-if="tab === 'regio'">
+          <p v-if="regioVenues.length === 0" class="venues-hint">
+            <i class="bi bi-info-circle"></i>
+            <I18nText k="venues.emptyListHint" />
+          </p>
+          <VenuesCatalog
+            :venues="regioVenues"
+            :selected-venue="selectedVenueWithPlan"
+            state-key="node.venues.catalog"
+            :event-href="venueEventHref"
+            @select="openVenueDetail"
+            @close="() => closeVenueDetail()"
+          >
+            <template #detail-links="{ venue }">
+              <EventScheduleLink :event="venue" />
+            </template>
+          </VenuesCatalog>
+        </template>
+
+        <template v-else-if="tab === 'quali'">
+          <p v-if="qualiVenues.length === 0" class="venues-hint">
+            <i class="bi bi-info-circle"></i>
+            <I18nText k="venues.noQuali" />
+          </p>
+          <template v-else>
+            <p class="venues-count">{{ t('venues.resultsCount', { count: qualiVenues.length }) }}</p>
+            <ul class="venues-rows liquid-surface liquid-surface--radius-lg">
+              <li v-for="venue in qualiVenues" :key="venue.id">
+                <VenueEventRow :venue="venue" :href="venueEventHref(venue)" @select="openVenueDetail" />
+              </li>
+            </ul>
+          </template>
+        </template>
+
+        <template v-else>
+          <p v-if="finalVenues.length === 0" class="venues-hint">
+            <i class="bi bi-info-circle"></i>
+            <I18nText k="venues.noFinal" />
+          </p>
+          <div v-else-if="activeFinal && !planLinksDone" class="venues-status liquid-surface">
+            <i class="bi bi-arrow-repeat spin"></i>
+            <I18nText k="venues.loading" />
+          </div>
+          <div v-else-if="activeFinal" class="venues-final liquid-surface liquid-surface--radius-lg">
+            <PublicEventFrame
+              :src="venuePublicUrl(activeFinal)"
+              :title="venueDisplayName(activeFinal, locale)"
+              :sso-token="getToken"
+              :sso-ready="authenticated"
+              @back="leaveFinal"
+            />
+          </div>
+          <template v-else>
+            <p class="venues-count">{{ t('venues.finalPick') }}</p>
+            <ul class="venues-rows liquid-surface liquid-surface--radius-lg">
+              <li v-for="venue in finalVenues" :key="venue.id">
+                <VenueEventRow :venue="venue" :href="venueEventHref(venue)" @select="pickFinal" />
+              </li>
+            </ul>
+          </template>
+        </template>
+
+        <VenueDetailModal
+          v-if="tab !== 'regio'"
+          :show="!!selectedVenue"
+          :venue="selectedVenueWithPlan"
           @close="() => closeVenueDetail()"
         >
-          <template #detail-links="{ venue }">
+          <template #links="{ venue }">
             <EventScheduleLink :event="venue" />
           </template>
-        </VenuesCatalog>
+        </VenueDetailModal>
       </template>
     </main>
   </div>
@@ -355,6 +483,30 @@ onBeforeUnmount(() => {
 .venues-hint-warn {
   border-color: rgba(255, 122, 0, 0.35);
   color: var(--color-text);
+}
+.venues-switch {
+  max-width: 40rem;
+  margin: 0 auto 1.5rem;
+}
+.venues-count {
+  margin: 0 0 0.6rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.venues-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: clip;
+}
+.venues-rows > li + li {
+  border-top: 1px solid var(--color-border);
+}
+.venues-final {
+  display: flex;
+  height: max(32rem, calc(100dvh - 14rem));
+  overflow: hidden;
 }
 .spin {
   animation: venues-spin 0.8s linear infinite;

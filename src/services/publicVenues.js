@@ -27,10 +27,14 @@ const client = axios.create({
 })
 
 /**
+ * @param {{ debug?: boolean, types?: Array<'regio'|'quali'|'final'> }} [options] Without
+ *   `types` DRAHT sends regional events only.
  * @returns {Promise<{ data: object[], meta?: { count?: number, generatedAt?: string } }>}
  */
 export async function fetchPublicVenues(options = {}) {
-  const params = options.debug ? { debug: '1' } : undefined
+  const params = {}
+  if (options.debug) params.debug = '1'
+  if (options.types?.length) params.types = options.types.join(',')
   const res = await client.get(venuesApiUrl(), { params })
   const body = res.data ?? {}
   const list = Array.isArray(body.data) ? body.data : []
