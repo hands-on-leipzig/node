@@ -913,11 +913,10 @@ const { canInstall, promptInstall } = usePwaInstall()
 
     <div
       class="glass-app__panel"
-      :class="{ 'glass-app__panel--embed': route.name === 'venues-event' }"
       :key="'content-' + showTranslationKeys + '-' + translationEditMode"
     >
       <div class="glass-app__panel-body">
-        <div v-if="route.name !== 'venues-event'" class="content-actions content-actions--desktop">
+        <div class="content-actions content-actions--desktop">
           <button
             v-if="canInstall"
             type="button"

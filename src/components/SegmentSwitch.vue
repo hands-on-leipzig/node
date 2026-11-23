@@ -41,21 +41,30 @@ function placeLens() {
   }, 280)
 }
 
+/** Buttons too: content in the start slot narrows them without resizing the switch. */
+function observeSizes() {
+  lensResize?.disconnect()
+  const el = switchEl.value
+  if (!el || typeof ResizeObserver === 'undefined') return
+  lensResize ??= new ResizeObserver(() => placeLens())
+  lensResize.observe(el)
+  el.querySelectorAll('.segment-switch__btn').forEach((btn) => lensResize.observe(btn))
+}
+
 watch(switchEl, (el) => {
   lensResize?.disconnect()
-  lensResize = null
   lensPlaced = false
   if (!el) return
   nextTick(() => {
     placeLens()
-    if (typeof ResizeObserver !== 'undefined') {
-      lensResize = new ResizeObserver(() => placeLens())
-      lensResize.observe(el)
-    }
+    observeSizes()
   })
 })
 
-watch(() => [props.modelValue, props.options], () => nextTick(() => placeLens()), { deep: true })
+watch(() => [props.modelValue, props.options], () => nextTick(() => {
+  placeLens()
+  observeSizes()
+}), { deep: true })
 
 onBeforeUnmount(() => {
   lensResize?.disconnect()
@@ -78,6 +87,7 @@ onBeforeUnmount(() => {
     >
       <span class="segment-switch__lens-glass" />
     </span>
+    <slot name="start" />
     <button
       v-for="option in options"
       :key="option.id"

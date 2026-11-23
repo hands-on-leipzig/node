@@ -19,7 +19,7 @@ const routes = [
       {
         path: 'e/:publicPath(.*)',
         name: 'venues-event',
-        component: () => import('@/views/PublicEventView.vue'),
+        component: () => import('@/views/VenuesView.vue'),
         meta: { public: true, titleKey: 'venues.title' },
       },
       {
