@@ -620,6 +620,7 @@ const { canInstall, promptInstall } = usePwaInstall()
               v-if="hasFoundersEnrollments"
               type="button"
               class="sidebar-section-toggle"
+                :title="t('nav.sidebarSectionFounders')"
                 :aria-expanded="foundersSectionOpen"
                 :aria-controls="'sidebar-section-founders'"
                 @click="toggleFoundersSection"
@@ -671,7 +672,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                   </span>
                 </button>
             </div>
-            <p v-if="sidebarGroupsError" class="sidebar-section-hint sidebar-section-hint--error">
+            <p v-if="sidebarGroupsError" class="sidebar-section-hint sidebar-section-hint--error" :title="sidebarGroupsError">
               <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
               {{ sidebarGroupsError }}
             </p>
@@ -680,6 +681,7 @@ const { canInstall, promptInstall } = usePwaInstall()
                 type="button"
                 class="sidebar-section-toggle"
                 :class="{ 'sidebar-section-toggle--after-founders': hasFoundersEnrollments }"
+                :title="t('nav.sidebarSectionFuture')"
                 :aria-expanded="futureSectionOpen"
                 :aria-controls="'sidebar-section-future'"
                 @click="toggleFutureSection"
@@ -1140,6 +1142,67 @@ const { canInstall, promptInstall } = usePwaInstall()
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* Icon rail: glass only hides its own labels; JOIN's sections, tiles and brand shrink here. */
+@media (min-width: 769px) {
+  .glass-sidebar--collapsed .join-brand-line {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .glass-sidebar--collapsed .join-brand .glass-sidebar__brand-logo {
+    width: 2.5rem;
+    max-width: 2.5rem;
+    max-height: 1.7rem;
+    object-fit: cover;
+    object-position: left center;
+  }
+  .glass-sidebar--collapsed .sidebar-section-toggle {
+    justify-content: center;
+    width: calc(100% - 0.5rem);
+    margin: 0.55rem 0.25rem 0.1rem;
+    padding: 0.35rem 0;
+  }
+  .glass-sidebar--collapsed .sidebar-section-toggle--after-founders {
+    margin-top: 0.75rem;
+  }
+  .glass-sidebar--collapsed .sidebar-section-toggle-label {
+    display: none;
+  }
+  .glass-sidebar--collapsed .sidebar-section-entries {
+    padding: 0.15rem 0.25rem 0.35rem;
+  }
+  .glass-sidebar--collapsed .sidebar-future-group-teams {
+    margin: 0.1rem 0 0;
+    padding: 0.15rem 0 0.2rem 0.2rem;
+    border-left-width: 2px;
+  }
+  .glass-sidebar--collapsed .sidebar-tekla-tile {
+    justify-content: center;
+    padding: 0.5rem 0.15rem;
+  }
+  .glass-sidebar--collapsed .sidebar-tekla-tile-text {
+    align-items: center;
+  }
+  /* The number names the entry; the full name stays in the tooltip. */
+  .glass-sidebar--collapsed .sidebar-tekla-tile-text:has(.sidebar-tekla-tile-ref) .sidebar-tekla-tile-title {
+    display: none;
+  }
+  .glass-sidebar--collapsed .sidebar-tekla-tile-ref {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+  .glass-sidebar--collapsed .sidebar-section-hint {
+    margin: 0.35rem 0.25rem;
+    padding: 0.4rem 0;
+    font-size: 0;
+    text-align: center;
+  }
+  .glass-sidebar--collapsed .sidebar-section-hint .bi {
+    margin: 0;
+    font-size: 0.9rem;
+  }
 }
 @keyframes spin {
   to { transform: rotate(360deg); }

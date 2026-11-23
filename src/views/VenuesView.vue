@@ -617,8 +617,11 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 4;
-  padding: 0.35rem 0 0.75rem;
-  background: var(--liquid-tile-bg-strong, var(--liquid-tile-bg));
+  margin-bottom: 0.75rem;
+}
+/* The capsule floats without a backdrop; the catalog's opaque search bar keeps the gap below it. */
+.venues-page :deep(.venues-search-bar) {
+  padding-top: 0.75rem;
 }
 .venues-switch {
   max-width: 44rem;
